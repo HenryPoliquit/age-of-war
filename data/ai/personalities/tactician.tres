@@ -6,3 +6,4 @@
 script = ExtResource("1_jhumi")
 id = &"tactician"
 display_name = "Tactician"
+role_mix = {"heavy": 0.3, "ranged": 0.3, "siege": 0.05, "vanguard": 0.35}

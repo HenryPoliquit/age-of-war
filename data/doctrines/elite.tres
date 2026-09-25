@@ -6,7 +6,7 @@
 script = ExtResource("1_il0p1")
 id = &"elite"
 display_name = "Elite"
-description = "Units +25% HP and damage, +30% cost."
-unit_cost_mult = 1.3
+description = "Units +25% HP, +20% damage, +20% cost."
+unit_cost_mult = 1.2
 unit_hp_mult = 1.25
-unit_damage_mult = 1.25
+unit_damage_mult = 1.2

@@ -451,7 +451,8 @@ func _units_act(s: SimSide, enemy_front: SimUnit, dt: float) -> void:
 			target_unit = enemy_front
 		elif dist_struct <= def.range:
 			target_struct = true
-		if target_unit != null or target_struct:
+		var attacking := target_unit != null or target_struct
+		if attacking:
 			u.state = &"attack"
 			if u.cooldown <= 0.0:
 				u.cooldown = def.attack_interval
@@ -460,18 +461,22 @@ func _units_act(s: SimSide, enemy_front: SimUnit, dt: float) -> void:
 					_hit_unit(u, target_unit, u.base_damage * u.damage_mult(rules.veterancy_bonus), def.damage_type)
 				else:
 					_hit_structures(u, enemy)
-		else:
+		# Melee presses in to contact distance while fighting so the allies behind it come into reach;
+		# ranged units hold at their range.
+		var melee := def.range <= rules.melee_range_max and not def.is_ranged_siege()
+		if not attacking or melee:
 			# Movement is code-driven; blocked by the ally ahead, the nearest enemy and a Hold rally line.
-			var limit := lane
+			var limit := lane - rules.melee_contact
 			if ahead != null:
 				limit = minf(limit, ahead.progress - rules.unit_spacing)
 			if enemy_front != null and enemy_front.alive():
-				limit = minf(limit, lane - enemy_front.progress - 10.0)
-			if s.stance == &"hold":
+				limit = minf(limit, lane - enemy_front.progress - rules.melee_contact)
+			if s.stance == &"hold" and not attacking:
 				limit = minf(limit, s.rally_progress)
 			var target_p := u.progress + def.speed * (1.0 - u.slow) * dt
 			var new_p := maxf(u.progress, minf(target_p, limit))
-			u.state = &"walk" if new_p > u.progress + 1e-4 else &"idle"
+			if not attacking:
+				u.state = &"walk" if new_p > u.progress + 1e-4 else &"idle"
 			u.progress = new_p
 		ahead = u
 

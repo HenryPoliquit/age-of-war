@@ -319,8 +319,9 @@ func _apply_counters(sim: MatchSim, weights: Dictionary) -> void:
 		var defence := 0.0
 		for dt in dtype_share:
 			defence += dtype_share[dt] * rules.matrix(dt, d.armour)
-		var edge := offence / maxf(0.3, defence)
-		weights[role] *= clampf(edge, 0.5, 2.0)
+		# Cubed so a 15–30% matrix edge actually changes the build.
+		var edge := pow(offence / maxf(0.3, defence), 3.0)
+		weights[role] *= clampf(edge, 0.25, 3.0)
 
 
 # ---------------------------------------------------------------------------

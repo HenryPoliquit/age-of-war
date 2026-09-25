@@ -7,6 +7,9 @@ extends Resource
 @export var match_time_limit: float = 1800.0
 @export var lane_length: float = 2400.0
 @export var unit_spacing: float = 12.0
+## Units with range at or below this are melee: they press in to `melee_contact` while fighting.
+@export var melee_range_max: float = 45.0
+@export var melee_contact: float = 8.0
 
 @export_group("Start")
 @export var start_gold: float = 150.0
