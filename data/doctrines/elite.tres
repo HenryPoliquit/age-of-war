@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="DoctrineDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/doctrine_def.gd" id="1_il0p1"]
+
+[resource]
+script = ExtResource("1_il0p1")
+id = &"elite"
+display_name = "Elite"
+description = "Units +25% HP and damage, +30% cost."
+unit_cost_mult = 1.3
+unit_hp_mult = 1.25
+unit_damage_mult = 1.25

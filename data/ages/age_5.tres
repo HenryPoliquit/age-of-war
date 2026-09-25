@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="AgeDef" format=3]
+
+[ext_resource type="Resource" path="res://data/abilities/air_raid.tres" id="1_jtqw8"]
+[ext_resource type="Script" path="res://scripts/data/doctrine_def.gd" id="2_31cal"]
+[ext_resource type="Script" path="res://scripts/data/age_def.gd" id="3_acuwc"]
+[ext_resource type="Script" path="res://scripts/data/turret_def.gd" id="4_67j1m"]
+[ext_resource type="Resource" path="res://data/turrets/machine_gun_nest.tres" id="5_iwmv1"]
+[ext_resource type="Resource" path="res://data/turrets/field_gun.tres" id="6_fwd7a"]
+[ext_resource type="Resource" path="res://data/turrets/barbed_wire.tres" id="7_yhgkv"]
+[ext_resource type="Script" path="res://scripts/data/unit_def.gd" id="8_aboh3"]
+[ext_resource type="Resource" path="res://data/units/trench_raider.tres" id="9_jqk68"]
+[ext_resource type="Resource" path="res://data/units/rifleman.tres" id="10_ws7f2"]
+[ext_resource type="Resource" path="res://data/units/armoured_car.tres" id="11_v5h3a"]
+[ext_resource type="Resource" path="res://data/units/field_howitzer.tres" id="12_ttlre"]
+
+[resource]
+script = ExtResource("3_acuwc")
+index = 5
+display_name = "Industrial"
+evolve_cost = 1100
+veterancy_base_xp = 2800
+base_max_hp = 8352.0
+units = Array[ExtResource("8_aboh3")]([ExtResource("9_jqk68"), ExtResource("10_ws7f2"), ExtResource("11_v5h3a"), ExtResource("12_ttlre")])
+turrets = Array[ExtResource("4_67j1m")]([ExtResource("5_iwmv1"), ExtResource("6_fwd7a"), ExtResource("7_yhgkv")])
+ability = ExtResource("1_jtqw8")
+sky_color = Color(0.627451, 0.4, 0.2901961, 1)
+ground_color = Color(0.2901961, 0.23137255, 0.1882353, 1)

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="TurretDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/turret_def.gd" id="1_jjtrp"]
+
+[resource]
+script = ExtResource("1_jjtrp")
+id = &"smoke_battery"
+display_name = "Smoke Battery"
+age = 4
+kind = "support"
+damage_type = "none"
+cost = 374
+hp = 950.0
+damage = 0.0
+attack_interval = 1.0
+range = 0.0
+min_range = 0.0
+splash = 0.0
+aura_radius = 180.0
+aura_slow = 0.3

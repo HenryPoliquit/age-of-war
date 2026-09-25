@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="AiPersonalityDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ai_personality_def.gd" id="1_exuol"]
+
+[resource]
+script = ExtResource("1_exuol")
+id = &"fast_age"
+display_name = "Fast-age Tactician"
+sim_only = true
+age_plan = "fast"

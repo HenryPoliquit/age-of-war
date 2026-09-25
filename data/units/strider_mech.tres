@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="UnitDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/unit_def.gd" id="1_ad46t"]
+
+[resource]
+script = ExtResource("1_ad46t")
+id = &"strider_mech"
+display_name = "Strider Mech"
+age = 6
+role = "heavy"
+armour = "heavy"
+damage_type = "blast"
+cost = 1420
+train_time = 3.0
+hp = 12876.0
+damage = 891.4
+attack_interval = 1.6
+range = 40.0
+min_range = 0.0
+speed = 45.0
+momentum_on_kill = 3

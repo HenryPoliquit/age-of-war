@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="AiPersonalityDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ai_personality_def.gd" id="1_imylb"]
+
+[resource]
+script = ExtResource("1_imylb")
+id = &"spam_ranged"
+display_name = "Spam: Ranged"
+sim_only = true
+spam_role = "ranged"
+age_plan = "fast"

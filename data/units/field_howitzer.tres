@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="UnitDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/unit_def.gd" id="1_600hy"]
+
+[resource]
+script = ExtResource("1_600hy")
+id = &"field_howitzer"
+display_name = "Field Howitzer"
+age = 5
+role = "siege"
+armour = "light"
+damage_type = "siege"
+cost = 442
+train_time = 3.0
+hp = 1097.0
+damage = 411.5
+attack_interval = 3.5
+range = 380.0
+min_range = 120.0
+speed = 40.0
+momentum_on_kill = 2

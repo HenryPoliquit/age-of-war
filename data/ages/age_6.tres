@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="AgeDef" format=3]
+
+[ext_resource type="Resource" path="res://data/abilities/orbital_lance.tres" id="1_rn3ao"]
+[ext_resource type="Script" path="res://scripts/data/doctrine_def.gd" id="2_orto8"]
+[ext_resource type="Script" path="res://scripts/data/age_def.gd" id="3_osjng"]
+[ext_resource type="Script" path="res://scripts/data/turret_def.gd" id="4_4a1dv"]
+[ext_resource type="Resource" path="res://data/turrets/pulse_turret.tres" id="5_klel0"]
+[ext_resource type="Resource" path="res://data/turrets/plasma_mortar.tres" id="6_il1sb"]
+[ext_resource type="Resource" path="res://data/turrets/stasis_field.tres" id="7_kcsrw"]
+[ext_resource type="Script" path="res://scripts/data/unit_def.gd" id="8_pxl3g"]
+[ext_resource type="Resource" path="res://data/units/aegis_trooper.tres" id="9_4l3wi"]
+[ext_resource type="Resource" path="res://data/units/pulse_rifleman.tres" id="10_bxpkl"]
+[ext_resource type="Resource" path="res://data/units/strider_mech.tres" id="11_dbq23"]
+[ext_resource type="Resource" path="res://data/units/rail_artillery.tres" id="12_e6vsf"]
+
+[resource]
+script = ExtResource("3_osjng")
+index = 6
+display_name = "Future"
+evolve_cost = 2800
+veterancy_base_xp = 6000
+base_max_hp = 14199.0
+units = Array[ExtResource("8_pxl3g")]([ExtResource("9_4l3wi"), ExtResource("10_bxpkl"), ExtResource("11_dbq23"), ExtResource("12_e6vsf")])
+turrets = Array[ExtResource("4_4a1dv")]([ExtResource("5_klel0"), ExtResource("6_il1sb"), ExtResource("7_kcsrw")])
+ability = ExtResource("1_rn3ao")
+sky_color = Color(0.10980392, 0.078431375, 0.2, 1)
+ground_color = Color(0.16862746, 0.18431373, 0.24705882, 1)

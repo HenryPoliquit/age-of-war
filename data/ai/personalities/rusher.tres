@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="AiPersonalityDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ai_personality_def.gd" id="1_wxbrk"]
+
+[resource]
+script = ExtResource("1_wxbrk")
+id = &"rusher"
+display_name = "Rusher"
+role_mix = {
+"heavy": 0.1,
+"ranged": 0.3,
+"siege": 0.05,
+"vanguard": 0.55
+}
+reserve_seconds = 1.0
+age_plan = "fast"
+forge_target = 1
+forge_after = 120.0
+turret_target = 1
+turret_after = 240.0
+uses_hold = true
+doctrine_prefs = Array[StringName]([&"horde", &"siegecraft"])

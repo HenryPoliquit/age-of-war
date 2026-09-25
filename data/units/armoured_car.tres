@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="UnitDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/unit_def.gd" id="1_dk4x0"]
+
+[resource]
+script = ExtResource("1_dk4x0")
+id = &"armoured_car"
+display_name = "Armoured Car"
+age = 5
+role = "heavy"
+armour = "heavy"
+damage_type = "blast"
+cost = 835
+train_time = 3.0
+hp = 6776.0
+damage = 469.2
+attack_interval = 1.6
+range = 40.0
+min_range = 0.0
+speed = 45.0
+momentum_on_kill = 3

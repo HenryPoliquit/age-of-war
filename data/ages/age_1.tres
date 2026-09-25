@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="AgeDef" format=3]
+
+[ext_resource type="Resource" path="res://data/abilities/stampede.tres" id="1_o1vce"]
+[ext_resource type="Script" path="res://scripts/data/doctrine_def.gd" id="2_eakcc"]
+[ext_resource type="Script" path="res://scripts/data/age_def.gd" id="3_mooak"]
+[ext_resource type="Script" path="res://scripts/data/turret_def.gd" id="4_dmugk"]
+[ext_resource type="Resource" path="res://data/turrets/rock_thrower.tres" id="5_nyund"]
+[ext_resource type="Script" path="res://scripts/data/unit_def.gd" id="6_ird76"]
+[ext_resource type="Resource" path="res://data/units/brawler.tres" id="7_el26a"]
+[ext_resource type="Resource" path="res://data/units/slinger.tres" id="8_seadb"]
+[ext_resource type="Resource" path="res://data/units/tusk_rider.tres" id="9_br2hk"]
+
+[resource]
+script = ExtResource("3_mooak")
+display_name = "Stone"
+units = Array[ExtResource("6_ird76")]([ExtResource("7_el26a"), ExtResource("8_seadb"), ExtResource("9_br2hk")])
+turrets = Array[ExtResource("4_dmugk")]([ExtResource("5_nyund")])
+ability = ExtResource("1_o1vce")
+sky_color = Color(0.9098039, 0.7176471, 0.47843137, 1)
+ground_color = Color(0.627451, 0.47843137, 0.27058825, 1)

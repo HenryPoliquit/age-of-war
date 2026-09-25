@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="DoctrineDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/doctrine_def.gd" id="1_ttuvf"]
+
+[resource]
+script = ExtResource("1_ttuvf")
+id = &"siegecraft"
+display_name = "Siegecraft"
+description = "Siege units +50% structure damage, −25% cost."
+pick_age = 4
+siege_cost_mult = 0.75
+siege_structure_mult = 1.5

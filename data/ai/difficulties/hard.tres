@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="AiDifficultyDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ai_difficulty_def.gd" id="1_5ocer"]
+
+[resource]
+script = ExtResource("1_5ocer")
+id = &"hard"
+display_name = "Hard"
+decision_interval = 0.75
+counter_level = 2
+aim_level = 2
