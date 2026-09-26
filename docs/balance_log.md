@@ -25,6 +25,7 @@ Every change from the GDD baselines, and why. Harness numbers are from `run_sim.
 | B17 | Skill cooldown 20 → 40 s | Escalation 47 → 37%, 48 → 38%; passing targets unchanged (1 / 0) |
 | B18 | Stampede damage 80 → 35, Bombardment 480 → 200 (the two whole-lane sweeps); Ranged damage ×0.85 in every age | 4 of 6 Tactician mirrors ended at 96 s: a 60 XP Stampede one-shot the whole enemy Age 1 army (6 kills in 1.6 s) and the loser never recovered. Lower sweep damage alone let Ranged spam reach 100% (the sweep had been hiding it), so it was tested together with the Ranged cut. Pair: seed 1 **1 → 4/8**, seed 2 **0 → 2/8**; mirror 11:52 / 11:35; Age 6 13:55 / 14:02 (57% / 53% of sides); Ranged spam 42% / 55%; Heavy spam 75% / 75% |
 | — | Rejected on both seeds (keep-rule: target metric better on both seeds, passing count not lower, no failing target more than 10 points worse) | Heavy HP ×0.85 or Heavy cost ×1.2 (escalation +20 points); skill XP costs ×2 (escalation +3–4); Heavy HP ×0.85 on top of B18 (Vanguard spam 50–65%); evolution costs ×0.8 / ×0.7 (passing 4 → 2 / 1, fewer sides reach Age 6); base HP ×0.8 (passing 4 → 2). Three rejections in a row ended the pass |
+| B19 | Review fix: the AI saves for an upgrade in a row it favours strongly (bias ≥ 3, i.e. Turtle's turrets) like a structure; a turret slot far out of reach no longer blocks that want | Turtle (one turret all game, never 60–470 g spare) upgraded turrets in 1 of 5 test matches; now 5 of 5 (GDD §11.2 identity). Cost: seed 1 **4 → 3/8**, seed 2 **2/8**; escalation 41 → 46%, 40 → 45%; Turtle 42% / 37%. Letting the blocked slot fall through to Income as well (65–69% escalation) and saving for Rusher's Vanguard upgrades (Rusher 78–81%) were both tried and dropped |
 
 ## Findings for the design docs
 
@@ -36,10 +37,10 @@ Every change from the GDD baselines, and why. Harness numbers are from `run_sim.
 
 ## v3 findings (M1b-7 not green)
 
-After B15–B18 the harness passes **4/8 on seed 1 and 2/8 on seed 2** (`reports/sim_report.md` is seed 1). Still failing, with the diagnosed cause:
+After B15–B19 the harness passes **3/8 on seed 1 and 2/8 on seed 2** (`reports/sim_report.md` is seed 1). Still failing, with the diagnosed cause:
 
 - **Stalemates: 41% of matches reach 15:00 (target < 10%); the Turtle mirror escalates 45–50% and runs to 30:00.** Not fully isolated. The prime suspect is the removal of Hold/staged pushes: B12 had cut Turtle-mirror escalation from 45% to 5–15%. Units now walk out as they are trained — fast Vanguards ahead of the slower units — and die piecemeal at defended gates. The levers that cut stalemates (cheaper evolution, lower base HP) broke other targets. **Needs a design decision:** some way for waves to form (for example units wait at the gate until a wave is ready, or a "send wave" button), or stronger escalation.
 - **Heavy spam beats the Tactician 75%.** The Stone Age Heavy (420 HP, ~19 damage/s) beats an equal-gold mixed army that arrives strung out. Heavy nerfs pushed stalemates up 20 points or let Vanguard spam through, so this is tied to the wave problem above.
 - **Age 6 arrives at ~14:00 (target 10:00–12:00) and only ~55% of sides reach it.** XP is now split between skills and evolving; cheaper evolution made matches end before Age 6 more often.
 - **Ranged spam wins 42–55%** (target < 30%).
-- **Turtle rarely buys turret upgrades** (one match in five): units are bought first, and turret upgrades (~60 g and up) are seldom affordable at decision time. The AI would need to save for them the way it saves for Siege.
+- **Turtle keeps only one turret all game:** slots 2–4 (400 × 1.7ⁿ g by then) are never affordable within its 30 s saving window, so its "turret wall" identity rests on one upgraded turret. Slot prices or the AI's saving window need a look.

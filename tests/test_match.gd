@@ -76,13 +76,12 @@ func test_fx_records_only_when_enabled() -> void:
 func test_ai_buys_unit_or_turret_upgrades() -> void:
 	# Emergent behaviour, so judged over several matches rather than one seed.
 	var gd := GameData.get_default()
-	var turtle_turret_upgrades := 0
 	for seed in range(11, 16):
 		var r := MatchRunner.run(gd, {"personality": &"tactician"}, {"personality": &"turtle"}, seed)
 		var bought: Array = r.log.events.filter(func(ev): return ev.type == "upgrade" and ev.row != "income")
 		check(not bought.is_empty(), "seed %d: some unit or turret upgrade was bought" % seed)
-		turtle_turret_upgrades += bought.filter(func(ev): return ev.row == "turret" and ev.side == 1).size()
-	check(turtle_turret_upgrades > 0, "Turtle upgrades its turrets in at least one of five matches")
+		# GDD §11.2: Turtle's identity is turrets and turret upgrades.
+		check(bought.any(func(ev): return ev.row == "turret" and ev.side == 1), "seed %d: Turtle upgrades its turrets" % seed)
 
 
 func test_ai_upgrades_only_what_pays_off() -> void:

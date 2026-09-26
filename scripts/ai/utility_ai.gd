@@ -84,13 +84,25 @@ func _spend_xp(sim: MatchSim, pressure: bool) -> void:
 # ---------------------------------------------------------------------------
 # Gold
 
-## Leftover gold buys the best-value upgrade, but only one that pays for itself: its bonus on the gold
-## already fielded in that row (× personality bias) must cover its price. At most one per decision;
-## never under pressure or with a thin army.
+## Leftover gold buys the best-value upgrade that pays for itself. At most one per decision.
 func _buy_upgrade(sim: MatchSim, pressure: bool) -> void:
-	var s := sim.sides[side]
-	if pressure or s.army_value() < sim.income_rate(side) * personality.upgrade_after_army_seconds:
+	if not _upgrades_allowed(sim, pressure):
 		return
+	var best := _best_upgrade(sim, 0.0, sim.sides[side].gold)
+	if not best.is_empty():
+		sim.buy_upgrade(side, best.row, best.stat)
+
+
+## Never under pressure or with a thin army.
+func _upgrades_allowed(sim: MatchSim, pressure: bool) -> bool:
+	return not pressure and sim.sides[side].army_value() >= sim.income_rate(side) * personality.upgrade_after_army_seconds
+
+
+## Best upgrade costing at most `budget` that pays for itself: its bonus on the gold already fielded in
+## that row (× personality bias) must cover its price. Rows with bias below `min_bias` are skipped.
+## Returns {row, stat, cost} or {}.
+func _best_upgrade(sim: MatchSim, min_bias: float, budget: float) -> Dictionary:
+	var s := sim.sides[side]
 	var fielded := {}
 	for u in s.units:
 		fielded[u.def.role] = fielded.get(u.def.role, 0.0) + u.cost_paid
@@ -103,22 +115,23 @@ func _buy_upgrade(sim: MatchSim, pressure: bool) -> void:
 	for row in MatchSim.UPGRADES:
 		if row == "income":
 			continue
-		var value: float = fielded.get(row, 0.0) * personality.upgrade_bias.get(row, 0.0)
-		if value <= 0.0:
+		var bias: float = personality.upgrade_bias.get(row, 0.0)
+		var value: float = fielded.get(row, 0.0) * bias
+		if value <= 0.0 or bias < min_bias:
 			continue
 		for stat in MatchSim.UPGRADES[row]:
 			var cost := sim.upgrade_cost(side, row, stat)
 			var benefit := value * _upgrade_bonus(sim, stat)
-			if cost > s.gold or benefit < cost:
+			if cost > budget or benefit < cost:
 				continue
 			var score := benefit / cost
 			if score > best_score:
 				best_score = score
 				best_row = row
 				best_stat = stat
-	if best_row != "":
-		sim.buy_upgrade(side, best_row, best_stat)
-
+	if best_row == "":
+		return {}
+	return {"row": best_row, "stat": best_stat, "cost": sim.upgrade_cost(side, best_row, best_stat)}
 
 
 func _upgrade_bonus(sim: MatchSim, stat: String) -> float:
@@ -195,15 +208,29 @@ func _structural_want(sim: MatchSim, pressure: bool) -> Dictionary:
 			var best := _best_turret(sim)
 			if best != null:
 				return {"kind": "replace", "slot": t.slot, "def": best, "cost": best.cost - roundf(t.def.cost * sim.rules.sell_refund)}
+	# Wanting a slot that is far out of reach still blocks the Income want (as before), but not a
+	# favoured upgrade: that slot would never be saved for.
+	var slot_blocked := false
 	if turret_time and s.turret_count() < personality.turret_target:
 		var slot := sim.first_free_slot(side)
 		if slot == -1:
 			if s.turret_slots < sim.max_turret_slots():
-				return {"kind": "slot", "cost": sim.slot_cost(side)}
+				var slot_cost := sim.slot_cost(side)
+				if slot_cost - s.gold <= sim.income_rate(side) * 30.0:
+					return {"kind": "slot", "cost": slot_cost}
+				slot_blocked = true
 		else:
 			var def := _best_turret(sim)
 			if def != null:
 				return {"kind": "turret", "slot": slot, "def": def, "cost": float(def.cost)}
+	# Upgrades in rows the personality strongly favours (bias 3+, i.e. Turtle's turrets) are saved
+	# for like a structure; otherwise unit spending never leaves enough gold (GDD §11.2).
+	if _upgrades_allowed(sim, pressure):
+		var up := _best_upgrade(sim, 3.0, INF)
+		if not up.is_empty():
+			return {"kind": "upgrade", "row": up.row, "stat": up.stat, "cost": up.cost}
+	if slot_blocked:
+		return {}
 	var inc := s.upgrade_level("income", "income")
 	if inc < personality.income_target and sim.time >= personality.income_after + inc * 90.0 and not pressure:
 		return {"kind": "income", "cost": sim.upgrade_cost(side, "income", "income")}
@@ -214,6 +241,8 @@ func _do_want(sim: MatchSim, want: Dictionary) -> void:
 	match want.kind:
 		"income":
 			sim.buy_upgrade(side, "income", "income")
+		"upgrade":
+			sim.buy_upgrade(side, want.row, want.stat)
 		"slot":
 			sim.unlock_slot(side)
 		"turret":
