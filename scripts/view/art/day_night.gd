@@ -7,7 +7,8 @@ extends RefCounted
 const PERIOD := 240.0
 ## Start mid-morning so a match opens in daylight.
 const START_PHASE := 0.12
-const NIGHT := Color(0.42, 0.48, 0.74)
+## Night keeps a cool cast but stays readable: the lane stays at least ~70% as bright as by day.
+const NIGHT := Color(0.72, 0.76, 0.92)
 const DUSK := Color(1.0, 0.72, 0.52)
 
 ## phase 0..1: 0–0.5 the sun is up (rises at 0, sets at 0.5), 0.5–1 the moon is up.
