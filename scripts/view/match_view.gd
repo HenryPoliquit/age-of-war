@@ -1,20 +1,21 @@
 class_name MatchView
 extends Node2D
-## Graybox match presentation (M0/M1): draws MatchSim state as coloured boxes and hosts the HUD.
+## Match presentation: steps MatchSim at its fixed tick, interpolates between ticks, and turns sim
+## FX records and events into visuals (projectiles, impacts, corpses, evolution moment).
 ## Contains no rules — every action goes through MatchSim commands, exactly like the AI's.
 
 signal exit_to_menu
 signal rematch
 
 const GROUND_Y := 760.0
-const TEAM := [Color("3b7dd8"), Color("e8862a")]
-const TEAM_ALT := [Color("2f9e8f"), Color("c8457a")]
-const ROLE_SIZE := {"vanguard": Vector2(18, 34), "ranged": Vector2(13, 30), "heavy": Vector2(34, 42), "siege": Vector2(32, 24)}
-var SPEEDS := [1.0, 2.0, 0.0]
+const TEAM := [Color("3f86e0"), Color("ec8a2c")]
+const TEAM_ALT := [Color("2fb3a3"), Color("d1497f")]
+const VIGNETTE := preload("res://shaders/vignette.gdshader")
 
 var personality_id: StringName = &"tactician"
 var difficulty_id: StringName = &"normal"
 var colourblind := false
+var start_age := 1
 
 var sim: MatchSim
 var ai: UtilityAI
@@ -22,40 +23,90 @@ var ai: UtilityAI
 var left_ai: UtilityAI
 var hud: MatchHud
 var camera: Camera2D
+var backdrops: Array[Backdrop] = []
+var world: WorldLayer
+var fx: FxLayer
+
+var speeds := [1.0, 2.0, 0.0]
 var speed_index := 0
 var aiming := false
 var aim_x := 0.0
+
+## Presentation clock: advances with game speed, freezes on hitstop and pause.
+var anim_time := 0.0
+## Interpolation factor between the previous and current sim tick.
+var alpha := 1.0
+var prev_progress := {}
+var flash_at := {}
+var base_rebuilt := {}
+
 var _accum := 0.0
-var _fx: Array[Dictionary] = []
+var _freeze := 0.0
+var _shake := 0.0
+var _punch := 0.0
+var _slowmo_until := -1.0
+var _cam_x := 900.0
 var _drag_pan := false
 var _logged := false
-var _font: Font
+## Demo/autoplay: the camera tracks the front line.
+var _follow_front := false
 
 
 func _ready() -> void:
-	_font = ThemeDB.fallback_font
 	var seed := int(Time.get_unix_time_from_system()) % 1000003
 	sim = MatchSim.new(GameData.get_default(), seed)
 	sim.record_fx = true
+	var args := OS.get_cmdline_user_args()
+	for a in args:
+		if a.begins_with("--speed="):
+			speeds[0] = float(a.get_slice("=", 1))
+		elif a.begins_with("--start-age="):
+			start_age = int(a.get_slice("=", 1))
+	if start_age > 1:
+		sim.set_start_age(start_age)
 	ai = UtilityAI.make(sim.data, personality_id, difficulty_id, MatchSim.RIGHT, seed + 17)
 	ai.setup(sim)
 	sim.sides[0].controller_name = "Player"
-	var args := OS.get_cmdline_user_args()
 	if "--autoplay" in args:
 		left_ai = UtilityAI.make(sim.data, &"tactician", &"hard", MatchSim.LEFT, seed + 3)
 		left_ai.setup(sim)
-	for a in args:
-		if a.begins_with("--speed="):
-			SPEEDS[0] = float(a.get_slice("=", 1))
+	sim.event_emitted.connect(_on_event)
+
 	camera = Camera2D.new()
-	camera.position = Vector2(640, 540)
-	camera.position_smoothing_enabled = true
-	camera.position_smoothing_speed = 8.0
 	add_child(camera)
 	camera.make_current()
+	for i in 2:
+		var b := Backdrop.new()
+		b.setup(i, sim.sides[i].age)
+		add_child(b)
+		backdrops.append(b)
+	world = WorldLayer.new()
+	world.view = self
+	add_child(world)
+	fx = FxLayer.new()
+	fx.view = self
+	add_child(fx)
+	var post := CanvasLayer.new()
+	post.layer = 1
+	var vig := ColorRect.new()
+	vig.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	vig.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var vm := ShaderMaterial.new()
+	vm.shader = VIGNETTE
+	vig.material = vm
+	post.add_child(vig)
+	add_child(post)
 	hud = MatchHud.new()
 	hud.view = self
+	hud.layer = 5
 	add_child(hud)
+	_cam_x = get_viewport_rect().size.x * 0.5 - 140.0
+	_follow_front = left_ai != null
+	for a in args:
+		if a.begins_with("--cam="):
+			_cam_x = float(a.get_slice("=", 1))
+			_follow_front = false
+	_place_camera(0.0)
 
 
 func team_color(side: int) -> Color:
@@ -71,24 +122,59 @@ func begin_aim() -> void:
 		aiming = true
 
 
+func render_time() -> float:
+	return sim.time - sim.rules.tick_dt * (1.0 - alpha)
+
+
+func add_shake(amount: float) -> void:
+	_shake = minf(18.0, _shake + amount)
+
+
+func hitstop(seconds: float) -> void:
+	_freeze = maxf(_freeze, seconds)
+
+
+func zoom_punch(amount: float) -> void:
+	_punch = maxf(_punch, amount)
+
+
+# ---------------------------------------------------------------------------
+
 func _process(delta: float) -> void:
-	var spd: float = SPEEDS[speed_index]
-	_accum += delta * spd
+	var spd: float = speeds[speed_index]
+	if anim_time < _slowmo_until:
+		spd *= 0.5  # Evolution moment: time slows to 50% (GDD §13.5).
+	if _freeze > 0.0:
+		_freeze -= delta
+		spd = 0.0
 	var dt := sim.rules.tick_dt
+	_accum += delta * spd
 	var steps := 0
 	while _accum >= dt and steps < 400 and not sim.is_over():
+		for s in sim.sides:
+			for u in s.units:
+				prev_progress[u.id] = u.progress
 		ai.update(sim, dt)
 		if left_ai != null:
 			left_ai.update(sim, dt)
 		sim.step()
 		_accum -= dt
 		steps += 1
-	for f in sim.fx:
-		f["born"] = sim.time
-		_fx.append(f)
-	sim.fx.clear()
-	_fx = _fx.filter(func(f): return sim.time - f.born < 0.35)
+		_consume_fx()
+	if sim.is_over():
+		_accum = 0.0
+	alpha = clampf(_accum / dt, 0.0, 1.0)
+	var adt := delta * spd
+	anim_time += adt
+	fx.step(adt)
+	if prev_progress.size() > 400:
+		_prune_prev()
 	_pan(delta)
+	_place_camera(delta)
+	for b in backdrops:
+		b.cam_x = camera.get_screen_center_position().x
+		b.seam_x = sim.front_x
+		b.time = anim_time
 	if aiming:
 		aim_x = clampf(get_global_mouse_position().x, 0.0, sim.rules.lane_length)
 	if sim.is_over() and not _logged:
@@ -97,7 +183,17 @@ func _process(delta: float) -> void:
 		sim.match_log.meta = {"left": "player", "right": String(personality_id), "right_difficulty": String(difficulty_id), "winner": sim.winner, "duration": sim.time}
 		sim.match_log.save_json("user://logs/match_%s.json" % stamp)
 		hud.show_post_match()
-	queue_redraw()
+
+
+func _prune_prev() -> void:
+	var alive := {}
+	for s in sim.sides:
+		for u in s.units:
+			alive[u.id] = true
+	for k in prev_progress.keys():
+		if not alive.has(k):
+			prev_progress.erase(k)
+			flash_at.erase(k)
 
 
 func _pan(delta: float) -> void:
@@ -108,14 +204,25 @@ func _pan(delta: float) -> void:
 		dir += 1.0
 	var vp := get_viewport_rect().size
 	var m := get_viewport().get_mouse_position()
-	if not _drag_pan and m.y > 80 and m.y < vp.y - 200:
+	if not _drag_pan and m.y > 80 and m.y < vp.y - 200 and DisplayServer.window_is_focused():
 		if m.x < 12:
 			dir -= 1.0
 		elif m.x > vp.x - 12:
 			dir += 1.0
+	_cam_x += dir * 1000.0 * delta
+	if _follow_front:
+		_cam_x = lerpf(_cam_x, sim.front_x, 1.0 - exp(-2.0 * delta))
+
+
+func _place_camera(delta: float) -> void:
+	var vp := get_viewport_rect().size
 	var half := vp.x * 0.5
-	camera.position.x = clampf(camera.position.x + dir * 900.0 * delta, half - 160.0, sim.rules.lane_length - half + 160.0)
-	camera.position.y = vp.y * 0.5
+	_cam_x = clampf(_cam_x, half - 260.0, sim.rules.lane_length - half + 260.0)
+	_shake = maxf(0.0, _shake - 40.0 * delta)
+	_punch = maxf(0.0, _punch - 0.25 * delta)
+	var shake := Vector2(randf_range(-1, 1), randf_range(-1, 1)) * _shake * hud.shake_scale
+	camera.position = Vector2(_cam_x, vp.y * 0.5) + shake
+	camera.zoom = Vector2.ONE * (1.0 + _punch)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -130,8 +237,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			aiming = false
 		elif event.button_index == MOUSE_BUTTON_LEFT and event.pressed and sim.sides[0].stance == &"hold" and event.shift_pressed:
 			sim.set_stance(0, &"hold", get_global_mouse_position().x)
+		elif event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
+			_cam_x -= 120.0
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
+			_cam_x += 120.0
 	elif event is InputEventMouseMotion and _drag_pan:
-		camera.position.x -= event.relative.x
+		_cam_x -= event.relative.x
 	elif event is InputEventKey and event.pressed and not event.echo:
 		_hotkey(event.physical_keycode)
 
@@ -176,125 +287,151 @@ func toggle_stance() -> void:
 
 
 # ---------------------------------------------------------------------------
-# Drawing
+# Sim → visuals
 
-func _draw() -> void:
-	var lane := sim.rules.lane_length
-	var l_age := sim.data.age(sim.sides[0].age)
-	var r_age := sim.data.age(sim.sides[1].age)
-	var top := -200.0
-	var bottom := 1300.0
-	var seam := 90.0
-	var fx_ := sim.front_x
-	# Split battlefield (GDD §13.6): each half shows that side's age, blended at the front line.
-	draw_rect(Rect2(-600, top, fx_ - seam + 600, GROUND_Y - top), l_age.sky_color)
-	draw_rect(Rect2(fx_ + seam, top, lane + 600 - fx_ - seam, GROUND_Y - top), r_age.sky_color)
-	draw_polygon(PackedVector2Array([Vector2(fx_ - seam, top), Vector2(fx_ + seam, top), Vector2(fx_ + seam, GROUND_Y), Vector2(fx_ - seam, GROUND_Y)]),
-		PackedColorArray([l_age.sky_color, r_age.sky_color, r_age.sky_color, l_age.sky_color]))
-	draw_rect(Rect2(-600, GROUND_Y, fx_ + 600, bottom - GROUND_Y), l_age.ground_color)
-	draw_rect(Rect2(fx_, GROUND_Y, lane + 600 - fx_, bottom - GROUND_Y), r_age.ground_color)
-	draw_line(Vector2(lane * 0.5, GROUND_Y + 6), Vector2(lane * 0.5, GROUND_Y + 30), Color(1, 1, 1, 0.35), 2.0)
-	# Front marker
-	draw_line(Vector2(fx_, GROUND_Y - 150), Vector2(fx_, GROUND_Y), Color(1, 1, 1, 0.5), 2.0)
-	draw_rect(Rect2(fx_, GROUND_Y - 150, 26, 16), Color(1, 1, 1, 0.6))
-	for s in sim.sides:
-		_draw_base(s)
-	# Hold rally line
-	var me := sim.sides[0]
-	if me.stance == &"hold":
-		var rx := sim.to_world(0, me.rally_progress)
-		for y in range(int(GROUND_Y - 120), int(GROUND_Y), 16):
-			draw_line(Vector2(rx, y), Vector2(rx, y + 8), team_color(0), 3.0)
-	for s in sim.sides:
-		for u in s.units:
-			_draw_unit(u)
-	for e in sim.effects:
-		var def: AbilityDef = e.def
-		var c := team_color(e.side)
-		c.a = 0.22
-		draw_rect(Rect2(e.center - def.width * 0.5, GROUND_Y - 160, def.width, 170), c)
-	for f in _fx:
-		var age_t: float = sim.time - f.born
-		var a := 1.0 - age_t / 0.35
+func _on_event(ev: Dictionary) -> void:
+	match ev.type:
+		"evolve_start":
+			var side: int = ev.side
+			fx.evolution_wave(sim.to_world(side, 0.0) + (-90.0 if side == 0 else 90.0), team_color(side))
+			if side == 0 or left_ai == null:
+				_slowmo_until = anim_time + 0.5
+		"evolve":
+			var side: int = ev.side
+			backdrops[side].set_age(ev.age)
+			base_rebuilt[side] = anim_time
+			hud.banner("%s Age" % sim.data.age(ev.age).display_name, team_color(side), side)
+		"ability":
+			fx.ability_cast(ev.ability, ev.x, ev.side)
+			hud.banner(sim.data.age(sim.sides[ev.side].age).ability.display_name + "!", team_color(ev.side), ev.side, true)
+		"turret_destroyed":
+			var gate := sim.to_world(ev.side, 0.0)
+			fx.impact("blast", Vector2(gate + (-80.0 if ev.side == 0 else 80.0), GROUND_Y - 140), true, true)
+
+
+func _consume_fx() -> void:
+	for f in sim.fx:
 		match f.type:
-			"hit":
-				var col := {"slash": Color.WHITE, "pierce": Color("ffe28a"), "blast": Color("ff7b3a"), "siege": Color("c9b08a")}.get(f.dtype, Color.WHITE) as Color
-				col.a = a
-				var y := GROUND_Y - (80.0 if f.get("structure", false) else 22.0)
-				draw_circle(Vector2(f.x, y), 4.0 + age_t * (40.0 if f.dtype == "blast" else 14.0), col)
+			"shot":
+				_on_shot(f)
+			"turret_shot":
+				_on_turret_shot(f)
 			"death":
-				draw_rect(Rect2(f.x - 12, GROUND_Y - 30 * a, 24, 30 * a), Color(0.1, 0.1, 0.1, a * 0.6))
+				_on_death(f)
 			"ability_pulse":
-				draw_rect(Rect2(f.lo, GROUND_Y - 180, f.hi - f.lo, 190), Color(1, 1, 1, a * 0.35))
-	if aiming:
-		var def := sim.data.age(me.age).ability
-		draw_rect(Rect2(aim_x - def.width * 0.5, GROUND_Y - 160, def.width, 170), Color(1, 1, 1, 0.25))
-		draw_rect(Rect2(aim_x - def.width * 0.5, GROUND_Y - 160, def.width, 170), Color.WHITE, false, 2.0)
+				fx.ability_pulse(f.ability, f.lo, f.hi, f.side, team_color(f.side))
+				if f.ability != "shieldwall":
+					for u in sim.sides[1 - f.side].units:
+						var x := sim.to_world(u.side, u.progress)
+						if x >= f.lo and x <= f.hi:
+							flash_at[u.id] = anim_time + 0.1
+	sim.fx.clear()
 
 
-func _draw_base(s: SimSide) -> void:
-	var lane := sim.rules.lane_length
-	var w := 110.0
-	var h := 150.0 + 18.0 * s.age
-	var x := -w if s.index == 0 else lane
-	var c := team_color(s.index).darkened(0.35)
-	draw_rect(Rect2(x, GROUND_Y - h, w, h), c)
-	draw_rect(Rect2(x, GROUND_Y - h, w, h), Color.BLACK, false, 2.0)
-	draw_string(_font, Vector2(x + 8, GROUND_Y - h + 22), sim.data.age(s.age).display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color.WHITE)
-	if s.is_evolving():
-		draw_string(_font, Vector2(x + 8, GROUND_Y - h + 42), "Evolving…", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.YELLOW)
-	for d in s.doctrines.size():
-		draw_rect(Rect2(x + 10 + d * 34, GROUND_Y - h - 36, 28, 36), team_color(s.index))
-		draw_string(_font, Vector2(x + 13 + d * 34, GROUND_Y - h - 12), String(s.doctrines[d].display_name).left(2), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
-	for i in s.turret_slots:
-		var tx := x + 8 + (i % 3) * 34
-		var ty := GROUND_Y - h + 56 + (i / 3) * 34
-		var t: SimTurret = s.turrets[i]
-		if t == null:
-			draw_rect(Rect2(tx, ty, 28, 28), Color(1, 1, 1, 0.25), false, 1.5)
-			continue
-		var tc := {"sentry": Color("d9d9d9"), "artillery": Color("8c8c8c"), "support": Color("7fbf7f")}[t.def.kind] as Color
-		if t.def.age < s.age:
-			tc = tc.darkened(0.4)
-		draw_rect(Rect2(tx, ty, 28, 28), tc)
-		draw_string(_font, Vector2(tx + 8, ty + 20), str(t.def.age), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.BLACK)
-		if sim.time - t.last_fire_time < 0.1:
-			draw_line(Vector2(tx + 14, ty + 14), Vector2(t.last_target_x, GROUND_Y - 20), Color(1, 1, 0.6, 0.7), 2.0)
-		if t.hp < t.max_hp:
-			draw_rect(Rect2(tx, ty - 5, 28 * t.hp / t.max_hp, 3), Color.RED)
+const RANGED_KIND := {"sling": "stone", "javelin": "javelin", "bow": "arrow", "musket": "bullet", "rifle": "tracer", "pulse": "bolt"}
+const SIEGE_KIND := {"trebuchet": "shell", "mortar": "shell", "howitzer": "shell", "rail": "bolt", "mech": "bolt", "car": "bullet"}
 
 
-func _draw_unit(u: SimUnit) -> void:
-	var sz: Vector2 = ROLE_SIZE[u.def.role]
-	var x := sim.to_world(u.side, u.progress)
-	var dir := 1.0 if u.side == 0 else -1.0
-	if u.state == &"attack":
-		var since := sim.time - u.last_attack_time
-		if since < 0.15:
-			x += dir * 5.0 * (1.0 - since / 0.15)
-	var jitter := float((u.id * 37) % 11) - 5.0
-	var base := GROUND_Y + jitter
-	var col := team_color(u.side)
-	col = col.lerp(Color.WHITE, 0.08 * (u.age - 1))
-	if sim.time - u.last_hit_time < 0.06:
-		col = col.lerp(Color.WHITE, 0.8)
-	var r := Rect2(x - sz.x * 0.5, base - sz.y, sz.x, sz.y)
-	draw_rect(r, col)
-	draw_rect(r, Color(0, 0, 0, 0.6), false, 1.0)
-	# Role glyph: ranged gets a bow line, heavy a band, siege a wheel pair.
-	match u.def.role:
-		"ranged":
-			draw_line(Vector2(x + dir * 7, base - sz.y + 4), Vector2(x + dir * 7, base - 8), Color.BLACK, 2.0)
-		"heavy":
-			draw_rect(Rect2(r.position.x, base - sz.y * 0.55, sz.x, 5), Color(0, 0, 0, 0.5))
-		"siege":
-			draw_circle(Vector2(x - 9, base - 2), 5, Color.BLACK)
-			draw_circle(Vector2(x + 9, base - 2), 5, Color.BLACK)
-	if u.vet_rank > 0:
-		for i in u.vet_rank:
-			draw_rect(Rect2(x - 7 + i * 5, base - sz.y - 12, 3, 4), Color.GOLD)
-	if u.armour_buff_until > sim.time:
-		draw_rect(r.grow(3), Color(0.6, 0.85, 1, 0.8), false, 2.0)
-	if u.hp < u.max_hp:
-		draw_rect(Rect2(x - 12, base - sz.y - 7, 24, 3), Color(0, 0, 0, 0.6))
-		draw_rect(Rect2(x - 12, base - sz.y - 7, 24 * u.hp / u.max_hp, 3), Color("5fd35f"))
+func _on_shot(f: Dictionary) -> void:
+	var def: UnitDef = f.def
+	var u: SimUnit = f.unit
+	var st := UnitArt.style_for(def)
+	var dir := 1.0 if f.side == 0 else -1.0
+	var L := WorldLayer.anim_len(def)
+	var target: SimUnit = f.target
+	var origin := Vector2(f.from_x, GROUND_Y + WorldLayer.jitter(u.id))
+	var to: Vector2
+	if target != null:
+		to = Vector2(f.to_x, GROUND_Y + WorldLayer.jitter(target.id) - UnitArt.height_for(target.def) * WorldLayer.UNIT_SCALE * 0.5)
+	else:
+		to = Vector2(f.to_x + dir * 40.0, GROUND_Y - 70.0)
+	var dtype: String = def.damage_type
+	var heavy: bool = def.role in ["heavy", "siege"]
+	var structure: bool = f.structure
+	var rig: String = st.rig
+	var weapon: String = st.get("weapon", "")
+	var kind: String = RANGED_KIND.get(weapon, SIEGE_KIND.get(rig, ""))
+	var target_id := target.id if target != null else -1
+	var hit := func():
+		var vis := dtype
+		# Cavalry hits read as heavy blows, not explosions.
+		if dtype == "blast" and rig in ["mounted", "chariot"]:
+			vis = "slash"
+		fx.impact("siege" if structure and heavy else vis, to, heavy, structure)
+		if target_id >= 0:
+			flash_at[target_id] = anim_time
+	if kind == "":
+		# Melee: the hit lands on the contact frame of the swing (GDD §13.3).
+		fx.later(L * 0.42, hit)
+		return
+	var muzzle := origin + Vector2(dir * 28.0, -42.0) * WorldLayer.UNIT_SCALE
+	var big := false
+	match rig:
+		"trebuchet":
+			muzzle = origin + Vector2(dir * 40.0, -110.0)
+		"mortar":
+			muzzle = origin + Vector2(dir * 22.0, -32.0)
+			big = true
+		"howitzer":
+			muzzle = origin + Vector2(dir * 46.0, -42.0)
+			big = true
+		"rail", "mech":
+			muzzle = origin + Vector2(dir * 56.0, -56.0)
+			big = true
+		"car":
+			muzzle = origin + Vector2(dir * 34.0, -50.0)
+	var gun := kind in ["bullet", "tracer", "bolt"] or rig in ["mortar", "howitzer"]
+	var col := team_color(f.side).lightened(0.5)
+	fx.later(L * 0.35, func():
+		if gun:
+			fx.muzzle(muzzle, 0.0 if dir > 0 else PI, big, col if kind == "bolt" else Color(1.0, 0.8, 0.4))
+		fx.shoot(kind, muzzle, to, dtype, hit, heavy)
+		if kind == "bolt":
+			fx.projectiles[-1]["col"] = col)
+
+
+const TURRET_KIND := {
+	"sentry": ["stone", "arrow", "javelin", "bullet", "tracer", "bolt"],
+	"artillery": ["shell", "shell", "shell", "ball", "shell", "bolt"],
+}
+
+
+func _on_turret_shot(f: Dictionary) -> void:
+	var def: TurretDef = f.def
+	var side: int = f.side
+	var dir := 1.0 if side == 0 else -1.0
+	var gate := sim.to_world(side, 0.0)
+	var sp := BaseArt.slot_pos(f.slot)
+	var from := Vector2(gate + dir * sp.x, GROUND_Y + 4 + sp.y - 8)
+	var target: SimUnit = f.target
+	var to := Vector2(f.to_x, GROUND_Y - (UnitArt.height_for(target.def) * 0.5 if target != null else 6.0))
+	var kind: String = TURRET_KIND.get(def.kind, ["stone"])[clampi(def.age - 1, 0, 5)]
+	var tid := target.id if target != null else -1
+	var splash := def.kind == "artillery"
+	var col := team_color(side).lightened(0.5)
+	if kind in ["bullet", "tracer", "ball", "bolt"] or (splash and def.age >= 4):
+		fx.muzzle(from + Vector2(dir * 18.0, 0), 0.0 if dir > 0 else PI, splash, col if kind == "bolt" else Color(1.0, 0.8, 0.4))
+	var enemy := 1 - side
+	var radius := def.splash
+	fx.shoot(kind, from, to, def.damage_type, func():
+		fx.impact(def.damage_type, to, splash)
+		if tid >= 0:
+			flash_at[tid] = anim_time
+		if splash:
+			for v in sim.sides[enemy].units:
+				if absf(sim.to_world(v.side, v.progress) - to.x) <= radius:
+					flash_at[v.id] = anim_time, splash)
+	if kind == "bolt":
+		fx.projectiles[-1]["col"] = col
+
+
+func _on_death(f: Dictionary) -> void:
+	var def: UnitDef = f.def
+	world.add_corpse(def, f.x, f.side, f.unit_id)
+	var rig: String = UnitArt.style_for(def).rig
+	if rig in ["car", "mech", "rail", "howitzer"]:
+		fx.impact("blast", Vector2(f.x, GROUND_Y - 24), true)
+	elif rig in ["ram", "trebuchet", "mortar", "chariot"]:
+		fx.impact("siege", Vector2(f.x, GROUND_Y - 20))
+	else:
+		fx.burst("smoke", Vector2(f.x, GROUND_Y - 4), 4, Color(0.7, 0.62, 0.5, 0.5), Vector2(10, 40), Vector2(0.4, 0.8), Vector2(6, 12), -10.0)

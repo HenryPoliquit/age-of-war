@@ -74,3 +74,24 @@ func test_ai_match_completes_and_logs() -> void:
 	check(r.log.timeline.size() >= int(r.duration) - 1, "1 s samples")
 	var d: Dictionary = r.log.to_dict()
 	check(d.has("events") and d.has("timeline") and d.has("unit_stats"))
+
+
+func test_start_age() -> void:
+	var sim := MatchSim.new(GameData.get_default(), 1)
+	sim.set_start_age(4)
+	for s in sim.sides:
+		check_eq(s.age, 4)
+		check_near(s.base_hp, sim.data.age(4).base_max_hp, 0.01)
+		check_near(s.gold, sim.rules.start_gold * pow(1.7, 3), 0.5)
+	check(sim.queue_role(0, "siege"), "Age 4 roster available")
+
+
+func test_fx_records_only_when_enabled() -> void:
+	var sim := new_sim()
+	place(sim, 0, "ranged", 1000.0)
+	place(sim, 1, "vanguard", 1250.0)
+	run_for(sim, 2.0)
+	check(sim.fx.is_empty(), "no fx without record_fx")
+	sim.record_fx = true
+	run_for(sim, 2.0)
+	check(sim.fx.any(func(f): return f.type == "shot"), "shots recorded")

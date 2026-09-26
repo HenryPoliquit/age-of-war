@@ -96,3 +96,21 @@ The sim is O(units) per tick, except Artillery cluster search and AI ability aim
 - **Balance is not green** (see `reports/sim_report.md` and `docs/balance_log.md`). The harness says why, which is its job, but M2's gate needs it green.
 - **Small armies.** The GDD economy (income-limited, unit cost ×1.7 per age) produces armies of about 2–10 units per side, not the 30-vs-30 fights PRD §6/§11 budget for. Decide whether that's the intended feel or whether costs/income should shift so crowds happen. It affects performance budgets, readability, and how strong turrets feel.
 - Renderer choice (D17), contact-keyframe damage (D4), Spine vs. built-in skeletons (PRD §10.1).
+
+## 10. Presentation layer (interim procedural art)
+
+Until painted parts exist (M2), everything is drawn procedurally with canvas calls. The structure is meant to survive the swap to real art: each piece has one job, and a skeleton-based renderer can replace it without touching the others.
+
+| File | Job |
+| --- | --- |
+| `scripts/view/match_view.gd` | Steps the sim, interpolates between 10 Hz ticks (`prev_progress`, `alpha`), keeps the presentation clock (`anim_time`: follows game speed, freezes on hitstop), camera shake / zoom punch / evolution slow-mo, and turns `sim.fx` records and sim events into visuals |
+| `scripts/view/world_layer.gd` | Bases, turrets, units, corpses (pooled nodes for per-corpse fade), HP bars, rally and front markers |
+| `scripts/view/art/unit_art.gd` | Modular rigs (humanoid, mounted, chariot, car, mech, ram, trebuchet, mortar, howitzer, rail) dressed per unit id; walk phase from distance walked (no foot sliding), attack poses with anticipation → contact → recovery, hit flash, secondary motion on plumes/manes |
+| `scripts/view/art/base_art.gd` | One base silhouette per age with turret mounts, damage states (cracks, fire), rebuild-on-evolve; turrets per kind and age with aim and recoil |
+| `scripts/view/art/scenery.gd`, `backdrop.gd`, `shaders/split_backdrop.gdshader` | Per-age parallax scenery (GDD §4.1), the split battlefield blended at the front line with a ragged brush seam, and the painterly dissolve when a side evolves |
+| `scripts/view/fx_layer.gd` | Pooled particles, projectiles (arrows, stones, javelins, bullets/tracers, cannonballs, shells, energy bolts), per-damage-type impacts (GDD §13.4), muzzle flashes, scorch decals, ability visuals and telegraphs, evolution shockwave. Additive "glow" pass stands in for 2D lights |
+| `scripts/view/match_hud.gd` | Themed HUD: base bars, tide pips, minimap, unit cards with live portraits, queue strip, command panel, doctrine choice, event banners, post-match |
+
+Timing rules that keep visuals honest to the sim: melee impacts land on the swing's contact frame (≈0.42 of the attack animation); ranged units release their projectile at the end of anticipation and the target flashes when it arrives. The sim still applies damage at attack start (D4), so the visual lag is at most ~0.4 s. Moving damage to the contact frame in the sim is still M1-12.
+
+**Quality bar (PRD §11) status with procedural art:** blended state changes, impact flashes, hitstop and shake on heavy hits, layered blast effects, the evolution event (slow-mo, shockwave, backdrop dissolve, base rebuild, banner) and the split battlefield are in. Still missing: audio, real 2D lights and normal maps, animation blending between states (poses switch instantly), and silhouette/greyscale checks. **All of it needs the owner's local review; the cloud only checks screenshots.**

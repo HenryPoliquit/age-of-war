@@ -50,6 +50,19 @@ func _init(p_data: GameData = null, p_seed: int = 1) -> void:
 	match_log.seed = p_seed
 
 
+## Skirmish option (GDD §12.1): both sides start in `age`, with base HP and starting gold for that age.
+## Call before the first step.
+func set_start_age(age: int) -> void:
+	age = clampi(age, 1, GameData.AGE_COUNT)
+	for s in sides:
+		s.age = age
+		s.base_max_hp = data.age(age).base_max_hp
+		s.base_hp = s.base_max_hp
+		s.gold = rules.start_gold * rules.age_cost_mult(age)
+		for a in range(1, age):
+			s.age_times[a] = 0.0
+
+
 # ---------------------------------------------------------------------------
 # Coordinates
 
@@ -457,6 +470,10 @@ func _units_act(s: SimSide, enemy_front: SimUnit, dt: float) -> void:
 			if u.cooldown <= 0.0:
 				u.cooldown = def.attack_interval
 				u.last_attack_time = time
+				if record_fx:
+					var to_x := to_world(enemy.index, target_unit.progress) if target_unit != null else to_world(enemy.index, 0.0)
+					fx.append({"type": "shot", "side": u.side, "unit": u, "def": def, "from_x": to_world(u.side, u.progress),
+						"to_x": to_x, "structure": target_unit == null, "target": target_unit})
 				if target_unit != null:
 					_hit_unit(u, target_unit, u.base_damage * u.damage_mult(rules.veterancy_bonus), def.damage_type)
 				else:
@@ -515,7 +532,8 @@ func _on_kill(victim: SimUnit, by_side: int) -> void:
 	s.stat_xp_earned += victim.cost_paid * rules.xp_per_kill_fraction
 	s.momentum = minf(rules.momentum_cap, s.momentum + victim.def.momentum_on_kill)
 	if record_fx:
-		fx.append({"type": "death", "x": to_world(victim.side, victim.progress), "side": victim.side, "role": victim.def.role})
+		fx.append({"type": "death", "x": to_world(victim.side, victim.progress), "side": victim.side, "role": victim.def.role,
+			"def": victim.def, "unit_id": victim.id})
 
 
 func _hit_structures(u: SimUnit, enemy: SimSide) -> void:
@@ -578,6 +596,8 @@ func _turrets_act(s: SimSide, dt: float) -> void:
 				t.cooldown = t.def.attack_interval
 				t.last_fire_time = time
 				t.last_target_x = to_world(enemy.index, target.progress)
+				if record_fx:
+					fx.append({"type": "turret_shot", "side": s.index, "slot": t.slot, "def": t.def, "to_x": t.last_target_x, "target": target if t.def.kind == "sentry" else null})
 				t.stat_damage_dealt += _damage_unit(target, raw, t.def.damage_type, s.index)
 		elif t.def.kind == "artillery":
 			var best: SimUnit = null
@@ -597,6 +617,8 @@ func _turrets_act(s: SimSide, dt: float) -> void:
 				t.cooldown = t.def.attack_interval
 				t.last_fire_time = time
 				t.last_target_x = to_world(enemy.index, best.progress)
+				if record_fx:
+					fx.append({"type": "turret_shot", "side": s.index, "slot": t.slot, "def": t.def, "to_x": t.last_target_x, "target": null})
 				var center := best.progress
 				for v in enemy.units:
 					if v.alive() and absf(v.progress - center) <= t.def.splash:
