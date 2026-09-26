@@ -57,5 +57,7 @@ func test_queue_limit_and_training() -> void:
 func test_doctrine_costs() -> void:
 	var sim := new_sim()
 	var def := sim.data.unit_for_role(2, "vanguard")
-	sim.sides[0].doctrines.append(sim.data.doctrines[&"horde"])
-	check_near(sim.unit_price(0, def), roundf(def.cost * 0.8), 0.01)
+	var horde: DoctrineDef = sim.data.doctrines[&"horde"]
+	sim.sides[0].doctrines.append(horde)
+	check(horde.unit_cost_mult < 1.0, "Horde is a discount")
+	check_near(sim.unit_price(0, def), roundf(def.cost * horde.unit_cost_mult), 0.01)

@@ -76,7 +76,7 @@ static func style_for(def: UnitDef) -> Dictionary:
 static func height_for(def: UnitDef) -> float:
 	match style_for(def).rig:
 		"humanoid":
-			return 60.0
+			return 66.0
 		"mounted", "chariot":
 			return 82.0
 		"mech":
@@ -160,6 +160,47 @@ static func _poly(ci: CanvasItem, pts: Array, col: Color, offset := Vector2.ZERO
 	ci.draw_colored_polygon(p, col)
 
 
+## Polygon shaded as a volume: vertices facing the key light (upper front) lighter, far side darker.
+static func _shade_poly(ci: CanvasItem, pts: Array, col: Color, light := Vector2(0.45, -0.9)) -> void:
+	var c := Vector2.ZERO
+	for v in pts:
+		c += v
+	c /= pts.size()
+	var p := PackedVector2Array()
+	var cols := PackedColorArray()
+	var ln := light.normalized()
+	for v in pts:
+		p.append(v)
+		var d: Vector2 = (v - c)
+		var k := d.normalized().dot(ln) if d.length() > 0.001 else 0.0
+		cols.append(col.lightened(0.16 * k) if k > 0.0 else col.darkened(-0.22 * k))
+	ci.draw_polygon(p, cols)
+
+
+static func _ellipse_pts(c: Vector2, r: Vector2, rot := 0.0, n := 14) -> Array:
+	var out := []
+	for i in n:
+		var a := TAU * i / n
+		out.append(c + Vector2(cos(a) * r.x, sin(a) * r.y).rotated(rot))
+	return out
+
+
+## Tapered limb segment with rounded joints, shaded across its width.
+static func _seg(ci: CanvasItem, a: Vector2, b: Vector2, wa: float, wb: float, col: Color) -> void:
+	var d := (b - a)
+	if d.length() < 0.01:
+		return
+	var n := d.normalized().orthogonal()
+	var lit := col.lightened(0.12)
+	var dark := col.darkened(0.2)
+	# The side facing the light (up/forward) is lighter.
+	var s := 1.0 if n.dot(Vector2(0.45, -0.9)) > 0.0 else -1.0
+	ci.draw_polygon(PackedVector2Array([a + n * wa * 0.5 * s, b + n * wb * 0.5 * s, b - n * wb * 0.5 * s, a - n * wa * 0.5 * s]),
+		PackedColorArray([lit, lit, dark, dark]))
+	ci.draw_circle(a, wa * 0.5, col)
+	ci.draw_circle(b, wb * 0.5, col.darkened(0.05))
+
+
 static func _wheel(ci: CanvasItem, c: Vector2, r: float, rot: float, rim: Color, hub: Color, spokes := 6) -> void:
 	ci.draw_circle(c, r, rim)
 	ci.draw_circle(c, r * 0.72, rim.darkened(0.35))
@@ -187,37 +228,77 @@ static func humanoid(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, po
 	var trim: Color = _c(pal[1], pose)
 	var metal: Color = _c(pal[2], pose)
 	var tm: Color = _c(team, pose)
+	var armoured: bool = st.get("helmet", "") in ["crest", "kettle", "greathelm", "morion", "visor"]
+	var leather := _c(Color("4a3322"), pose)
 	var bob := lerpf(sin(t * 2.1 + seed) * 0.7, absf(sin(walk)) * 2.2, mv)
-	var hip := Vector2(0, -25 * build + bob * 0.5)
-	var sh := Vector2(1.5, -44 * build + bob)
-	var head := sh + Vector2(1.5, -8 * build)
+	var hip := Vector2(0, -30 * build + bob * 0.5)
+	var sh := Vector2(1.5, -50 * build + bob)
+	var head := sh + Vector2(1.8, -9.5 * build)
+	var b := build
 	if legs:
-		_shadow(ci, 12 * build)
+		_shadow(ci, 12 * b)
 		for i in [1, 0]:
 			var ph: float = walk + PI * i
 			var thigh := lerpf(0.12 if i == 0 else -0.1, sin(ph) * 0.6, mv)
-			var knee := hip + Vector2(0, 12 * build).rotated(-thigh)
+			var knee := hip + Vector2(0, 15 * b).rotated(-thigh)
 			var bend := lerpf(0.05, maxf(0.0, cos(ph)) * 0.9, mv)
-			var foot := knee + Vector2(0, 13 * build).rotated(-thigh + bend)
-			var leg_col := trim.darkened(0.25 if i == 1 else 0.0)
-			_limb(ci, hip, knee, 5.5 * build, leg_col)
-			_limb(ci, knee, foot, 5.0 * build, leg_col)
-			ci.draw_line(foot, foot + Vector2(5 * build, 0), Color(0.12, 0.1, 0.08), 3.5 * build)
+			var foot := knee + Vector2(0, 14 * b).rotated(-thigh + bend)
+			var back := 0.22 if i == 1 else 0.0
+			_seg(ci, hip, knee, 7.2 * b, 5.4 * b, trim.darkened(back))
+			_seg(ci, knee, foot, 5.4 * b, 4.2 * b, trim.darkened(back + 0.08))
+			if armoured:
+				_seg(ci, knee.lerp(foot, 0.1), foot + Vector2(0, -2 * b), 5.8 * b, 4.8 * b, metal.darkened(back))
+				ci.draw_circle(knee, 3.2 * b, metal.darkened(back - 0.1))
+			# Boot: heel, sole and toe.
+			_shade_poly(ci, [foot + Vector2(-3.2, -6) * b, foot + Vector2(3, -6) * b, foot + Vector2(4.5, -2) * b,
+				foot + Vector2(8.5, -0.5) * b, foot + Vector2(8.5, 1.5) * b, foot + Vector2(-3.5, 1.5) * b], leather.darkened(back))
+			ci.draw_line(foot + Vector2(-3.5, 1.5) * b, foot + Vector2(8.5, 1.5) * b, Color(0.08, 0.06, 0.05), 1.2 * b)
+	# Cape trails behind and lags the body (secondary motion).
+	if st.get("cape", false) or st.get("helmet", "") == "greathelm":
+		var flap := sin(t * 3.0 + seed) * 2.0 + mv * 3.0
+		_shade_poly(ci, [sh + Vector2(-6, 0) * b, sh + Vector2(2, 1) * b, hip + Vector2(-2, 8) * b,
+			hip + Vector2(-12 - flap, 10) * b, hip + Vector2(-9 - flap * 0.5, -2) * b], tm.darkened(0.35))
 	_pack(ci, st.get("pack", ""), sh, hip, build, pal, tm, pose, t)
-	# Back arm swings opposite the front leg.
+	# Back arm swings opposite the front leg: upper arm, forearm, hand.
 	var arm_sw := sin(walk) * 0.5 * mv
-	var back_hand := sh + Vector2(-2, 15 * build).rotated(arm_sw)
-	_limb(ci, sh + Vector2(-3, 1), back_hand, 4.5 * build, cloth.darkened(0.3))
-	# Torso with team tabard.
-	_poly(ci, [hip + Vector2(-6.5, 1) * build, hip + Vector2(6.5, 1) * build, sh + Vector2(7.5, 0) * build, sh + Vector2(-7, 0) * build], cloth)
-	_poly(ci, [hip + Vector2(-3, 3) * build, hip + Vector2(4, 3) * build, sh + Vector2(4, 3) * build, sh + Vector2(-2, 3) * build], tm)
-	ci.draw_line(hip + Vector2(-6.5, -1) * build, hip + Vector2(6.5, -1) * build, trim.darkened(0.3), 2.5 * build)
-	if st.get("helmet", "") in ["crest", "kettle", "greathelm", "morion", "visor"]:
-		_poly(ci, [sh + Vector2(-7.5, 1) * build, sh + Vector2(8, 1) * build, sh + Vector2(6, 10) * build, sh + Vector2(-6, 10) * build], metal)
-	# Head and headgear.
-	ci.draw_circle(head, 6.8 * build, skin)
-	ci.draw_circle(head + Vector2(3.2, -0.8) * build, 1.1 * build, Color(0.1, 0.08, 0.06))
-	_helmet(ci, st.get("helmet", ""), head, build, pal, tm, pose, t, seed)
+	var elbow := sh + Vector2(-3, 1) * b + Vector2(0, 10 * b).rotated(arm_sw)
+	var back_hand := elbow + Vector2(0, 9 * b).rotated(arm_sw * 0.6 - 0.25)
+	_seg(ci, sh + Vector2(-3, 1) * b, elbow, 5.0 * b, 4.2 * b, cloth.darkened(0.3))
+	_seg(ci, elbow, back_hand, 4.2 * b, 3.4 * b, cloth.darkened(0.34))
+	ci.draw_circle(back_hand, 2.1 * b, skin.darkened(0.25))
+	# Torso: hips, waist, chest, shoulders.
+	var torso := [hip + Vector2(-6.5, 3) * b, hip + Vector2(7, 3) * b, hip + Vector2(6, -8) * b, sh + Vector2(8.5, 5) * b,
+		sh + Vector2(7.5, -1.5) * b, sh + Vector2(-7.5, -1.5) * b, sh + Vector2(-8, 5) * b, hip + Vector2(-5.5, -8) * b]
+	_shade_poly(ci, torso, cloth)
+	if armoured:
+		# Breastplate / hauberk with mail rows.
+		_shade_poly(ci, [hip + Vector2(-5.5, -5) * b, hip + Vector2(6.5, -5) * b, sh + Vector2(8, 4) * b, sh + Vector2(6, -0.5) * b,
+			sh + Vector2(-6, -0.5) * b, sh + Vector2(-7, 4) * b], metal)
+		for r in 4:
+			var y := -1.0 - r * 3.4
+			ci.draw_line(hip + Vector2(-4.5, y) * b, hip + Vector2(6, y) * b, Color(metal.darkened(0.35), 0.5), 0.8 * b)
+	# Team tabard with a hem, belt and buckle.
+	_shade_poly(ci, [sh + Vector2(-3, 2) * b, sh + Vector2(5, 2) * b, hip + Vector2(5.5, 8) * b, hip + Vector2(2, 5.5) * b,
+		hip + Vector2(-1.5, 8.5) * b, hip + Vector2(-3.5, 2) * b], tm)
+	ci.draw_line(hip + Vector2(5.5, 8) * b, hip + Vector2(2, 5.5) * b, tm.darkened(0.3), 1.0 * b)
+	ci.draw_line(hip + Vector2(-6, -1) * b, hip + Vector2(6.8, -1) * b, leather, 2.4 * b)
+	ci.draw_rect(Rect2(hip + Vector2(1.2, -2.4) * b, Vector2(2.6, 2.8) * b), _c(Color("c9a45c"), pose))
+	if armoured:
+		# Pauldron.
+		_shade_poly(ci, _ellipse_pts(sh + Vector2(1, 1.5) * b, Vector2(6, 4.2) * b, -0.2), metal.lightened(0.05))
+	# Neck and head: skull, jaw, ear, brow, eye, nose.
+	ci.draw_rect(Rect2(sh + Vector2(-0.5, -4.5) * b, Vector2(4.5, 4.5) * b), skin.darkened(0.15))
+	_shade_poly(ci, _ellipse_pts(head, Vector2(5.4, 6.0) * b, 0.0), skin)
+	_shade_poly(ci, [head + Vector2(-2.5, 3) * b, head + Vector2(4.8, 2.2) * b, head + Vector2(4.2, 5.2) * b, head + Vector2(0.5, 6.4) * b], skin.darkened(0.06))
+	ci.draw_circle(head + Vector2(-1.4, 0.6) * b, 1.5 * b, skin.darkened(0.2))
+	ci.draw_colored_polygon(PackedVector2Array([head + Vector2(5.0, -0.8) * b, head + Vector2(7.0, 1.6) * b, head + Vector2(5.0, 2.2) * b]), skin.darkened(0.05))
+	ci.draw_line(head + Vector2(2.0, -2.2) * b, head + Vector2(4.6, -2.0) * b, Color(0.15, 0.1, 0.07, 0.8), 0.9 * b)
+	ci.draw_circle(head + Vector2(3.4, -0.9) * b, 0.75 * b, Color(0.08, 0.06, 0.05))
+	ci.draw_line(head + Vector2(3.2, 3.6) * b, head + Vector2(4.6, 3.4) * b, Color(0.3, 0.15, 0.12, 0.7), 0.7 * b)
+	if seed % 3 == 0 and st.get("helmet", "") in ["hair", "band", "cap", "kettle", "morion", "tricorne", "brodie"]:
+		var hair: Color = _c(HAIR[seed % HAIR.size()], pose)
+		_shade_poly(ci, [head + Vector2(-2.5, 2) * b, head + Vector2(4.8, 2.4) * b, head + Vector2(3.5, 6.8) * b, head + Vector2(0.5, 7.4) * b, head + Vector2(-2, 5) * b], hair)
+	_helmet(ci, st.get("helmet", ""), head, build * 0.84, pal, tm, pose, t, seed)
 	# Front arm + weapon.
 	_weapon(ci, st.get("weapon", "sword"), sh, build, swing(atk), atk, pal, tm, skin, pose, t)
 	match st.get("shield", ""):
@@ -436,51 +517,86 @@ static func quadruped(ci: CanvasItem, kind: String, team: Color, pose: Dictionar
 	var walk: float = pose.get("walk", 0.0)
 	var t: float = pose.get("t", 0.0)
 	var atk: float = pose.get("atk", -1.0)
+	var boar := kind == "boar"
 	var col := _c({"boar": Color("5b4130"), "warhorse": Color("d8d2c4"), "horse": Color("6a4a31")}[kind], pose)
+	var dark := col.darkened(0.35)
 	var tm := _c(team, pose)
-	var len := 22.0 if kind == "boar" else 25.0
-	var h := 26.0 if kind == "boar" else 34.0
+	var L := 21.0 if boar else 24.0
+	var H := 22.0 if boar else 33.0
 	var bob := lerpf(sin(t * 1.5 + seed) * 0.5, absf(sin(walk * 2.0)) * 2.0, mv)
 	var lunge := maxf(0.0, swing(atk)) * 5.0
-	var body := Vector2(lunge, -h - 8 + bob)
-	_shadow(ci, 30)
-	# Legs: diagonal pairs.
-	for i in 4:
-		var front := i >= 2
-		var ph: float = walk * 1.0 + (PI if i % 2 == 1 else 0.0) + (PI * 0.5 if front else 0.0)
-		var hip := body + Vector2(len * (0.7 if front else -0.7), 6)
-		var a := lerpf(0.05, sin(ph) * 0.55, mv)
-		var knee := hip + Vector2(0, h * 0.5).rotated(-a)
-		var foot := knee + Vector2(0, h * 0.5 - 2).rotated(-a + maxf(0.0, cos(ph)) * 0.7 * mv * (-1.0 if front else 1.0))
-		var lc := col.darkened(0.3 if i % 2 == 1 else 0.1)
-		_limb(ci, hip, knee, 6.0, lc)
-		_limb(ci, knee, foot, 4.5, lc)
-		ci.draw_circle(foot, 3.0, Color(0.15, 0.12, 0.1))
-	_ellipse(ci, body, Vector2(len + 6, 12), col)
-	# Neck and head.
-	var neck := body + Vector2(len, -4)
-	var head := neck + Vector2(10, -12 if kind != "boar" else 2) + Vector2(lunge * 0.5, 0)
-	_limb(ci, neck, head, 10.0 if kind != "boar" else 13.0, col)
-	_ellipse(ci, head + Vector2(6, 2), Vector2(9, 5.5), col, 0.35 if kind != "boar" else 0.1)
-	ci.draw_circle(head + Vector2(4, -1), 1.3, Color(0.05, 0.05, 0.05))
-	if kind == "boar":
-		ci.draw_polyline(PackedVector2Array([head + Vector2(12, 4), head + Vector2(17, 0), head + Vector2(15, -5)]), Color("efe6cf"), 2.5)
-		for i in 5:
-			ci.draw_line(body + Vector2(-10 + i * 6, -11), body + Vector2(-12 + i * 6, -17), col.darkened(0.4), 2.0)
-	else:
-		# Mane / tail lag behind (secondary motion).
-		for i in 4:
-			ci.draw_line(neck + Vector2(i * 2, -6 - i * 3), neck + Vector2(i * 2 - 7, -3 - i * 3 + sin(t * 4 + i) * 1.5), col.darkened(0.5), 2.5)
-		ci.draw_line(body + Vector2(-len - 4, -4), body + Vector2(-len - 14, 8 + sin(t * 3.0) * 3.0), col.darkened(0.5), 4.0)
+	var c := Vector2(lunge, -H - 10 + bob)
+	_shadow(ci, 32)
+	# Legs: far pair first (darker), then near pair. Front legs bend forward at the knee, hind legs
+	# bend back at the hock; each ends in a fetlock and hoof.
+	for pass_i in 2:
+		for front in [false, true]:
+			var near := pass_i == 1
+			var ph: float = walk + (0.0 if near else PI) + (PI * 0.5 if front else 0.0)
+			var swing_a := lerpf(0.05, sin(ph) * 0.5, mv)
+			var lift := maxf(0.0, cos(ph)) * 0.8 * mv
+			var top := c + Vector2(L * (0.62 if front else -0.62), 5)
+			var lc := col.darkened(0.28 if not near else 0.0)
+			var upper := top + Vector2(0, H * 0.42).rotated(-swing_a)
+			var lower_dir := -swing_a + (lift if front else -lift * 0.6) + (0.0 if front else 0.35)
+			var fet := upper + Vector2(0, H * 0.42).rotated(lower_dir)
+			var hoof := fet + Vector2(1.5, H * 0.14).rotated(lower_dir * 0.5)
+			_seg(ci, top, upper, (9.0 if boar else 8.0), 5.2, lc)
+			_seg(ci, upper, fet, 4.6, 3.4, lc)
+			_seg(ci, fet, hoof, 3.4, 3.8, lc.darkened(0.1))
+			ci.draw_rect(Rect2(hoof + Vector2(-2.5, -1.2), Vector2(5.5, 2.8)), Color(0.12, 0.1, 0.08))
+		if pass_i == 0:
+			# Tail behind the far legs.
+			if boar:
+				ci.draw_polyline(PackedVector2Array([c + Vector2(-L - 2, -4), c + Vector2(-L - 6, -2 + sin(t * 6.0)), c + Vector2(-L - 5, 3)]), dark, 1.5)
+			else:
+				for k in 5:
+					var sway := sin(t * 2.5 + k * 0.4) * 3.0 + mv * 4.0
+					ci.draw_polyline(PackedVector2Array([c + Vector2(-L - 2, -6 + k), c + Vector2(-L - 9 - sway * 0.5, 2 + k), c + Vector2(-L - 12 - sway, 14 + k * 1.5)]), dark.darkened(0.1 * (k % 2)), 2.0)
+			# Barrel: chest, withers, back, croup, hindquarters, belly.
+			var body := [c + Vector2(L + 6, -2), c + Vector2(L - 2, -11), c + Vector2(L * 0.2, -12 if not boar else -15), c + Vector2(-L * 0.6, -11),
+				c + Vector2(-L - 5, -6), c + Vector2(-L - 6, 4), c + Vector2(-L * 0.5, 10), c + Vector2(L * 0.4, 10), c + Vector2(L + 5, 6)]
+			_shade_poly(ci, body, col)
+			if not boar:
+				# Neck up to the head.
+				var neck_top := c + Vector2(L + 8, -24) + Vector2(lunge * 0.4, 0)
+				_shade_poly(ci, [c + Vector2(L - 4, -10), c + Vector2(L + 6, -4), neck_top + Vector2(5, 4), neck_top + Vector2(-2, -1)], col)
+				var hd := neck_top + Vector2(4, -1)
+				_shade_poly(ci, [hd + Vector2(-4, -4), hd + Vector2(3, -6), hd + Vector2(13, 3), hd + Vector2(12, 7), hd + Vector2(6, 7), hd + Vector2(-3, 3)], col)
+				ci.draw_colored_polygon(PackedVector2Array([hd + Vector2(-2, -4), hd + Vector2(0, -10), hd + Vector2(2, -5)]), dark)
+				ci.draw_circle(hd + Vector2(2.5, -1.5), 1.2, Color(0.05, 0.04, 0.04))
+				ci.draw_circle(hd + Vector2(11.5, 4.5), 0.9, Color(0.1, 0.07, 0.06))
+				# Bridle and reins in team colour.
+				ci.draw_polyline(PackedVector2Array([hd + Vector2(-1, -3), hd + Vector2(8, 3), hd + Vector2(9, 6)]), tm.darkened(0.2), 1.2)
+				ci.draw_line(hd + Vector2(8, 3), c + Vector2(4, -14), Color(0.25, 0.18, 0.12), 1.0)
+				# Mane strands lag behind (secondary motion).
+				for k in 6:
+					var mp := (c + Vector2(L - 4, -11)).lerp(neck_top + Vector2(-2, -2), k / 5.0)
+					ci.draw_line(mp, mp + Vector2(-5 - mv * 2.0, 3 + sin(t * 4.0 + k) * 1.5), dark, 2.2)
+			else:
+				# Boar head: heavy snout, tusks, bristled back.
+				var hd := c + Vector2(L + 4, -2) + Vector2(lunge * 0.5, 0)
+				_shade_poly(ci, [hd + Vector2(-4, -9), hd + Vector2(6, -6), hd + Vector2(14, 1), hd + Vector2(13, 6), hd + Vector2(2, 7), hd + Vector2(-4, 4)], col)
+				ci.draw_rect(Rect2(hd + Vector2(12, 0), Vector2(3, 5)), col.darkened(0.3))
+				ci.draw_polyline(PackedVector2Array([hd + Vector2(10, 5), hd + Vector2(15, 2), hd + Vector2(14, -3)]), Color("efe6cf"), 2.4)
+				ci.draw_circle(hd + Vector2(4, -3), 1.1, Color(0.05, 0.04, 0.04))
+				ci.draw_colored_polygon(PackedVector2Array([hd + Vector2(-2, -8), hd + Vector2(-1, -13), hd + Vector2(2, -8)]), dark)
+				for k in 8:
+					var bp := c + Vector2(-L * 0.6 + k * 4.5, -12 - (2 if k % 2 == 0 else 0))
+					ci.draw_line(bp, bp + Vector2(-2, -4), dark, 1.6)
 	if kind == "warhorse":
-		# Caparison in team colour.
-		_poly(ci, [body + Vector2(-len - 4, -6), body + Vector2(len + 4, -6), body + Vector2(len + 6, 14), body + Vector2(-len - 6, 14)], tm)
-		for i in 5:
-			ci.draw_line(body + Vector2(-len + i * 11, 14), body + Vector2(-len + i * 11 + 4, 18), tm.darkened(0.3), 3.0)
-		ci.draw_line(body + Vector2(-len - 4, -2), body + Vector2(len + 4, -2), Color("d9c27a"), 2.0)
+		# Caparison in team colour with a scalloped hem and gold trim.
+		_shade_poly(ci, [c + Vector2(-L - 5, -9), c + Vector2(L + 3, -9), c + Vector2(L + 6, 14), c + Vector2(-L - 7, 14)], tm)
+		for k in 6:
+			var hx := -L - 5 + k * (2 * L + 10) / 6.0
+			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(hx, 14), c + Vector2(hx + 4, 19), c + Vector2(hx + 8, 14)]), tm.darkened(0.25))
+		ci.draw_line(c + Vector2(-L - 5, -5), c + Vector2(L + 3, -5), Color("d9c27a"), 2.0)
+		ci.draw_line(c + Vector2(-L - 6, 11), c + Vector2(L + 5, 11), Color("d9c27a"), 1.5)
 	else:
-		ci.draw_rect(Rect2(body + Vector2(-8, -12), Vector2(16, 5)), tm)
-	return body + Vector2(-2, -8)
+		# Saddle blanket.
+		_shade_poly(ci, [c + Vector2(-9, -13), c + Vector2(8, -13), c + Vector2(9, -4), c + Vector2(-10, -4)], tm)
+		ci.draw_rect(Rect2(c + Vector2(-6, -15), Vector2(12, 3)), Color(0.3, 0.2, 0.12))
+	return c + Vector2(-2, -10)
 
 
 static func mounted(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pose: Dictionary, seed: int) -> void:
@@ -498,7 +614,7 @@ static func _rider(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pose
 	var shifted := {}
 	for k in pose:
 		shifted[k] = pose[k]
-	_offset_humanoid(ci, st, pal, team, shifted, seed, at + Vector2(0, 22))
+	_offset_humanoid(ci, st, pal, team, shifted, seed, at + Vector2(0, 27))
 
 
 static func _offset_humanoid(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pose: Dictionary, seed: int, offset: Vector2) -> void:

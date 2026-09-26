@@ -5,6 +5,8 @@ extends Node2D
 ## On evolution the previous age stays underneath while the new one dissolves in (GDD §13.5 step 3).
 
 const SHADER := preload("res://shaders/split_backdrop.gdshader")
+const SKY := preload("res://shaders/sky.gdshader")
+const GROUND := preload("res://shaders/ground.gdshader")
 
 var side := 0
 var age := 1
@@ -21,6 +23,10 @@ var _old: Backdrop
 var _dissolve := 1.0
 
 
+var _sky: Node2D
+var _ground: Node2D
+
+
 func setup(p_side: int, p_age: int) -> void:
 	side = p_side
 	age = p_age
@@ -29,6 +35,101 @@ func setup(p_side: int, p_age: int) -> void:
 	_mat.set_shader_parameter("side", float(side))
 	_mat.set_shader_parameter("dissolve", 1.0)
 	material = _mat
+	if has_layers():
+		_sky = _layer(SKY, true, _draw_sky_rect)
+		_ground = _layer(GROUND, false, _draw_ground_rect)
+
+
+## Only the backdrop proper has sky and ground (the front layer overrides this).
+func has_layers() -> bool:
+	return true
+
+
+func _layer(shader: Shader, behind: bool, cb: Callable) -> Node2D:
+	var n := Node2D.new()
+	var m := ShaderMaterial.new()
+	m.shader = shader
+	m.set_shader_parameter("side", float(side))
+	n.material = m
+	n.show_behind_parent = behind
+	n.draw.connect(cb)
+	add_child(n)
+	return n
+
+
+## The part of the view this side can show: its half of the screen plus the seam's soft margin,
+## so neither side shades pixels the other side covers.
+func _view_rect() -> Rect2:
+	var vp := get_viewport_rect().size
+	var left := cam_x - vp.x * 0.5 - 80
+	var right := cam_x + vp.x * 0.5 + 80
+	var margin := vp.x * 0.12
+	if side == 0:
+		right = minf(right, seam_x + margin)
+	else:
+		left = maxf(left, seam_x - margin)
+	return Rect2(left, -400, maxf(0.0, right - left), 2000)
+
+
+func _draw_sky_rect() -> void:
+	var r := _view_rect()
+	_sky.draw_rect(Rect2(r.position, Vector2(r.size.x, Scenery.GROUND_Y + 400)), Color.WHITE)
+
+
+func _draw_ground_rect() -> void:
+	var r := _view_rect()
+	_ground.draw_rect(Rect2(r.position.x, Scenery.GROUND_Y - 8, r.size.x, 700), Color.WHITE)
+
+
+func _update_layers(seam_uv: float) -> void:
+	if _sky == null:
+		return
+	var sc := Scenery.for_age(age)
+	var pal := sc.palette
+	var cl: Dictionary = Scenery.CLOUDS[age - 1]
+	var sm: ShaderMaterial = _sky.material
+	var gm: ShaderMaterial = _ground.material
+	var top: Color = pal.sky[0]
+	var horizon: Color = pal.sky[1]
+	var sun: Color = pal.sun
+	var sun_uv := Vector2(pal.sun_pos.x, pal.sun_pos.y / 1080.0)
+	var sun_size: float = pal.sun_r / 1080.0
+	var moon := 0.0
+	var star_a := 1.0 if age == 6 else 0.0
+	if dn != null:
+		var k: float = DayNight.STRENGTH[age - 1]
+		top = top.lerp(Color("0b1030"), (1.0 - dn.daylight) * k)
+		horizon = horizon.lerp(Color("2a3358"), (1.0 - dn.daylight) * k).lerp(Color("f08a5a"), dn.twilight * 0.5 * k)
+		if age != 6:
+			var bp := dn.body_pos()
+			sun_uv = Vector2(bp.x, bp.y / 1080.0)
+			star_a = dn.stars()
+			if dn.is_night():
+				sun = Color(0.9, 0.93, 1.0)
+				sun_size = 30.0 / 1080.0
+				moon = 1.0
+			else:
+				sun = sun.lerp(Color("ff9a5a"), dn.twilight * 0.6)
+	if pal.sun_r <= 0.0 and moon < 0.5:
+		sun_size = 0.0
+	var night := 1.0 - dn.daylight if dn != null else 0.0
+	for pair in [["top_color", top], ["horizon_color", horizon], ["sun_color", sun], ["sun_uv", sun_uv],
+			["sun_size", sun_size], ["moon", moon], ["stars", star_a], ["cloud_cover", cl.cover], ["cloud_band", cl.band],
+			["cloud_light", (cl.light as Color).lerp(Color("5a6488"), night * 0.7)], ["cloud_shadow", (cl.shadow as Color).lerp(Color("1c2138"), night * 0.7)],
+			["drift", cam_x * 0.00012 + time * 0.004], ["time_s", time]]:
+		sm.set_shader_parameter(pair[0], pair[1])
+	gm.set_shader_parameter("top_color", pal.ground[0])
+	gm.set_shader_parameter("bottom_color", pal.ground[1])
+	gm.set_shader_parameter("road_color", pal.road)
+	gm.set_shader_parameter("kind", Scenery.GROUND_KIND[age - 1])
+	gm.set_shader_parameter("ground_y", Scenery.GROUND_Y - 8.0)
+	gm.set_shader_parameter("time_s", time)
+	for m in [sm, gm]:
+		m.set_shader_parameter("seam", seam_uv)
+		m.set_shader_parameter("opaque_left", _mat.get_shader_parameter("opaque_left"))
+		m.set_shader_parameter("dissolve", _mat.get_shader_parameter("dissolve"))
+	_sky.queue_redraw()
+	_ground.queue_redraw()
 
 
 func set_age(new_age: int) -> void:
@@ -40,6 +141,8 @@ func set_age(new_age: int) -> void:
 	_old.setup(side, age)
 	_old.show_behind_parent = true
 	add_child(_old)
+	# Draw the outgoing age first, underneath this one's sky, scenery and ground.
+	move_child(_old, 0)
 	age = new_age
 	_dissolve = 0.0
 
@@ -49,9 +152,12 @@ func _process(delta: float) -> void:
 	var seam_screen := (vp.get_canvas_transform() * Vector2(seam_x, 0)).x
 	var seam_uv := seam_screen / vp.get_visible_rect().size.x
 	_mat.set_shader_parameter("seam", seam_uv)
+	_update_layers(seam_uv)
 	if _old != null:
 		_old.cam_x = cam_x
 		_old.time = time
+		_old.dn = dn
+		_old.seam_x = seam_x
 		_old._mat.set_shader_parameter("seam", seam_uv)
 		_dissolve = minf(1.0, _dissolve + delta / 1.6)
 		_mat.set_shader_parameter("dissolve", _dissolve)
@@ -69,33 +175,6 @@ func _draw() -> void:
 	var left := cam.x - vp.x * 0.5 - 60
 	var right := cam.x + vp.x * 0.5 + 60
 	var t := time
-	# Sky gradient in view space.
-	var sky: Array = pal.sky
-	var top: Color = sky[0]
-	var horizon: Color = sky[1]
-	if dn != null:
-		var k: float = DayNight.STRENGTH[age - 1]
-		top = top.lerp(Color("0b1030"), (1.0 - dn.daylight) * k)
-		horizon = horizon.lerp(Color("2a3358"), (1.0 - dn.daylight) * k).lerp(Color("f08a5a"), dn.twilight * 0.5 * k)
-	draw_polygon(PackedVector2Array([Vector2(left, -400), Vector2(right, -400), Vector2(right, Scenery.GROUND_Y), Vector2(left, Scenery.GROUND_Y)]),
-		PackedColorArray([top, top, horizon, horizon]))
-	if dn != null and age != 6 and dn.stars() > 0.0:
-		_draw_stars(left, right, dn.stars())
-	if pal.sun_r > 0.0:
-		var sp := Vector2(left + (right - left) * pal.sun_pos.x, pal.sun_pos.y)
-		var body: Color = pal.sun
-		var r: float = pal.sun_r
-		if dn != null and age != 6:
-			var bp := dn.body_pos()
-			sp = Vector2(left + (right - left) * bp.x, bp.y)
-			if dn.is_night():
-				body = Color(0.9, 0.93, 1.0)
-				r = 30.0
-			else:
-				body = body.lerp(Color("ff9a5a"), dn.twilight * 0.6)
-		for i in 5:
-			draw_circle(sp, r * (1.0 + i * 0.6), Color(body, 0.12 - i * 0.02))
-		draw_circle(sp, r, body)
 	for li in sc.layers.size():
 		var layer: Dictionary = sc.layers[li]
 		var off: float = cam.x * (1.0 - layer.factor)

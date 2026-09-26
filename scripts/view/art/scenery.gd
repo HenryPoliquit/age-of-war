@@ -29,6 +29,17 @@ const PALETTES := [
 	 "road": Color("2a2d48"), "light": Color("8ff4ff")},
 ]
 
+## Shader looks per age: ground material kind and cloud character (GDD §4.1 palette & lighting).
+const GROUND_KIND := [0, 1, 2, 3, 4, 5]
+const CLOUDS := [
+	{"cover": 0.35, "band": 0.55, "light": Color("ffd9b0"), "shadow": Color("9a6a7a")},
+	{"cover": 0.3, "band": 0.35, "light": Color("ffffff"), "shadow": Color("b8c8dc")},
+	{"cover": 0.75, "band": 0.35, "light": Color("d9ddd8"), "shadow": Color("7f8a86")},
+	{"cover": 0.85, "band": 0.3, "light": Color("7f8899"), "shadow": Color("2a303d")},
+	{"cover": 0.7, "band": 0.45, "light": Color("e29a62"), "shadow": Color("5a3a34")},
+	{"cover": 0.25, "band": 0.5, "light": Color("6a4a9a"), "shadow": Color("1a1030")},
+]
+
 ## layers: Array[{factor, shapes: Array[Dictionary]}]; shapes: {poly, col} | {circle, r, col} | {line, to, w, col}
 ## anims: Array[Dictionary] evaluated each frame (smoke, flags, drones, lamps, signs).
 var age: int
@@ -216,9 +227,10 @@ func _ruin(layer: int, x: float, y: float, col: Color) -> void:
 func _medieval() -> void:
 	var p := palette
 	for i in 7:
-		var y := rng.randf_range(120, 380)
-		var x := rng.randf_range(X0, X1)
-		_add(0, {"poly": _blob(Vector2(x, y), Vector2(rng.randf_range(160, 320), rng.randf_range(20, 40)), 14), "col": Color(p.sky[1].lightened(0.1), 0.55)})
+		# Clouds come from shaders/sky.gdshader; keep the random draws so the layout is unchanged.
+		rng.randf(); rng.randf(); rng.randf(); rng.randf()
+		for k in 14:
+			rng.randf()
 	_ridge(0, 610, 60, 300, _haze(p.far, 0.4), 3)
 	_ridge(1, 670, 40, 260, _haze(p.mid, 0.2), 3)
 	for x: float in _xs(1500, 300):
@@ -235,22 +247,29 @@ func _medieval() -> void:
 
 func _castle(layer: int, x: float, y: float, col: Color, p: Dictionary) -> void:
 	_rect(layer, Rect2(x - 90, y - 70, 180, 70), col)
+	for r in 6:
+		_line(layer, Vector2(x - 90, y - 64 + r * 11), Vector2(x + 90, y - 64 + r * 11), 1, col.darkened(0.12))
 	for i in 3:
 		var tx := x - 90 + i * 90
 		_rect(layer, Rect2(tx - 16, y - 120, 32, 120), col.darkened(0.06))
+		for r in 9:
+			_line(layer, Vector2(tx - 16, y - 114 + r * 12), Vector2(tx + 16, y - 114 + r * 12), 1, col.darkened(0.16))
 		for k in 3:
 			_rect(layer, Rect2(tx - 16 + k * 12, y - 128, 8, 8), col.darkened(0.06))
-		_tri(layer, Vector2(tx - 18, y - 120), Vector2(tx + 18, y - 120), Vector2(tx, y - 150), col.darkened(0.2))
+		_tri(layer, Vector2(tx - 19, y - 120), Vector2(tx + 19, y - 120), Vector2(tx, y - 152), col.darkened(0.25))
+		_rect(layer, Rect2(tx - 2, y - 100, 4, 12), col.darkened(0.45))
+		_rect(layer, Rect2(tx - 2, y - 70, 4, 12), col.darkened(0.45))
 	for k in 12:
 		_rect(layer, Rect2(x - 90 + k * 15, y - 78, 9, 8), col)
+	_rect(layer, Rect2(x - 14, y - 34, 28, 34), col.darkened(0.4))
 
 
 func _gunpowder() -> void:
 	var p := palette
 	for i in 10:
-		var y := rng.randf_range(80, 360)
-		var x := rng.randf_range(X0, X1)
-		_add(0, {"poly": _blob(Vector2(x, y), Vector2(rng.randf_range(200, 380), rng.randf_range(30, 60)), 14), "col": Color(p.sky[0].lightened(0.12), 0.7)})
+		rng.randf(); rng.randf(); rng.randf(); rng.randf()
+		for k in 14:
+			rng.randf()
 	anims.append({"type": "lightning"})
 	_rect(0, Rect2(X0, 600, X1 - X0, 160), p.far)
 	_ridge(1, 640, 90, 280, _haze(p.mid, 0.15), 12, 30)
@@ -274,6 +293,12 @@ func _industrial() -> void:
 		var w := rng.randf_range(80, 180)
 		var h := rng.randf_range(60, 150)
 		_rect(0, Rect2(x, 640 - h, w, h + 120), _haze(p.far, 0.3))
+		for k in int(w / 22):
+			_tri(0, Vector2(x + k * 22, 640 - h), Vector2(x + k * 22 + 22, 640 - h), Vector2(x + k * 22 + 22, 640 - h - 12), _haze(p.far, 0.26))
+		for r in int(h / 30):
+			for k in int(w / 24):
+				if rng.randf() < 0.45:
+					_rect(0, Rect2(x + 6 + k * 24, 650 - h + r * 30, 10, 12), Color(1.0, 0.62, 0.25, rng.randf_range(0.15, 0.45)))
 		if rng.randf() < 0.55:
 			var cx := x + rng.randf_range(10, w - 20)
 			var ch := rng.randf_range(80, 160)
@@ -325,24 +350,7 @@ func _future() -> void:
 
 
 func _ground() -> void:
-	var p := palette
-	var top: Color = p.ground[0]
-	var bot: Color = p.ground[1]
-	_add(4, {"grad": Rect2(X0, GROUND_Y - 8, X1 - X0, 600), "top": top, "bottom": bot})
-	_add(4, {"grad": Rect2(X0, GROUND_Y - 6, X1 - X0, 30), "top": p.road, "bottom": Color(p.road, 0.0)})
-	for i in 260:
-		var x := rng.randf_range(X0, X1)
-		var y := rng.randf_range(GROUND_Y + 8, GROUND_Y + 300)
-		match age:
-			1, 2, 4:
-				_add(4, {"poly": _blob(Vector2(x, y), Vector2(rng.randf_range(3, 9), rng.randf_range(2, 4)), 6), "col": bot.lerp(top, rng.randf()).darkened(0.1)})
-			3:
-				_line(4, Vector2(x, y), Vector2(x + rng.randf_range(-3, 3), y - rng.randf_range(5, 11)), 2, top.lightened(rng.randf_range(0.0, 0.25)))
-			5:
-				_add(4, {"poly": _blob(Vector2(x, y), Vector2(rng.randf_range(8, 20), rng.randf_range(2, 5)), 8), "col": Color(0.15, 0.12, 0.1, 0.35)})
-			6:
-				if i % 3 == 0:
-					_line(4, Vector2(x, y), Vector2(x + rng.randf_range(30, 120), y), 1.5, Color("37e7ff", 0.18))
+	# The ground itself is shaded by shaders/ground.gdshader; only Future keeps its neon lane lines.
 	if age == 6:
 		_line(4, Vector2(X0, GROUND_Y + 24), Vector2(X1, GROUND_Y + 24), 2, Color("37e7ff", 0.55))
 		_line(4, Vector2(X0, GROUND_Y + 30), Vector2(X1, GROUND_Y + 30), 1, Color("ff4fd8", 0.45))

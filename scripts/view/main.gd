@@ -56,7 +56,8 @@ func _ready() -> void:
 	panel.add_child(_menu)
 	var title := Label.new()
 	title.text = "TIMEFRONT"
-	title.add_theme_font_size_override("font_size", 64)
+	title.add_theme_font_override("font", UiStyle.font("title"))
+	title.add_theme_font_size_override("font_size", 72)
 	title.add_theme_color_override("font_color", MatchHud.ACCENT)
 	title.add_theme_constant_override("outline_size", 12)
 	title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))

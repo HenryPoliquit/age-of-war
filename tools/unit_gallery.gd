@@ -32,7 +32,7 @@ func _initialize() -> void:
 
 func _draw_panel(n: Node2D, mode: int) -> void:
 	var gd := GameData.get_default()
-	var f := ThemeDB.fallback_font
+	var f := UiStyle.font("bold")
 	n.draw_string(f, Vector2(10, 28), ["Colour", "Greyscale", "Silhouette"][mode], HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.1, 0.1, 0.1))
 	for c in ROLES.size():
 		n.draw_string(f, Vector2(24 + c * 152, 58), ROLES[c].to_upper(), HORIZONTAL_ALIGNMENT_CENTER, 140, 14, Color(0.2, 0.2, 0.2))

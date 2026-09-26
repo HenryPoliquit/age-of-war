@@ -16,7 +16,7 @@ const SERIES := [
 func _draw() -> void:
 	if match_log == null or match_log.timeline.is_empty():
 		return
-	var font := ThemeDB.fallback_font
+	var font := UiStyle.font("bold")
 	var tl := match_log.timeline
 	var t_end: float = tl[-1].t
 	var rows := SERIES.size() + 1

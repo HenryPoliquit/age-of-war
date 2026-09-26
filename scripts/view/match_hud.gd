@@ -4,7 +4,7 @@ extends CanvasLayer
 ## command panel (economy, ability, evolve/veterancy, Forge, turrets, stance, speed), doctrine
 ## choice, event banners and the post-match screen. Reads MatchSim; acts only through its commands.
 
-const ACCENT := Color("d8b46a")
+const ACCENT := UiStyle.ACCENT
 const PANEL_BG := Color(0.06, 0.07, 0.1, 0.84)
 const GOLD := Color("f2c14e")
 const XP := Color("8fd0ff")
@@ -79,23 +79,7 @@ static func _box(bg: Color, border := Color(0, 0, 0, 0), radius := 8, width := 1
 
 
 static func make_theme() -> Theme:
-	var th := Theme.new()
-	th.default_font_size = 16
-	th.set_stylebox("panel", "PanelContainer", _box(PANEL_BG, Color(ACCENT, 0.35)))
-	th.set_stylebox("normal", "Button", _box(Color(0.14, 0.16, 0.22, 0.95), Color(ACCENT, 0.35), 6))
-	th.set_stylebox("hover", "Button", _box(Color(0.2, 0.23, 0.31, 0.98), Color(ACCENT, 0.8), 6))
-	th.set_stylebox("pressed", "Button", _box(Color(0.3, 0.26, 0.16, 1.0), ACCENT, 6))
-	th.set_stylebox("disabled", "Button", _box(Color(0.1, 0.11, 0.14, 0.85), Color(1, 1, 1, 0.06), 6))
-	th.set_stylebox("focus", "Button", StyleBoxEmpty.new())
-	th.set_color("font_color", "Button", Color("eef0f4"))
-	th.set_color("font_disabled_color", "Button", Color(1, 1, 1, 0.35))
-	th.set_color("font_color", "Label", Color("eef0f4"))
-	th.set_constant("outline_size", "Label", 4)
-	th.set_color("font_outline_color", "Label", Color(0, 0, 0, 0.6))
-	th.set_stylebox("background", "ProgressBar", _box(Color(0, 0, 0, 0.55), Color(1, 1, 1, 0.12), 5))
-	th.set_stylebox("panel", "PopupMenu", _box(PANEL_BG, Color(ACCENT, 0.5)))
-	th.set_stylebox("panel", "TooltipPanel", _box(Color(0.05, 0.06, 0.08, 0.96), Color(ACCENT, 0.5), 6))
-	return th
+	return UiStyle.theme()
 
 
 func _panel(parent: Control) -> PanelContainer:
@@ -104,9 +88,11 @@ func _panel(parent: Control) -> PanelContainer:
 	return p
 
 
-func _label(parent: Control, text := "", size := 16, col := Color("eef0f4")) -> Label:
+func _label(parent: Control, text := "", size := 16, col := UiStyle.TEXT, title := false) -> Label:
 	var l := Label.new()
 	l.text = text
+	if title:
+		l.add_theme_font_override("font", UiStyle.font("title"))
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", col)
 	parent.add_child(l)
@@ -140,13 +126,18 @@ func _build_top() -> void:
 		v.add_child(row)
 		var name := _label(row, "You" if i == 0 else "Enemy", 15, view.team_color(i).lightened(0.35))
 		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		_age_labels.append(_label(row, "", 15, ACCENT))
+		_age_labels.append(_label(row, "", 16, ACCENT, true))
 		_doc_labels.append(_label(row, "", 13, Color(1, 1, 1, 0.7)))
 		var bar_hp := ProgressBar.new()
 		bar_hp.custom_minimum_size = Vector2(0, 16)
 		bar_hp.show_percentage = false
 		bar_hp.fill_mode = ProgressBar.FILL_BEGIN_TO_END if i == 0 else ProgressBar.FILL_END_TO_BEGIN
-		bar_hp.add_theme_stylebox_override("fill", _box(view.team_color(i), Color(1, 1, 1, 0.25), 5))
+		var fill := StyleBoxFlat.new()
+		fill.bg_color = view.team_color(i)
+		fill.border_color = view.team_color(i).lightened(0.4)
+		fill.border_width_top = 2
+		fill.border_width_bottom = 2
+		bar_hp.add_theme_stylebox_override("fill", fill)
 		v.add_child(bar_hp)
 		_hp.append(bar_hp)
 		if i == 1:
@@ -157,7 +148,7 @@ func _build_top() -> void:
 			var mid := VBoxContainer.new()
 			mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			mid.alignment = BoxContainer.ALIGNMENT_CENTER
-			_clock = _label(mid, "0:00", 24)
+			_clock = _label(mid, "0:00", 26, UiStyle.TEXT, true)
 			_clock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			_tide = TidePips.new()
 			_tide.hud = self
@@ -293,7 +284,7 @@ func _build_doctrine() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
 	_doctrine_panel.add_child(v)
-	var l := _label(v, "Choose a doctrine", 26, ACCENT)
+	var l := _label(v, "Choose a doctrine", 28, ACCENT, true)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var s := _label(v, "Kept for the rest of the match. Your evolution waits while you decide.", 14, Color(1, 1, 1, 0.7))
 	s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -312,7 +303,7 @@ func _build_banner() -> void:
 	v.offset_top = 170
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(v)
-	_banner = _label(v, "", 64, ACCENT)
+	_banner = _label(v, "", 64, ACCENT, true)
 	_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_banner.add_theme_constant_override("outline_size", 10)
 	_banner_sub = _label(v, "", 20)
@@ -497,7 +488,7 @@ func show_post_match() -> void:
 	var v := VBoxContainer.new()
 	_post.add_child(v)
 	var won := sim.winner == MatchSim.LEFT
-	var title := _label(v, {MatchSim.LEFT: "VICTORY", MatchSim.RIGHT: "DEFEAT", MatchSim.DRAW: "DRAW"}[sim.winner], 56, ACCENT if won else Color("e07a6a"))
+	var title := _label(v, {MatchSim.LEFT: "VICTORY", MatchSim.RIGHT: "DEFEAT", MatchSim.DRAW: "DRAW"}[sim.winner], 60, ACCENT if won else Color("e07a6a"), true)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var sub := _label(v, "%d:%02d · %s Age vs %s Age" % [int(sim.time) / 60, int(sim.time) % 60, sim.data.age(sim.sides[0].age).display_name, sim.data.age(sim.sides[1].age).display_name], 18, Color(1, 1, 1, 0.7))
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -563,7 +554,7 @@ class Meter extends Control:
 		draw_rect(Rect2(Vector2.ZERO, Vector2(size.x * clampf(value, 0.0, 1.0), size.y)), c)
 		draw_rect(r, Color(1, 1, 1, 0.18), false, 1.0)
 		if text != "" and size.y > 14:
-			var f := ThemeDB.fallback_font
+			var f := UiStyle.font("bold")
 			draw_string_outline(f, Vector2(8, size.y * 0.5 + 6), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, 4, Color(0, 0, 0, 0.7))
 			draw_string(f, Vector2(8, size.y * 0.5 + 6), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color.WHITE)
 
@@ -577,7 +568,7 @@ class TidePips extends Control:
 		var n := sim.rules.tide_multipliers.size()
 		var w := 16.0
 		var x0 := size.x * 0.5 - (n * w) * 0.5 - 40
-		var f := ThemeDB.fallback_font
+		var f := UiStyle.font("bold")
 		draw_string(f, Vector2(x0 - 44, 13), "Tide", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1, 1, 1, 0.6))
 		for i in n:
 			var c := Vector2(x0 + i * w + 6, 8)
@@ -635,7 +626,7 @@ class UnitCard extends Button:
 	func _draw() -> void:
 		var sim := hud.sim
 		var roster := sim.roster(0)
-		var f := ThemeDB.fallback_font
+		var f := UiStyle.font("bold")
 		draw_string(f, Vector2(8, 20), "%d" % (index + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, MatchHud.ACCENT)
 		if index >= roster.size():
 			draw_string(f, Vector2(0, size.y * 0.5), "Siege from Bronze", HORIZONTAL_ALIGNMENT_CENTER, size.x, 13, Color(1, 1, 1, 0.3))
@@ -659,7 +650,7 @@ class QueueStrip extends Control:
 	func _draw() -> void:
 		var sim := hud.sim
 		var me := sim.sides[0]
-		var f := ThemeDB.fallback_font
+		var f := UiStyle.font("bold")
 		draw_string(f, Vector2(4, 20), "Queue", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1, 1, 1, 0.55))
 		for i in sim.rules.queue_slots:
 			var r := Rect2(60 + i * 36, 2, 30, 26)

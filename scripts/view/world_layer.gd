@@ -24,8 +24,18 @@ var _drawers: Array[Node2D] = []
 var _overlay: Node2D
 
 
+const GRAIN := preload("res://shaders/split_backdrop.gdshader")
+
+
 func _ready() -> void:
-	_font = ThemeDB.fallback_font
+	_font = UiStyle.font("bold")
+	# Bases and turrets get the same painterly surface grain as the scenery (no seam masking).
+	var gm := ShaderMaterial.new()
+	gm.shader = GRAIN
+	gm.set_shader_parameter("side", 0.0)
+	gm.set_shader_parameter("opaque_left", true)
+	gm.set_shader_parameter("grain", 0.18)
+	material = gm
 	for side in 2:
 		var g := CanvasGroup.new()
 		g.fit_margin = 6.0
@@ -74,11 +84,20 @@ func _process(delta: float) -> void:
 				move_amt.erase(k)
 	corpses = corpses.filter(func(c): return t - c.born < 1.4)
 	_update_corpse_nodes()
+	var dn_l: DayNight = view.backdrops[0].dn
+	BaseArt.night = 1.0 - dn_l.daylight if dn_l != null else 0.0
 	queue_redraw()
 	for side in 2:
 		var m: ShaderMaterial = _groups[side].material
 		m.set_shader_parameter("rim", view.team_color(side))
 		m.set_shader_parameter("width", 2.0 * view.camera.zoom.x)
+		# Key light follows the sun/moon of the side's backdrop; weaker and cooler at night.
+		var dn: DayNight = view.backdrops[side].dn
+		if dn != null:
+			var bp := dn.body_pos()
+			m.set_shader_parameter("light_dir", Vector2(bp.x - 0.5, 0.9 - bp.y / 1080.0))
+			m.set_shader_parameter("light_color", Color(1.0, 0.93, 0.82).lerp(Color(0.6, 0.7, 1.0), 1.0 - dn.daylight).lerp(Color(1.0, 0.7, 0.5), dn.twilight * 0.6))
+			m.set_shader_parameter("shade_strength", lerpf(0.35, 0.6, dn.daylight))
 		_drawers[side].queue_redraw()
 	_overlay.queue_redraw()
 
@@ -140,7 +159,7 @@ func _draw_base(s: SimSide, t: float) -> void:
 	var build := clampf((t - view.base_rebuilt.get(s.index, -10.0)) / 1.1, 0.0, 1.0)
 	var xf := Transform2D(0.0, Vector2(dir, 1), 0.0, Vector2(gate, GROUND_Y + 4))
 	UnitArt.begin(self, xf)
-	BaseArt.draw_base(self, s.age, team, s.base_hp / s.base_max_hp, t, build, s.turret_slots)
+	BaseArt.draw_base(self, s.age, team, s.base_hp / s.base_max_hp, t, build, s.turret_slots, self)
 	# Doctrine banners hang on the base (GDD §9: shown so the player can counter-plan).
 	for i in s.doctrines.size():
 		var p := Vector2(-170 + i * 40, -60)

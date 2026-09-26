@@ -80,7 +80,8 @@ static func make_panel(on_close: Callable) -> PanelContainer:
 	p.add_child(v)
 	var title := Label.new()
 	title.text = "Settings"
-	title.add_theme_font_size_override("font_size", 28)
+	title.add_theme_font_override("font", UiStyle.font("title"))
+	title.add_theme_font_size_override("font_size", 30)
 	title.add_theme_color_override("font_color", MatchHud.ACCENT)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(title)

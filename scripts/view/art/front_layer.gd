@@ -4,6 +4,10 @@ extends Backdrop
 ## same seam as the backdrop (each side keeps its own weather). Inherits the seam/dissolve plumbing.
 
 
+func has_layers() -> bool:
+	return false
+
+
 func setup(p_side: int, p_age: int) -> void:
 	super.setup(p_side, p_age)
 	_mat.set_shader_parameter("opaque_left", false)
@@ -39,8 +43,8 @@ func _draw_weather(w: Dictionary, left: float, right: float, vp: Vector2, t: flo
 		match w.kind:
 			"motes":
 				var x := left + fposmod(h1 * width + t * (8.0 + h3 * 14.0), width)
-				var y := 120.0 + fposmod(h2 * 700.0 - t * (4.0 + h3 * 6.0), 700.0) + sin(t * 0.8 + i) * 10.0
-				draw_circle(Vector2(x, y), 1.2 + h3 * 1.6, Color(col, col.a * (0.4 + 0.6 * sin(t * 1.3 + i * 2.1) ** 2)))
+				var y := 560.0 + fposmod(h2 * 320.0 - t * (4.0 + h3 * 6.0), 320.0) + sin(t * 0.8 + i) * 10.0
+				draw_circle(Vector2(x, y), 0.8 + h3 * 1.0, Color(col, col.a * 0.6 * (0.4 + 0.6 * sin(t * 1.3 + i * 2.1) ** 2)))
 			"gulls":
 				var x := left + fposmod(h1 * width + t * (30.0 + h3 * 30.0), width + 200) - 100
 				var y := 140.0 + h2 * 260.0 + sin(t * 0.7 + i) * 18.0
