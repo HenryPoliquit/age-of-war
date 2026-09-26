@@ -30,10 +30,10 @@ func _init(p_hud: MatchHud) -> void:
 	add_child(grid)
 	hud._label(grid, "")
 	for head in ["⚔ Attack", "♥ Health", "🛡 Defence · ➶ Range"]:
-		var l := hud._label(grid, head, 14, UiStyle.ACCENT)
+		var l := hud._label(grid, head, 15, UiStyle.ACCENT)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	for row in ROWS:
-		var name_label := hud._label(grid, "", 15)
+		var name_label := hud._label(grid, "", 16)
 		name_label.custom_minimum_size = Vector2(130, 0)
 		_labels[row] = name_label
 		var stats: Array = MatchSim.UPGRADES[row]
@@ -46,7 +46,7 @@ func _init(p_hud: MatchHud) -> void:
 			b.focus_mode = Control.FOCUS_NONE
 			b.custom_minimum_size = Vector2(150, 32)
 			b.alignment = HORIZONTAL_ALIGNMENT_CENTER
-			b.add_theme_font_size_override("font_size", 14)
+			b.add_theme_font_size_override("font_size", 15)
 			b.pressed.connect(func(): hud.feedback(hud.sim.buy_upgrade(0, row, stat)))
 			grid.add_child(b)
 			_cells["%s:%s" % [row, stat]] = b

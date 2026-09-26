@@ -88,7 +88,7 @@ static func theme() -> Theme:
 	th.set_color("font_color", "Button", TEXT)
 	th.set_color("font_hover_color", "Button", Color.WHITE)
 	th.set_color("font_pressed_color", "Button", ACCENT)
-	th.set_color("font_disabled_color", "Button", Color(TEXT, 0.35))
+	th.set_color("font_disabled_color", "Button", Color(TEXT, 0.6))
 	th.set_color("font_color", "Label", TEXT)
 	th.set_constant("outline_size", "Label", 4)
 	th.set_color("font_outline_color", "Label", Color(0, 0, 0, 0.75))

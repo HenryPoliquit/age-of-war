@@ -30,7 +30,7 @@ func _init(p_hud: MatchHud) -> void:
 		b.custom_minimum_size = Vector2(104, 96)
 		b.alignment = HORIZONTAL_ALIGNMENT_CENTER
 		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		b.add_theme_font_size_override("font_size", 14)
+		b.add_theme_font_size_override("font_size", 15)
 		b.pressed.connect(func(): open_menu(i))
 		row.add_child(b)
 		_slots.append(b)

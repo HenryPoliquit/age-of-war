@@ -80,20 +80,20 @@ class TrainRow extends Control:
 		var me := sim.sides[0]
 		var race := hud.view.race_of(0)
 		var f := UiStyle.font("bold")
-		var dim := Color(1, 1, 1, 0.55)
+		var dim := Color(1, 1, 1, 0.75)
 		var y := size.y * 0.5 + 5.0
-		draw_string(f, Vector2(4, y), "Training", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, dim)
+		draw_string(f, Vector2(4, y), "Training", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, dim)
 		var bar := Rect2(170, size.y * 0.5 - 5.0, 150, 10)
 		draw_rect(bar, Color(0, 0, 0, 0.5))
 		if me.queue.is_empty():
-			draw_string(f, Vector2(80, y), "—", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, dim)
+			draw_string(f, Vector2(80, y), "—", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, dim)
 		else:
 			var d := me.queue[0]
-			draw_string(f, Vector2(80, y), hud.view.race_def(0).unit_name(d), HORIZONTAL_ALIGNMENT_LEFT, 86, 14, UiStyle.TEXT)
+			draw_string(f, Vector2(80, y), hud.view.race_def(0).unit_name(d), HORIZONTAL_ALIGNMENT_LEFT, 86, 16, UiStyle.TEXT)
 			var p := 0.0 if me.is_evolving() else clampf(me.train_progress / d.train_time, 0.0, 1.0)
 			draw_rect(Rect2(bar.position, Vector2(bar.size.x * p, bar.size.y)), MatchHud.ACCENT)
 		draw_rect(bar, Color(1, 1, 1, 0.2), false, 1.0)
-		draw_string(f, Vector2(336, y), "Queue", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, dim)
+		draw_string(f, Vector2(336, y), "Queue", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, dim)
 		for i in sim.rules.queue_slots:
 			var r := Rect2(390 + i * 36, size.y * 0.5 - 15.0, 30, 30)
 			draw_rect(r, Color(0, 0, 0, 0.4))
@@ -104,4 +104,4 @@ class TrainRow extends Control:
 				UnitArt.draw_unit(self, q, hud.view.team_color(0), {"t": 0.0}, i, race)
 				draw_set_transform(Vector2.ZERO)
 			draw_rect(r, MatchHud.ACCENT if i == 0 and not me.queue.is_empty() else Color(1, 1, 1, 0.15), false, 1.0)
-		draw_string(f, Vector2(390 + sim.rules.queue_slots * 36 + 12, y), "On field %d/%d" % [me.units.size(), sim.rules.field_cap], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, dim)
+		draw_string(f, Vector2(390 + sim.rules.queue_slots * 36 + 12, y), "On field %d/%d" % [me.units.size(), sim.rules.field_cap], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, dim)
