@@ -13,7 +13,7 @@ const TOWER_SCALE := 1.2
 ## Tower height (before TOWER_SCALE) per race and age.
 const TOWER_H := {
 	&"human": [46.0, 50.0, 62.0, 70.0, 50.0, 78.0],
-	&"elf": [62.0, 64.0, 80.0, 84.0, 92.0, 94.0],
+	&"elf": [50.0, 56.0, 66.0, 74.0, 82.0, 86.0],
 	&"dwarf": [36.0, 40.0, 46.0, 48.0, 50.0, 52.0],
 }
 
@@ -613,7 +613,8 @@ static func draw_turret(ci: CanvasItem, def: TurretDef, team: Color, aim: float,
 	var arcane := def.age >= 6
 	match def.kind:
 		"sentry":
-			ci.draw_rect(Rect2(-12, -6, 24, 16), wood.darkened(dim) if def.age <= 3 else metal.darkened(0.3 + dim))
+			if race != &"elf":
+				ci.draw_rect(Rect2(-12, -6, 24, 16), wood.darkened(dim) if def.age <= 3 else metal.darkened(0.3 + dim))
 			var dirv := Vector2.RIGHT.rotated(aim)
 			var n := dirv.orthogonal()
 			var base := Vector2(0, -8)
@@ -644,7 +645,8 @@ static func draw_turret(ci: CanvasItem, def: TurretDef, team: Color, aim: float,
 			if arcane:
 				ci.draw_circle(base, 3.0, Color(glow, 0.6 + 0.3 * sin(t * 4.0)))
 		"artillery":
-			ci.draw_rect(Rect2(-16, -4, 32, 14), wood.darkened(0.2 + dim) if def.age <= 3 else metal.darkened(0.35 + dim))
+			if race != &"elf":
+				ci.draw_rect(Rect2(-16, -4, 32, 14), wood.darkened(0.2 + dim) if def.age <= 3 else metal.darkened(0.35 + dim))
 			var base := Vector2(-2, -8)
 			if race == &"elf" and not arcane:
 				# Leaf-wood throwing arm.
@@ -664,6 +666,23 @@ static func draw_turret(ci: CanvasItem, def: TurretDef, team: Color, aim: float,
 			ci.draw_circle(base, 7.0, team.darkened(dim))
 		"support":
 			var pulse := 0.5 + 0.5 * sin(t * 3.0)
+			if race == &"elf":
+				if def.age <= 4:
+					# Thorn bramble (Thornbrake / Mistwell sit in a knot of briars).
+					for n in 5:
+						var c := Vector2(-10 + n * 5, -8 - (n % 2) * 6)
+						UnitArt._ellipse(ci, c, Vector2(8, 6), Color("3e5a2e").darkened(dim + 0.05 * (n % 2)))
+						ci.draw_line(c, c + Vector2(-4 + n * 2, -9), Color("6e5236").darkened(dim), 1.2)
+					if def.age == 4:
+						for n in 3:
+							ci.draw_circle(Vector2(-6 + n * 6, -18 - pulse * 6 - n * 3), 3.0, Color(0.85, 0.92, 0.95, 0.45))
+				else:
+					# A seed-pod of light cupped in petals.
+					for n in 4:
+						var a := PI + (n + 0.5) * PI / 4.0
+						UnitArt._ellipse(ci, Vector2(cos(a), sin(a)) * 8.0 + Vector2(0, -6), Vector2(8, 3.5), Color("e8eef6").darkened(dim), a)
+					ci.draw_circle(Vector2(0, -12), 6.0, Color(glow, 0.5 + 0.4 * pulse))
+				return
 			match def.age:
 				3, 4:
 					# Cauldron / smoke pot / thorn thicket / steam vent.
@@ -695,26 +714,7 @@ static func draw_tower(ci: CanvasItem, race: StringName, age: int, team: Color, 
 	UnitArt._ellipse(ci, Vector2(0, 2), Vector2(24, 5), Color(0, 0, 0, 0.3))
 	match race:
 		&"elf":
-			var wood := Color("8a6a44").darkened(dim)
-			var white := Color("e6e2d8").darkened(dim)
-			if age <= 2:
-				# Living-wood stand: a twisted trunk opening into a cradle of branches.
-				_sp(ci, [Vector2(-14, 0), Vector2(-6, -10), Vector2(-7, -h + 12), Vector2(-16, -h), Vector2(16, -h), Vector2(7, -h + 12), Vector2(6, -10), Vector2(14, 0)], wood)
-				ci.draw_polyline(PackedVector2Array([Vector2(-2, -4), Vector2(2, -h * 0.5), Vector2(-1, -h + 12)]), Color(0, 0, 0, 0.25), 1.5)
-				for x in [-18.0, 18.0]:
-					UnitArt._ellipse(ci, Vector2(x, -h + 2), Vector2(8, 5), Color("4f7a3a").darkened(dim))
-			else:
-				var col := wood.lightened(0.1) if age <= 4 else white
-				_sp(ci, [Vector2(-12, 0), Vector2(-8, -h + 8), Vector2(-15, -h), Vector2(15, -h), Vector2(8, -h + 8), Vector2(12, 0)], col)
-				ci.draw_line(Vector2(-10, -h * 0.4), Vector2(10, -h * 0.4), Color("d9b25c").darkened(dim), 2.0)
-				for k in 3:
-					ci.draw_arc(Vector2(0, -12 - k * (h - 24) / 3.0), 9.0, 0.3, 2.8, 8, Color("4f7a3a").darkened(dim), 2.0)
-				if age >= 5:
-					var k := 0.6 + 0.4 * sin(t * 2.0)
-					ci.draw_circle(Vector2(0, -h * 0.6), 5.0, Color(glow, 0.35 * k))
-					ci.draw_line(Vector2(0, -h * 0.75), Vector2(0, -h * 0.45), Color(glow, 0.7 * k), 1.5)
-			_sp(ci, _rect_pts(Rect2(-17, -h - 3, 34, 5)), wood.darkened(0.1))
-			_sp(ci, [Vector2(-6, -h * 0.55), Vector2(6, -h * 0.55), Vector2(0, -h * 0.4)], tm)
+			_elf_tower(ci, age, h, tm, glow, t, dim)
 		&"dwarf":
 			var stone := (Color("8a8278") if age != 2 else Color("9a6a4a")).darkened(dim)
 			if age == 6:
@@ -783,3 +783,133 @@ static func draw_tower(ci: CanvasItem, race: StringName, age: int, team: Color, 
 					ci.draw_rect(Rect2(-3, -h * 0.7, 6, h * 0.3), Color(glow, 0.5 + 0.4 * k))
 					ci.draw_rect(Rect2(-8, -h * 0.25, 16, 9), tm)
 					_sp(ci, _rect_pts(Rect2(-14, -h - 4, 28, 5)), Color("c9a45c").darkened(dim))
+
+
+## Elven towers are grown or woven from nature, not built: a mossy standing stone with a nest, a
+## wicker tower, braided living roots, a vine-bound white stone column with a leaf balcony, a
+## flower on a tall stem cupping the turret, and a cluster of glowing crystal under a floating leaf.
+static func _elf_tower(ci: CanvasItem, age: int, h: float, tm: Color, glow: Color, t: float, dim: float) -> void:
+	var moss := Color("5f7f3a").darkened(dim)
+	var leaf := Color("4f7a3a").darkened(dim)
+	var wicker := Color("b08e5a").darkened(dim)
+	var stone := Color("9a968a").darkened(dim)
+	var gold := Color("d9b25c").darkened(dim)
+	match age:
+		1:
+			# Mossy standing stone, lashed with vines, a woven nest on top.
+			_sp(ci, UnitArt._ellipse_pts(Vector2(0, -6), Vector2(22, 9), 0.0, 12), stone.darkened(0.1))
+			_sp(ci, [Vector2(-12, -8), Vector2(-11, -h + 12), Vector2(-5, -h + 5), Vector2(7, -h + 7), Vector2(12, -h + 16), Vector2(12, -8)], stone)
+			for p in [Vector2(-8, -h + 14), Vector2(6, -h * 0.5), Vector2(-5, -18)]:
+				UnitArt._ellipse(ci, p, Vector2(7, 4), moss, 0.3)
+			var vine := PackedVector2Array()
+			for n in 13:
+				var y := -8.0 - n * (h - 16) / 12.0
+				vine.append(Vector2(sin(n * 1.1) * 12.0, y))
+			ci.draw_polyline(vine, leaf, 2.0)
+			_nest(ci, Vector2(0, -h), 18.0, wicker)
+		2:
+			# Woven wicker tower: tapered basket of staves and bands, a leaf collar.
+			var pts := [Vector2(-17, 0), Vector2(-11, -h), Vector2(11, -h), Vector2(17, 0)]
+			_sp(ci, pts, wicker)
+			for n in 5:
+				var x := -12.0 + n * 6.0
+				ci.draw_line(Vector2(x * 1.35, 0), Vector2(x, -h), wicker.darkened(0.3), 1.2)
+			var rows := int(h / 5.0)
+			for r in rows:
+				var y := -3.0 - r * 5.0
+				var w := lerpf(17.0, 11.0, -y / h) - 1.0
+				ci.draw_polyline(PackedVector2Array([Vector2(-w, y - 1.5), Vector2(0, y + 1.0), Vector2(w, y - 1.5)]), wicker.lightened(0.12) if r % 2 == 0 else wicker.darkened(0.15), 2.0)
+			for n in 7:
+				var a := PI + n * PI / 6.0
+				UnitArt._ellipse(ci, Vector2(cos(a) * 15.0, -h + 2 + sin(a) * 3.0), Vector2(7, 3), leaf.lightened(0.05 * (n % 2)), a)
+			_sp(ci, UnitArt._ellipse_pts(Vector2(0, -h), Vector2(17, 4), 0.0, 12), wicker.darkened(0.1))
+			for x in [-18.0, 18.0]:
+				UnitArt._ellipse(ci, Vector2(x, -2), Vector2(8, 4), moss)
+		3:
+			# Three living roots braided into a column, cupping the platform.
+			for strand in 3:
+				var line := PackedVector2Array()
+				for n in 17:
+					var u := n / 16.0
+					var spread := lerpf(18.0, 6.0, sin(u * PI) * 0.9 + u * 0.1)
+					line.append(Vector2(sin(u * 9.0 + strand * TAU / 3.0) * spread, -u * h))
+				ci.draw_polyline(line, Color("6e5236").darkened(dim + 0.1 * strand), 6.5 - strand * 0.5)
+			for x in [-22.0, -12.0, 14.0, 23.0]:
+				ci.draw_line(Vector2(x * 0.4, -6), Vector2(x, 1), Color("5e4630").darkened(dim), 3.0)
+			ci.draw_arc(Vector2(0, -h + 6), 16.0, 0.2, PI - 0.2, 12, Color("6e5236").darkened(dim), 5.0)
+			_sp(ci, UnitArt._ellipse_pts(Vector2(0, -h), Vector2(16, 4), 0.0, 12), moss)
+			for p in [Vector2(-15, -h + 4), Vector2(16, -h + 6), Vector2(-9, -h * 0.55), Vector2(10, -h * 0.3)]:
+				UnitArt._ellipse(ci, p, Vector2(5, 2.5), leaf, -0.6 if p.x < 0 else 0.6)
+		4:
+			# Vine-bound white stone column with a leaf-shaped balcony.
+			var white := Color("e8e4da").darkened(dim)
+			_sp(ci, [Vector2(-13, 0), Vector2(-9, -h + 6), Vector2(9, -h + 6), Vector2(13, 0)], white)
+			for n in 4:
+				ci.draw_line(Vector2(-10 + n * 0.8, -12 - n * (h - 20) / 4.0), Vector2(10 - n * 0.8, -12 - n * (h - 20) / 4.0), white.darkened(0.12), 1.0)
+			var vine := PackedVector2Array()
+			for n in 25:
+				var u := n / 24.0
+				vine.append(Vector2(sin(u * 14.0) * 11.0, -u * (h - 6)))
+			ci.draw_polyline(vine, leaf, 2.0)
+			for n in 7:
+				var u := (n + 0.5) / 7.0
+				UnitArt._ellipse(ci, Vector2(sin(u * 14.0) * 11.0 + 3.0, -u * (h - 6)), Vector2(4, 2), leaf.lightened(0.1), 0.5)
+			# Balcony: a broad leaf with a gilt rib, tips curling up.
+			_sp(ci, [Vector2(-22, -h + 2), Vector2(-14, -h + 7), Vector2(14, -h + 7), Vector2(22, -h + 2), Vector2(12, -h - 2), Vector2(-12, -h - 2)], leaf.lightened(0.05))
+			ci.draw_line(Vector2(-20, -h + 2), Vector2(20, -h + 2), gold, 1.2)
+		5:
+			# A great flower: a curving stem with broad leaves, petals cupping the turret.
+			var stem := PackedVector2Array()
+			for n in 13:
+				var u := n / 12.0
+				stem.append(Vector2(sin(u * 3.0) * 5.0, -u * (h - 8)))
+			ci.draw_polyline(stem, Color("4f7a3a").darkened(dim), 7.0)
+			for side in [-1.0, 1.0]:
+				var base := Vector2(side * 3.0, -h * (0.3 if side < 0 else 0.5))
+				_sp(ci, [base, base + Vector2(side * 14, -12), base + Vector2(side * 26, -6), base + Vector2(side * 14, 2)], leaf.lightened(0.08))
+				ci.draw_line(base, base + Vector2(side * 24, -6), leaf.darkened(0.2), 1.0)
+			var petal := Color("e8eef6").darkened(dim)
+			for n in 5:
+				var a := PI + (n + 0.5) * PI / 5.0
+				var d := Vector2(cos(a), sin(a))
+				_sp(ci, [Vector2(0, -h + 6), Vector2(0, -h + 6) + d * 14 + d.orthogonal() * 6, Vector2(0, -h + 6) + d * 22, Vector2(0, -h + 6) + d * 14 - d.orthogonal() * 6], petal.lerp(glow, 0.15 * (n % 2)))
+			var k := 0.6 + 0.4 * sin(t * 2.0)
+			for n in 4:
+				var a := t * 0.8 + n * TAU / 4.0
+				ci.draw_circle(Vector2(cos(a) * 16.0, -h - 4 + sin(a) * 5.0), 1.4, Color(glow, 0.7 * k))
+		_:
+			# Crystal bloom: faceted shards grown from a mossy mound, a leaf floating above them.
+			_sp(ci, UnitArt._ellipse_pts(Vector2(0, -4), Vector2(22, 9), 0.0, 12), moss)
+			var crystal := Color("cfe6f2").lerp(glow, 0.35).darkened(dim)
+			var k := 0.6 + 0.4 * sin(t * 1.8)
+			for p in [[-9.0, 0.62, -0.2], [9.0, 0.7, 0.18], [0.0, 0.9, 0.0]]:
+				var x: float = p[0]
+				var sh: float = p[1] * (h - 14)
+				var lean: float = p[2]
+				var base := Vector2(x, -6)
+				var tip := base + Vector2(0, -sh).rotated(lean)
+				var side := Vector2(6, 0).rotated(lean)
+				_sp(ci, [base - side, tip - side * 0.6 + Vector2(0, 8).rotated(lean), tip, tip + side * 0.6 + Vector2(0, 8).rotated(lean), base + side], crystal)
+				ci.draw_line(base, tip, Color(1, 1, 1, 0.5), 1.0)
+			ci.draw_circle(Vector2(0, -h * 0.5), 12.0, Color(glow, 0.18 * k))
+			# Motes rising from the crystals hold up the floating leaf.
+			for n in 4:
+				var u := fmod(t * 0.5 + n * 0.25, 1.0)
+				ci.draw_circle(Vector2(-8 + n * 5, lerpf(-h * 0.8, -h + 6, u)), 1.5, Color(glow, 0.8 * (1.0 - u)))
+			var hover := sin(t * 1.5) * 2.0
+			ci.draw_circle(Vector2(0, -h + 6 + hover), 16.0, Color(glow, 0.12 + 0.08 * k))
+			_sp(ci, [Vector2(-28, -h + 1 + hover), Vector2(-16, -h + 7 + hover), Vector2(16, -h + 7 + hover), Vector2(28, -h + 1 + hover), Vector2(16, -h - 3 + hover), Vector2(-16, -h - 3 + hover)], leaf.lerp(glow, 0.25))
+			ci.draw_line(Vector2(-26, -h + 2 + hover), Vector2(26, -h + 2 + hover), Color(glow, 0.8), 1.4)
+			for x in [-12.0, 0.0, 12.0]:
+				ci.draw_line(Vector2(x, -h + 2 + hover), Vector2(x + 5, -h + 6 + hover), Color(glow, 0.5), 1.0)
+	# Team colour: a leaf-shaped ribbon tied round the tower.
+	var ry := -h * 0.45
+	ci.draw_colored_polygon(PackedVector2Array([Vector2(8, ry), Vector2(18, ry + 3), Vector2(24, ry + 10), Vector2(16, ry + 8), Vector2(8, ry + 5)]), tm)
+
+
+static func _nest(ci: CanvasItem, c: Vector2, r: float, col: Color) -> void:
+	_sp(ci, UnitArt._ellipse_pts(c + Vector2(0, 2), Vector2(r, 5), 0.0, 12), col.darkened(0.15))
+	for n in 7:
+		var x := -r + n * r / 3.0
+		ci.draw_line(c + Vector2(x - 5, -1), c + Vector2(x + 6, 5), col.lightened(0.1), 1.5)
+		ci.draw_line(c + Vector2(x + 5, -1), c + Vector2(x - 4, 5), col.darkened(0.1), 1.5)

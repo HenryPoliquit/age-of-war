@@ -5,12 +5,16 @@ extends SceneTree
 
 var out := "reports/base_gallery.png"
 var night := 0.0
+## --towers: close-up of every race × age turret tower instead of the bases.
+var towers := false
 
 
 func _initialize() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--out="):
 			out = a.get_slice("=", 1)
+		elif a == "--towers":
+			towers = true
 		elif a.begins_with("--night="):
 			night = float(a.get_slice("=", 1))
 	var bg := ColorRect.new()
@@ -27,6 +31,9 @@ func _draw(n: Node2D) -> void:
 	var gd := GameData.get_default()
 	var f := UiStyle.font("bold")
 	BaseArt.night = night
+	if towers:
+		_draw_towers(n, gd, f)
+		return
 	for r in RaceLook.IDS.size():
 		var race: StringName = RaceLook.IDS[r]
 		for age in range(1, 7):
@@ -53,6 +60,27 @@ func _draw(n: Node2D) -> void:
 					BaseArt.draw_turret(n, turrets[i], MatchView.TEAM[0], -0.2, 0.0, 0.7, false, race)
 			n.draw_set_transform(Vector2.ZERO)
 			n.draw_string(f, Vector2(col_x + 10, gate.y + 34), "%s · %s" % [gd.race(race).display_name, gd.age(age).display_name], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.1, 0.1, 0.1))
+
+func _draw_towers(n: Node2D, gd: GameData, f: Font) -> void:
+	var sentries := {}
+	for age in range(1, 7):
+		for td in gd.age(age).turrets:
+			if td.kind == "sentry":
+				sentries[age] = td
+	for r in RaceLook.IDS.size():
+		var race: StringName = RaceLook.IDS[r]
+		for age in range(1, 7):
+			var foot := Vector2(160 + (age - 1) * 320, 320 + r * 350)
+			n.draw_rect(Rect2(foot.x - 150, foot.y, 300, 10), Color("5a4a3a"))
+			var k := 2.6
+			var xf := Transform2D(0.0, Vector2(k, k), 0.0, foot)
+			UnitArt.begin(n, xf)
+			BaseArt.draw_tower(n, race, age, MatchView.TEAM[0], 0.7)
+			UnitArt.begin(n, xf * Transform2D(0.0, Vector2(0, -BaseArt.tower_height(race, age))))
+			BaseArt.draw_turret(n, sentries[age], MatchView.TEAM[0], -0.2, 0.0, 0.7, false, race)
+			n.draw_set_transform(Vector2.ZERO)
+			n.draw_string(f, foot + Vector2(-140, 30), "%s · %s" % [gd.race(race).display_name, gd.age(age).display_name], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.1, 0.1, 0.1))
+
 
 func _capture() -> void:
 	for i in 3:
