@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="UnitDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/unit_def.gd" id="1_o2d18"]
+
+[resource]
+script = ExtResource("1_o2d18")
+id = &"medieval_ranged"
+display_name = "Medieval Ranged"
+age = 4
+role = "ranged"
+armour = "light"
+damage_type = "pierce"
+cost = 123
+train_time = 1.5
+hp = 412.0
+damage = 82.3
+attack_interval = 1.2
+range = 220.0
+min_range = 0.0
+speed = 60.0
+momentum_on_kill = 1

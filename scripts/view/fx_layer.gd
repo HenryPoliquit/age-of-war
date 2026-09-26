@@ -13,7 +13,7 @@ var lights: LightPool
 var particles: Array[Dictionary] = []
 var projectiles: Array[Dictionary] = []
 var decals: Array[Dictionary] = []
-var actors: Array[Dictionary] = []    # stampede beasts, bombers, lasting domes
+var actors: Array[Dictionary] = []    # stampede beasts, lasting domes, beams
 var scheduled: Array[Dictionary] = [] # {at, fn: Callable}
 var glow: Node2D
 var rng := RandomNumberGenerator.new()
@@ -129,10 +129,11 @@ func muzzle(pos: Vector2, dir: float, big := false, col := Color(1.0, 0.8, 0.4),
 ## kind: arrow | stone | javelin | bullet | tracer | ball | shell | bolt
 func shoot(kind: String, from: Vector2, to: Vector2, dtype: String, on_hit: Callable, heavy := false) -> void:
 	var dist := from.distance_to(to)
-	var speed := {"arrow": 760.0, "stone": 620.0, "javelin": 660.0, "bullet": 2400.0, "tracer": 2600.0, "ball": 700.0, "shell": 520.0, "bolt": 1500.0}.get(kind, 800.0) as float
-	if kind in ["arrow", "stone", "javelin"]:
+	var speed := {"arrow": 760.0, "stone": 620.0, "javelin": 660.0, "axe": 600.0, "bullet": 2400.0, "tracer": 2600.0, "ball": 700.0,
+		"shell": 520.0, "bolt": 1500.0, "orb": 560.0}.get(kind, 800.0) as float
+	if kind in ["arrow", "stone", "javelin", "axe"]:
 		_sound("bow", from, -6.0)
-	var arc := {"arrow": 0.22, "stone": 0.2, "javelin": 0.2, "ball": 0.18, "shell": 0.55}.get(kind, 0.0) as float
+	var arc := {"arrow": 0.22, "stone": 0.2, "javelin": 0.2, "axe": 0.2, "ball": 0.18, "shell": 0.55, "orb": 0.4}.get(kind, 0.0) as float
 	projectiles.append({"kind": kind, "from": from, "to": to, "born": now(), "dur": maxf(0.06, dist / speed),
 		"arc": dist * arc, "dtype": dtype, "on_hit": on_hit, "heavy": heavy})
 
@@ -146,14 +147,22 @@ func _proj_pos(p: Dictionary, u: float) -> Vector2:
 # ---------------------------------------------------------------------------
 # Abilities (GDD §7)
 
-func ability_pulse(ability: String, lo: float, hi: float, side: int, team: Color) -> void:
+## Race flavour for the shared abilities: same footprint and timing, different stuff falling.
+const STAMPEDE_BEAST := {&"human": "boar", &"elf": "stag", &"dwarf": "ram"}
+const VOLLEY_SHOT := {&"human": "javelin", &"elf": "arrow", &"dwarf": "axe"}
+const BOMBARD_SHOT := {&"human": "shell", &"elf": "javelin", &"dwarf": "shell"}
+const CANNONADE_SHOT := {&"human": "ball", &"elf": "orb", &"dwarf": "ball"}
+
+
+func ability_pulse(ability: String, lo: float, hi: float, side: int, team: Color, race: StringName = &"human") -> void:
 	var dir := 1.0 if side == 0 else -1.0
+	var magic: Color = RaceLook.look(race).glow
 	match ability:
 		"stampede":
 			_sound("stampede", Vector2((lo + hi) * 0.5, GROUND_Y))
 			for i in 8:
 				var start := (lo if dir > 0 else hi) - dir * rng.randf_range(80, 220)
-				actors.append({"kind": "beast", "x": start, "y": GROUND_Y + rng.randf_range(-6, 8), "vx": dir * rng.randf_range(620, 760),
+				actors.append({"kind": "beast", "beast": STAMPEDE_BEAST.get(race, "boar"), "x": start, "y": GROUND_Y + rng.randf_range(-6, 8), "vx": dir * rng.randf_range(620, 760),
 					"until_x": hi + 120 if dir > 0 else lo - 120, "born": now(), "life": 1.2, "side": side})
 			for k in 10:
 				burst("smoke", Vector2(rng.randf_range(lo, hi), GROUND_Y), 2, Color(0.7, 0.58, 0.42, 0.55), Vector2(20, 80), Vector2(0.6, 1.1), Vector2(10, 22), -20.0)
@@ -161,33 +170,45 @@ func ability_pulse(ability: String, lo: float, hi: float, side: int, team: Color
 		"shieldwall":
 			actors.append({"kind": "dome", "lo": lo, "hi": hi, "born": now(), "life": 8.0, "col": team})
 			ring(Vector2((lo + hi) * 0.5, GROUND_Y - 30), (hi - lo) * 0.6, Color(team.lightened(0.5), 0.6), 0.5, 6.0)
-		"arrow_storm":
+		"volley":
+			var kind: String = VOLLEY_SHOT.get(race, "arrow")
 			for i in 22:
 				var x := rng.randf_range(lo, hi)
 				var to := Vector2(x, GROUND_Y - rng.randf_range(4, 30))
 				var from := to + Vector2(-dir * rng.randf_range(160, 260), -rng.randf_range(520, 640))
-				later(rng.randf_range(0.0, 0.3), func(): shoot("arrow", from, to, "pierce", func(): impact("pierce", to)))
-		"broadside", "air_raid":
-			var n := 4 if ability == "broadside" else 3
+				later(rng.randf_range(0.0, 0.3), func(): shoot(kind, from, to, "pierce", func(): impact("pierce", to)))
+		"bombardment", "cannonade":
+			var n := 4 if ability == "bombardment" else 3
+			var kind: String = (BOMBARD_SHOT if ability == "bombardment" else CANNONADE_SHOT).get(race, "shell")
 			for i in n:
 				var x := rng.randf_range(lo, hi)
 				var to := Vector2(x, GROUND_Y - 6)
-				var from := to + (Vector2(-dir * 900, -300) if ability == "broadside" else Vector2(-dir * 60, -560))
-				later(rng.randf_range(0.0, 0.25), func(): shoot("ball" if ability == "broadside" else "shell", from, to, "blast", func(): impact("blast", to, true)))
-		"orbital_lance":
+				# Siege shot arcs in from the home lines; elven moonfire drops from high above.
+				var from := to + (Vector2(-dir * 60, -620) if kind == "orb" else Vector2(-dir * 900, -300 if kind != "shell" else -420))
+				later(rng.randf_range(0.0, 0.25), func():
+					shoot(kind, from, to, "blast", func(): impact("blast", to, true))
+					if kind == "orb":
+						projectiles[-1]["col"] = magic)
+		"starfall":
 			var c := Vector2((lo + hi) * 0.5, GROUND_Y)
-			actors.append({"kind": "beam", "x": c.x, "w": hi - lo, "born": now(), "life": 0.6, "col": team})
-			_light(c + Vector2(0, -60), team.lightened(0.6), 2.5, 700.0, 0.8)
+			actors.append({"kind": "beam", "x": c.x, "w": hi - lo, "born": now(), "life": 0.6, "col": magic})
+			_light(c + Vector2(0, -60), magic.lightened(0.3), 2.5, 700.0, 0.8)
 			impact("blast", c + Vector2(0, -10), true)
-			ring(c, 260, Color(team.lightened(0.6), 0.8), 0.6, 8.0)
+			ring(c, 260, Color(magic.lightened(0.3), 0.8), 0.6, 8.0)
+			for k in 10:
+				burst("spark", c + Vector2(rng.randf_range(-60, 60), -rng.randf_range(0, 120)), 2, magic.lightened(0.3), Vector2(80, 260), Vector2(0.3, 0.7), Vector2(2, 3.5), 300.0, PI, -PI * 0.5, true)
 			view.add_shake(16.0)
 			view.zoom_punch(0.06)
 
 
-func ability_cast(ability: String, x: float, side: int) -> void:
-	if ability == "air_raid":
-		var dir := 1.0 if side == 0 else -1.0
-		actors.append({"kind": "bomber", "x": x - dir * 1400, "y": 330.0, "vx": dir * 900.0, "born": now(), "life": 3.2, "side": side})
+func ability_cast(ability: String, x: float, side: int, race: StringName = &"human") -> void:
+	# A beacon at the caster's base marks the call (the effect itself arrives with the pulses).
+	var dir := 1.0 if side == 0 else -1.0
+	var magic: Color = RaceLook.look(race).glow
+	if ability in ["starfall", "cannonade"]:
+		flash(Vector2(view.sim.to_world(side, 0.0) + dir * 60.0, GROUND_Y - 200), 90, Color(magic, 0.5), 0.35)
+	if ability == "starfall":
+		ring(Vector2(x, GROUND_Y - 20), 120, Color(magic, 0.7), 0.8, 4.0)
 
 
 func _light(pos: Vector2, col: Color, energy: float, radius: float, life: float) -> void:
@@ -290,6 +311,14 @@ func _draw() -> void:
 				draw_colored_polygon(PackedVector2Array([pos + dirv * 4, pos + dirv.orthogonal() * 2.5, pos - dirv.orthogonal() * 2.5]), Color("b5b9bf"))
 			"stone":
 				draw_circle(pos, 3.0, Color("7b7466"))
+			"axe":
+				# Spinning throwing axe.
+				var a: float = (t - p.born) * 18.0
+				var d := Vector2.RIGHT.rotated(a)
+				draw_line(pos - d * 7, pos + d * 7, Color("6b4a2b"), 2.0)
+				draw_colored_polygon(PackedVector2Array([pos + d * 7, pos + d * 7 + d.orthogonal() * 6, pos + d * 3 + d.orthogonal() * 6]), Color("b5b9bf"))
+			"orb":
+				draw_circle(pos, 4.5, Color(1, 1, 1, 0.9))
 			"ball":
 				draw_circle(pos, 5.5, Color(0.1, 0.1, 0.1))
 			"shell":
@@ -306,7 +335,7 @@ func _draw_actor(a: Dictionary, t: float) -> void:
 		"beast":
 			var dir := signf(a.vx)
 			UnitArt.begin(self, Transform2D(0.0, Vector2(dir * 0.9, 0.9), 0.0, Vector2(a.x, a.y)))
-			UnitArt.quadruped(self, "boar", Color("5b4130"), {"moving": true, "walk": t * 26.0 + a.y, "t": t}, 0)
+			UnitArt.quadruped(self, a.get("beast", "boar"), Color("5b4130"), {"moving": true, "walk": t * 26.0 + a.y, "t": t}, 0)
 			draw_set_transform(Vector2.ZERO)
 		"dome":
 			var c: Color = a.col.lightened(0.5)
@@ -319,15 +348,6 @@ func _draw_actor(a: Dictionary, t: float) -> void:
 				pts.append(Vector2(cx + cos(ang) * rx, GROUND_Y + sin(ang) * 110.0))
 			draw_colored_polygon(pts, Color(c, 0.08 * fade))
 			draw_polyline(pts, Color(c, 0.55 * fade), 2.0)
-		"bomber":
-			var p := Vector2(a.x, a.y)
-			var dir := signf(a.vx)
-			UnitArt.begin(self, Transform2D(0.0, Vector2(dir, 1), 0.0, p))
-			draw_colored_polygon(PackedVector2Array([Vector2(-60, 0), Vector2(50, -6), Vector2(66, 0), Vector2(50, 6)]), Color("3a3d36"))
-			draw_colored_polygon(PackedVector2Array([Vector2(-6, 0), Vector2(18, 0), Vector2(-20, -44), Vector2(-34, -44)]), Color("4a4e44"))
-			draw_colored_polygon(PackedVector2Array([Vector2(-50, 0), Vector2(-40, 0), Vector2(-62, -18), Vector2(-68, -18)]), Color("4a4e44"))
-			draw_set_transform(Vector2.ZERO)
-			UnitArt._ellipse(self, Vector2(a.x, GROUND_Y + 4), Vector2(70, 7), Color(0, 0, 0, 0.3))
 		"beam":
 			pass
 
@@ -369,6 +389,10 @@ func _draw_glow() -> void:
 				glow.draw_circle(pos, 6.0, Color(c, 0.6))
 			"shell", "ball":
 				glow.draw_circle(pos, 8.0, Color(1.0, 0.6, 0.3, 0.25))
+			"orb":
+				var c: Color = p.get("col", Color("9fe4ff"))
+				glow.draw_line(back, pos, Color(c, 0.6), 6.0)
+				glow.draw_circle(pos, 10.0, Color(c, 0.55))
 	for a in actors:
 		if a.kind == "beam":
 			var u: float = (t - a.born) / a.life
@@ -385,6 +409,6 @@ func _draw_glow() -> void:
 		var pulse := 0.5 + 0.5 * sin(t * 18.0)
 		var lo: float = e.center - def.width * 0.5
 		glow.draw_rect(Rect2(lo, GROUND_Y - 4, def.width, 14), Color(c, 0.25 + 0.2 * pulse))
-		if def.id == &"orbital_lance":
+		if def.id == &"starfall":
 			glow.draw_arc(Vector2(e.center, GROUND_Y), 40.0 + 20.0 * pulse, 0, TAU, 40, Color(c, 0.8), 2.0)
 			glow.draw_line(Vector2(e.center, -400), Vector2(e.center, GROUND_Y), Color(c, 0.35 * pulse), 2.0)

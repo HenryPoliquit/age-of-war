@@ -9,6 +9,7 @@ var ages: Array[AgeDef] = []
 var doctrines: Dictionary = {}      # StringName -> DoctrineDef
 var personalities: Dictionary = {}  # StringName -> AiPersonalityDef
 var difficulties: Dictionary = {}   # StringName -> AiDifficultyDef
+var races: Dictionary = {}          # StringName -> RaceDef
 
 static var _cached: GameData
 
@@ -30,6 +31,8 @@ static func load_from(root: String) -> GameData:
 		gd.personalities[r.id] = r
 	for r in _load_dir(root + "/ai/difficulties"):
 		gd.difficulties[r.id] = r
+	for r in _load_dir(root + "/races"):
+		gd.races[r.id] = r
 	return gd
 
 
@@ -61,3 +64,7 @@ func turret_for_kind(age_index: int, kind: String) -> TurretDef:
 		if t.kind == kind:
 			return t
 	return null
+
+
+func race(id: StringName) -> RaceDef:
+	return races.get(id, races.get(&"human"))

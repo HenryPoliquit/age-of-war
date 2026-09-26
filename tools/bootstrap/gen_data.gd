@@ -4,30 +4,20 @@ extends SceneTree
 ## Refuses to overwrite existing files unless run with `-- --force`.
 ##   tools/godot --headless --path . -s tools/bootstrap/gen_data.gd
 
-const AGE_NAMES := ["Stone", "Bronze", "Medieval", "Gunpowder", "Industrial", "Future"]
+const AGE_NAMES := ["Stone", "Bronze", "Iron", "Medieval", "Gunpowder", "Arcane"]
 const EVOLVE_COSTS := [0, 300, 650, 1200, 2050, 3750]
 ## Age 6 has no next evolution; its veterancy ranks price off this value (PLAN §4 decision D6).
 const AGE6_VET_BASE := 6000
 const SKY := [Color("e8b77a"), Color("8fc7ee"), Color("9aa7a0"), Color("5b6573"), Color("a0664a"), Color("1c1433")]
 const GROUND := [Color("a07a45"), Color("c9b98a"), Color("5f7a4a"), Color("58524a"), Color("4a3b30"), Color("2b2f3f")]
 
-const ROSTER := {
-	"vanguard": ["Brawler", "Hoplite", "Man-at-Arms", "Halberdier", "Trench Raider", "Aegis Trooper"],
-	"ranged": ["Slinger", "Javelineer", "Longbowman", "Musketeer", "Rifleman", "Pulse Rifleman"],
-	"heavy": ["Tusk Rider", "Chariot", "Knight", "Cuirassier", "Armoured Car", "Strider Mech"],
-	"siege": ["", "Ram Crew", "Trebuchet", "Mortar Team", "Field Howitzer", "Rail Artillery"],
-}
+## Units and turrets get neutral per-slot ids ("iron_vanguard"); each race names them (data/races).
 # role: [first_age, cost, train, hp, dmg, interval, range, min_range, speed, armour, dtype, momentum]
 const BASE := {
 	"vanguard": [1, 15, 1.0, 110, 14, 1.0, 30, 0, 70, "light", "slash", 1],
 	"ranged": [1, 25, 1.5, 60, 10, 1.2, 220, 0, 60, "light", "pierce", 1],
 	"heavy": [1, 100, 3.0, 420, 30, 1.6, 40, 0, 45, "heavy", "blast", 3],
 	"siege": [2, 90, 3.0, 160, 60, 2.5, 30, 0, 40, "light", "siege", 2],
-}
-const TURRET_NAMES := {
-	"sentry": ["Rock Thrower", "Bolt Thrower", "Ballista", "Swivel Gun", "Machine Gun Nest", "Pulse Turret"],
-	"artillery": ["", "Stone Catapult", "Mangonel", "Bombard", "Field Gun", "Plasma Mortar"],
-	"support": ["", "", "Tar Cauldron", "Smoke Battery", "Barbed Wire", "Stasis Field"],
 }
 # kind: [first_age, dtype, cost, hp, dmg, interval, range, min_range, splash, aura_radius, aura_slow]
 const TURRET_BASE := {
@@ -38,10 +28,10 @@ const TURRET_BASE := {
 const ABILITIES := [
 	{"id": "stampede", "name": "Stampede", "affects": "enemy", "width": 300, "telegraph": 0.5, "pulses": 1, "interval": 0.0, "sweep": false, "damage": 80, "dtype": "slash", "knockback": 60},
 	{"id": "shieldwall", "name": "Shieldwall", "affects": "ally", "width": 300, "telegraph": 0.2, "pulses": 1, "interval": 0.0, "sweep": false, "armour": 0.4, "duration": 8.0},
-	{"id": "arrow_storm", "name": "Arrow Storm", "affects": "enemy", "width": 250, "telegraph": 0.5, "pulses": 3, "interval": 1.0, "sweep": false, "damage": 34, "dtype": "pierce"},
-	{"id": "broadside", "name": "Broadside", "affects": "enemy", "width": 400, "telegraph": 0.6, "pulses": 4, "interval": 0.5, "sweep": true, "damage": 70, "dtype": "blast", "knockback": 12},
-	{"id": "air_raid", "name": "Air Raid", "affects": "enemy", "width": 500, "telegraph": 1.5, "pulses": 5, "interval": 0.3, "sweep": true, "damage": 70, "dtype": "blast", "knockback": 12},
-	{"id": "orbital_lance", "name": "Orbital Lance", "affects": "enemy", "width": 90, "telegraph": 1.5, "pulses": 1, "interval": 0.0, "sweep": false, "damage": 400, "dtype": "blast"},
+	{"id": "volley", "name": "Volley", "affects": "enemy", "width": 250, "telegraph": 0.5, "pulses": 3, "interval": 1.0, "sweep": false, "damage": 34, "dtype": "pierce"},
+	{"id": "bombardment", "name": "Bombardment", "affects": "enemy", "width": 400, "telegraph": 0.6, "pulses": 4, "interval": 0.5, "sweep": true, "damage": 70, "dtype": "blast", "knockback": 12},
+	{"id": "cannonade", "name": "Cannonade", "affects": "enemy", "width": 500, "telegraph": 1.5, "pulses": 5, "interval": 0.3, "sweep": true, "damage": 70, "dtype": "blast", "knockback": 12},
+	{"id": "starfall", "name": "Starfall", "affects": "enemy", "width": 90, "telegraph": 1.5, "pulses": 1, "interval": 0.0, "sweep": false, "damage": 400, "dtype": "blast"},
 ]
 
 var force := false
@@ -89,7 +79,7 @@ func _gen_age(age: int, doctrines: Dictionary) -> void:
 			continue
 		var steps: int = age - int(b[0])
 		var u := UnitDef.new()
-		u.display_name = ROSTER[role][age - 1]
+		u.display_name = "%s %s" % [AGE_NAMES[age - 1], role.capitalize()]
 		u.id = StringName(_slug(u.display_name))
 		u.age = age
 		u.role = role
@@ -116,7 +106,7 @@ func _gen_age(age: int, doctrines: Dictionary) -> void:
 			continue
 		var steps: int = age - int(t[0])
 		var td := TurretDef.new()
-		td.display_name = TURRET_NAMES[kind][age - 1]
+		td.display_name = "%s %s" % [AGE_NAMES[age - 1], kind.capitalize()]
 		td.id = StringName(_slug(td.display_name))
 		td.age = age
 		td.kind = kind

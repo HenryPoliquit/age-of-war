@@ -1,0 +1,59 @@
+[gd_resource type="Resource" script_class="RaceDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/race_def.gd" id="1_race"]
+
+[resource]
+script = ExtResource("1_race")
+id = &"human"
+display_name = "Humans"
+description = "Adaptable kingdoms of plains and coasts: legions, knights, musketeers and battle-mages."
+unit_names = {
+"stone_vanguard": "Brawler",
+"stone_ranged": "Slinger",
+"stone_heavy": "Boar Rider",
+"bronze_vanguard": "Hoplite",
+"bronze_ranged": "Javelineer",
+"bronze_heavy": "Chariot",
+"bronze_siege": "Ram Crew",
+"iron_vanguard": "Legionary",
+"iron_ranged": "Auxilia Archer",
+"iron_heavy": "Cataphract",
+"iron_siege": "Onager",
+"medieval_vanguard": "Man-at-Arms",
+"medieval_ranged": "Longbowman",
+"medieval_heavy": "Knight",
+"medieval_siege": "Trebuchet",
+"gunpowder_vanguard": "Halberdier",
+"gunpowder_ranged": "Musketeer",
+"gunpowder_heavy": "Cuirassier",
+"gunpowder_siege": "Great Cannon",
+"arcane_vanguard": "Spellblade",
+"arcane_ranged": "Arcane Rifleman",
+"arcane_heavy": "Steam Juggernaut",
+"arcane_siege": "Sky Cannon"
+}
+turret_names = {
+"stone_sentry": "Rock Thrower",
+"bronze_sentry": "Bolt Thrower",
+"iron_sentry": "Scorpion",
+"medieval_sentry": "Crossbow Tower",
+"gunpowder_sentry": "Swivel Gun",
+"arcane_sentry": "Arcane Beacon",
+"bronze_artillery": "Stone Catapult",
+"iron_artillery": "Ballista",
+"medieval_artillery": "Mangonel",
+"gunpowder_artillery": "Bombard",
+"arcane_artillery": "Arcane Mortar",
+"iron_support": "Tar Cauldron",
+"medieval_support": "Caltrop Field",
+"gunpowder_support": "Smoke Battery",
+"arcane_support": "Warding Circle"
+}
+ability_names = {
+"stampede": "Stampede",
+"shieldwall": "Shieldwall",
+"volley": "Pilum Volley",
+"bombardment": "Trebuchet Barrage",
+"cannonade": "Cannonade",
+"starfall": "Arcane Lance"
+}

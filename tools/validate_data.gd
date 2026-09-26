@@ -53,6 +53,17 @@ func _init() -> void:
 				_check(t.damage > 0 and t.attack_interval > 0 and t.range > t.min_range, tt + " attack stats")
 		for d in a.doctrine_options:
 			_check(d.pick_age == a.index, "doctrine %s pick_age" % d.id)
+	# Races are cosmetic (GDD §5.7): every slot needs a name in every race.
+	_check(gd.races.has(&"human"), "human race exists (fallback)")
+	for rid in gd.races:
+		var rd: RaceDef = gd.races[rid]
+		_check(rd.id == rid and rd.display_name != "", "race %s id/name" % rid)
+		for a in gd.ages:
+			for u in a.units:
+				_check(rd.unit_names.has(String(u.id)), "race %s names unit %s" % [rid, u.id])
+			for t in a.turrets:
+				_check(rd.turret_names.has(String(t.id)), "race %s names turret %s" % [rid, t.id])
+			_check(rd.ability_names.has(String(a.ability.id)), "race %s names ability %s" % [rid, a.ability.id])
 	for id in gd.personalities:
 		var p: AiPersonalityDef = gd.personalities[id]
 		_check(p.age_plan in ["balanced", "fast", "strong"], "personality %s age_plan" % id)
@@ -63,7 +74,7 @@ func _init() -> void:
 		_check(d.decision_interval > 0, "difficulty %s interval" % id)
 		_check(d.income_bonus == 0.0 or id in [&"brutal", &"nightmare"], "difficulty %s: only Brutal/Nightmare get bonuses (GDD §11.1)" % id)
 	if problems.is_empty():
-		print("data OK: %d ages, %d ids, %d personalities, %d difficulties" % [gd.ages.size(), ids.size(), gd.personalities.size(), gd.difficulties.size()])
+		print("data OK: %d ages, %d ids, %d races, %d personalities, %d difficulties" % [gd.ages.size(), ids.size(), gd.races.size(), gd.personalities.size(), gd.difficulties.size()])
 	else:
 		for p in problems:
 			print("INVALID: ", p)

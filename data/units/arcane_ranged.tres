@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="UnitDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/unit_def.gd" id="1_f6pyv"]
+
+[resource]
+script = ExtResource("1_f6pyv")
+id = &"arcane_ranged"
+display_name = "Arcane Ranged"
+age = 6
+role = "ranged"
+armour = "light"
+damage_type = "pierce"
+cost = 355
+train_time = 1.5
+hp = 1486.0
+damage = 297.1
+attack_interval = 1.2
+range = 220.0
+min_range = 0.0
+speed = 60.0
+momentum_on_kill = 1

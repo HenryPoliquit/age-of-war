@@ -360,7 +360,7 @@ func slot_pressed(i: int) -> void:
 	var roster := sim.turret_roster(0)
 	for j in roster.size():
 		var t := roster[j]
-		_slot_menu.add_item("%s (%s) — %d g" % [t.display_name, t.kind.capitalize(), t.cost], j)
+		_slot_menu.add_item("%s (%s) — %d g" % [view.race_def(0).turret_name(t), t.kind.capitalize(), t.cost], j)
 		_slot_menu.set_item_disabled(j, s.gold < t.cost)
 	_slot_menu_index = i
 	_slot_menu.position = Vector2i(get_viewport().get_mouse_position()) - Vector2i(0, 40 + roster.size() * 28)
@@ -401,7 +401,7 @@ func _process(delta: float) -> void:
 	_momentum.value = me.momentum / sim.rules.momentum_cap
 	_momentum.text = "Momentum %d" % me.momentum
 	var ab := sim.data.age(me.age).ability
-	_ability.text = "⚡ %s  [Space]%s" % [ab.display_name, "" if me.ability_cooldown <= 0 else "   %ds" % ceili(me.ability_cooldown)]
+	_ability.text = "⚡ %s  [Space]%s" % [view.race_def(0).ability_name(ab), "" if me.ability_cooldown <= 0 else "   %ds" % ceili(me.ability_cooldown)]
 	_ability.disabled = not sim.can_fire_ability(0)
 	if me.age >= GameData.AGE_COUNT:
 		_evolve.text = "Final age"
@@ -433,8 +433,8 @@ func _process(delta: float) -> void:
 				b.text = "%s  + Build" % key
 				b.tooltip_text = "Empty slot — build a turret"
 			else:
-				b.text = "%s  %s" % [key, t.def.display_name]
-				b.tooltip_text = "%s (Age %d) — click to sell for %d g%s" % [t.def.display_name, t.def.age, roundi(t.def.cost * sim.rules.sell_refund), "\nOutclassed: replace it" if t.def.age < me.age else ""]
+				b.text = "%s  %s" % [key, view.race_def(0).turret_name(t.def)]
+				b.tooltip_text = "%s (Age %d) — click to sell for %d g%s" % [view.race_def(0).turret_name(t.def), t.def.age, roundi(t.def.cost * sim.rules.sell_refund), "\nOutclassed: replace it" if t.def.age < me.age else ""]
 			b.modulate = Color(1, 0.75, 0.6) if t != null and t.def.age < me.age else Color.WHITE
 		elif i == me.turret_slots:
 			b.text = "🔒 %dg" % sim.slot_cost(0)
@@ -473,7 +473,7 @@ func _update_doctrine() -> void:
 func matrix_tooltip(u: UnitDef) -> String:
 	var r := sim.rules
 	return "%s — %s\n%s damage · %s armour\nvs Light ×%.2f   vs Heavy ×%.2f   vs Structures ×%.2f\n%d HP · %.0f dmg every %.1fs · range %d · speed %d" % [
-		u.display_name, u.role.capitalize(), u.damage_type.capitalize(), u.armour.capitalize(),
+		view.race_def(0).unit_name(u), u.role.capitalize(), u.damage_type.capitalize(), u.armour.capitalize(),
 		r.matrix(u.damage_type, "light"), r.matrix(u.damage_type, "heavy"), r.matrix(u.damage_type, "structure"),
 		u.hp, u.damage, u.attack_interval, u.range, u.speed]
 
@@ -490,7 +490,7 @@ func show_post_match() -> void:
 	var won := sim.winner == MatchSim.LEFT
 	var title := _label(v, {MatchSim.LEFT: "VICTORY", MatchSim.RIGHT: "DEFEAT", MatchSim.DRAW: "DRAW"}[sim.winner], 60, ACCENT if won else Color("e07a6a"), true)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var sub := _label(v, "%d:%02d · %s Age vs %s Age" % [int(sim.time) / 60, int(sim.time) % 60, sim.data.age(sim.sides[0].age).display_name, sim.data.age(sim.sides[1].age).display_name], 18, Color(1, 1, 1, 0.7))
+	var sub := _label(v, "%d:%02d · %s, %s Age vs %s, %s Age" % [int(sim.time) / 60, int(sim.time) % 60, view.race_def(0).display_name, sim.data.age(sim.sides[0].age).display_name, view.race_def(1).display_name, sim.data.age(sim.sides[1].age).display_name], 18, Color(1, 1, 1, 0.7))
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var graphs := PostMatchGraphs.new()
 	graphs.match_log = sim.match_log
@@ -632,14 +632,15 @@ class UnitCard extends Button:
 			draw_string(f, Vector2(0, size.y * 0.5), "Siege from Bronze", HORIZONTAL_ALIGNMENT_CENTER, size.x, 13, Color(1, 1, 1, 0.3))
 			return
 		var u := roster[index]
-		var h := UnitArt.height_for(u)
+		var race := hud.view.race_of(0)
+		var h := UnitArt.height_for(u, race)
 		var sc := clampf(62.0 / h, 0.5, 1.1)
 		var t := Time.get_ticks_msec() / 1000.0
 		UnitArt.begin(self, Transform2D(0.0, Vector2(sc, sc), 0.0, Vector2(size.x * 0.5 + (h * 0.0), 92)))
-		UnitArt.draw_unit(self, u, hud.view.team_color(0), {"walk": 0.0, "moving": false, "atk": -1.0, "t": t, "flash": 0.0}, index + 3)
+		UnitArt.draw_unit(self, u, hud.view.team_color(0), {"walk": 0.0, "moving": false, "atk": -1.0, "t": t, "flash": 0.0}, index + 3, race)
 		draw_set_transform(Vector2.ZERO)
 		var col := Color.WHITE if not disabled else Color(1, 1, 1, 0.4)
-		draw_string(f, Vector2(0, 112), u.display_name, HORIZONTAL_ALIGNMENT_CENTER, size.x, 15, col)
+		draw_string(f, Vector2(0, 112), hud.view.race_def(0).unit_name(u), HORIZONTAL_ALIGNMENT_CENTER, size.x, 15, col)
 		draw_string(f, Vector2(0, 128), "%d g" % sim.unit_price(0, u), HORIZONTAL_ALIGNMENT_CENTER, size.x, 14, MatchHud.GOLD if not disabled else Color(MatchHud.GOLD, 0.4))
 		draw_string(f, Vector2(size.x - 70, 20), u.role.to_upper(), HORIZONTAL_ALIGNMENT_RIGHT, 62, 11, Color(1, 1, 1, 0.5))
 
@@ -657,9 +658,9 @@ class QueueStrip extends Control:
 			draw_rect(r, Color(0, 0, 0, 0.4))
 			if i < me.queue.size():
 				var d := me.queue[i]
-				var sc := 22.0 / UnitArt.height_for(d)
+				var sc := 22.0 / UnitArt.height_for(d, hud.view.race_of(0))
 				UnitArt.begin(self, Transform2D(0.0, Vector2(sc, sc), 0.0, r.position + Vector2(15, 25)))
-				UnitArt.draw_unit(self, d, hud.view.team_color(0), {"t": 0.0}, i)
+				UnitArt.draw_unit(self, d, hud.view.team_color(0), {"t": 0.0}, i, hud.view.race_of(0))
 				draw_set_transform(Vector2.ZERO)
 				if i == 0 and not me.is_evolving():
 					draw_rect(Rect2(r.position.x, r.end.y - 3, r.size.x * clampf(me.train_progress / d.train_time, 0, 1), 3), MatchHud.ACCENT)

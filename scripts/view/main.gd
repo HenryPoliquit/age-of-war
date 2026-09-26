@@ -5,6 +5,9 @@ var _menu: VBoxContainer
 var _personality: OptionButton
 var _difficulty: OptionButton
 var _start_age: OptionButton
+var _race: OptionButton
+var _enemy_race: OptionButton
+var _r_ids: Array[StringName] = []
 var _match: MatchView
 var _p_ids: Array[StringName] = []
 var _d_ids: Array[StringName] = []
@@ -23,7 +26,7 @@ func _ready() -> void:
 	GameSettings.load_settings()
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	theme = MatchHud.make_theme()
-	# Background: the split battlefield itself — Stone Age dawn meets Future night at a drifting seam.
+	# Background: the split battlefield itself — Stone Age dawn meets Arcane night at a drifting seam.
 	_bg_root = Control.new()
 	_bg_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_bg_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -71,6 +74,11 @@ func _ready() -> void:
 	var sep := HSeparator.new()
 	_menu.add_child(sep)
 	var data := GameData.get_default()
+	for id in RaceLook.IDS:
+		if data.races.has(id):
+			_r_ids.append(id)
+	_race = _race_picker("You play: ", data, 0)
+	_enemy_race = _race_picker("Enemy: ", data, _r_ids.size())
 	_personality = OptionButton.new()
 	for id in data.personalities:
 		var p: AiPersonalityDef = data.personalities[id]
@@ -90,6 +98,7 @@ func _ready() -> void:
 	for a in data.ages:
 		_start_age.add_item("Start in: %s Age" % a.display_name)
 	_menu.add_child(_start_age)
+	_update_parade()
 	var settings := Button.new()
 	settings.text = "Settings"
 	settings.alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -168,6 +177,7 @@ func _start() -> void:
 	_match.difficulty_id = _d_ids[_difficulty.selected]
 	_match.colourblind = GameSettings.get_value("colourblind")
 	_match.start_age = _start_age.selected + 1
+	_match.races = [_picked_race(_race), _picked_race(_enemy_race)]
 	_match.exit_to_menu.connect(_end_match.bind(false))
 	_match.rematch.connect(_end_match.bind(true))
 	get_tree().root.add_child.call_deferred(_match)
@@ -184,10 +194,37 @@ func _end_match(again: bool) -> void:
 		_start_menu_music()
 
 
+func _race_picker(prefix: String, data: GameData, selected: int) -> OptionButton:
+	var ob := OptionButton.new()
+	for id in _r_ids:
+		ob.add_item(prefix + data.races[id].display_name)
+		ob.set_item_tooltip(ob.item_count - 1, data.races[id].description)
+	ob.add_item(prefix + "Random race")
+	ob.select(clampi(selected, 0, ob.item_count - 1))
+	ob.item_selected.connect(func(_i): _update_parade())
+	_menu.add_child(ob)
+	return ob
+
+
+func _picked_race(ob: OptionButton) -> StringName:
+	if ob.selected < _r_ids.size():
+		return _r_ids[ob.selected]
+	return _r_ids[randi() % _r_ids.size()]
+
+
+func _update_parade() -> void:
+	if _parade == null or _race == null or _enemy_race == null:
+		return
+	for i in 2:
+		var ob := _race if i == 0 else _enemy_race
+		_parade.races[i] = _r_ids[ob.selected] if ob.selected < _r_ids.size() else _r_ids[(i + 1) % _r_ids.size()]
+
+
 ## Units of the two ages marching toward the seam behind the menu.
 class MenuParade extends Node2D:
 	var seam_x := 960.0
 	var t := 0.0
+	var races: Array[StringName] = [&"human", &"elf"]
 	var _defs: Array[UnitDef] = []
 
 	func _ready() -> void:
@@ -206,7 +243,7 @@ class MenuParade extends Node2D:
 			var x := seam_x - dir * (560.0 - lane)
 			var pos := Vector2(x, WorldLayer.GROUND_Y + (i % 3) * 5.0)
 			UnitArt.begin(self, Transform2D(0.0, Vector2(dir, 1) * 1.25, 0.0, pos))
-			UnitArt.draw_unit(self, def, MatchView.TEAM[side], {"walk": lane * 0.14, "moving": true, "atk": -1.0, "t": t + i, "flash": 0.0}, i)
+			UnitArt.draw_unit(self, def, MatchView.TEAM[side], {"walk": lane * 0.14, "moving": true, "atk": -1.0, "t": t + i, "flash": 0.0}, i, races[side])
 			draw_set_transform(Vector2.ZERO)
 
 

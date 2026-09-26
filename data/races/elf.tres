@@ -1,0 +1,59 @@
+[gd_resource type="Resource" script_class="RaceDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/race_def.gd" id="1_race"]
+
+[resource]
+script = ExtResource("1_race")
+id = &"elf"
+display_name = "Elves"
+description = "Ancient forest realms: rangers, bladesingers, elk riders and star-magic."
+unit_names = {
+"stone_vanguard": "Thornblade",
+"stone_ranged": "Hunter",
+"stone_heavy": "Stag Rider",
+"bronze_vanguard": "Grove Warden",
+"bronze_ranged": "Javelin Dancer",
+"bronze_heavy": "Elk Chariot",
+"bronze_siege": "Rootbreaker",
+"iron_vanguard": "Glade Guard",
+"iron_ranged": "Longstrider",
+"iron_heavy": "Elk Lancer",
+"iron_siege": "Bolt Engine",
+"medieval_vanguard": "Bladesinger",
+"medieval_ranged": "Ranger",
+"medieval_heavy": "Silver Knight",
+"medieval_siege": "Great Ballista",
+"gunpowder_vanguard": "Sentinel",
+"gunpowder_ranged": "Starbow Archer",
+"gunpowder_heavy": "Wild Rider",
+"gunpowder_siege": "Moonfire Catapult",
+"arcane_vanguard": "Moonblade",
+"arcane_ranged": "Arcanist",
+"arcane_heavy": "Treant",
+"arcane_siege": "Starfall Obelisk"
+}
+turret_names = {
+"stone_sentry": "Hunter's Perch",
+"bronze_sentry": "Dart Tower",
+"iron_sentry": "Watch Tree",
+"medieval_sentry": "Ranger Spire",
+"gunpowder_sentry": "Moonbow Spire",
+"arcane_sentry": "Star Spire",
+"bronze_artillery": "Vine Sling",
+"iron_artillery": "Bolt Thrower",
+"medieval_artillery": "Tower Ballista",
+"gunpowder_artillery": "Moonfire Engine",
+"arcane_artillery": "Sunburst Crystal",
+"iron_support": "Thornbrake",
+"medieval_support": "Mistwell",
+"gunpowder_support": "Entangling Roots",
+"arcane_support": "Grove Ward"
+}
+ability_names = {
+"stampede": "Wild Hunt",
+"shieldwall": "Barkskin",
+"volley": "Arrow Rain",
+"bombardment": "Hail of Thorns",
+"cannonade": "Moonfire",
+"starfall": "Starfall"
+}

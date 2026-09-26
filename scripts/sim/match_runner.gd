@@ -15,6 +15,7 @@ static func run(data: GameData, left: Dictionary, right: Dictionary, seed: int, 
 		ai.random_doctrines = random_doctrines or cfgs[i].get("random_doctrines", false)
 		ai.forced_doctrines = cfgs[i].get("doctrines", [])
 		ai.setup(sim)
+		sim.sides[i].race = StringName(cfgs[i].get("race", "human"))
 		ais.append(ai)
 	var dt := data.rules.tick_dt
 	while not sim.is_over():

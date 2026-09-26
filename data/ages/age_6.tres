@@ -1,22 +1,22 @@
 [gd_resource type="Resource" script_class="AgeDef" format=3]
 
-[ext_resource type="Resource" path="res://data/abilities/orbital_lance.tres" id="1_rn3ao"]
+[ext_resource type="Resource" path="res://data/abilities/starfall.tres" id="1_rn3ao"]
 [ext_resource type="Script" path="res://scripts/data/doctrine_def.gd" id="2_orto8"]
 [ext_resource type="Script" path="res://scripts/data/age_def.gd" id="3_osjng"]
 [ext_resource type="Script" path="res://scripts/data/turret_def.gd" id="4_4a1dv"]
-[ext_resource type="Resource" path="res://data/turrets/pulse_turret.tres" id="5_klel0"]
-[ext_resource type="Resource" path="res://data/turrets/plasma_mortar.tres" id="6_il1sb"]
-[ext_resource type="Resource" path="res://data/turrets/stasis_field.tres" id="7_kcsrw"]
+[ext_resource type="Resource" path="res://data/turrets/arcane_sentry.tres" id="5_klel0"]
+[ext_resource type="Resource" path="res://data/turrets/arcane_artillery.tres" id="6_il1sb"]
+[ext_resource type="Resource" path="res://data/turrets/arcane_support.tres" id="7_kcsrw"]
 [ext_resource type="Script" path="res://scripts/data/unit_def.gd" id="8_pxl3g"]
-[ext_resource type="Resource" path="res://data/units/aegis_trooper.tres" id="9_4l3wi"]
-[ext_resource type="Resource" path="res://data/units/pulse_rifleman.tres" id="10_bxpkl"]
-[ext_resource type="Resource" path="res://data/units/strider_mech.tres" id="11_dbq23"]
-[ext_resource type="Resource" path="res://data/units/rail_artillery.tres" id="12_e6vsf"]
+[ext_resource type="Resource" path="res://data/units/arcane_vanguard.tres" id="9_4l3wi"]
+[ext_resource type="Resource" path="res://data/units/arcane_ranged.tres" id="10_bxpkl"]
+[ext_resource type="Resource" path="res://data/units/arcane_heavy.tres" id="11_dbq23"]
+[ext_resource type="Resource" path="res://data/units/arcane_siege.tres" id="12_e6vsf"]
 
 [resource]
 script = ExtResource("3_osjng")
 index = 6
-display_name = "Future"
+display_name = "Arcane"
 evolve_cost = 2800
 veterancy_base_xp = 6000
 base_max_hp = 14199.0

@@ -1,24 +1,24 @@
 [gd_resource type="Resource" script_class="AgeDef" format=3]
 
-[ext_resource type="Resource" path="res://data/abilities/broadside.tres" id="1_5pcju"]
+[ext_resource type="Resource" path="res://data/abilities/bombardment.tres" id="1_5pcju"]
 [ext_resource type="Script" path="res://scripts/data/doctrine_def.gd" id="2_ndixu"]
 [ext_resource type="Resource" path="res://data/doctrines/bastion.tres" id="3_s3bym"]
 [ext_resource type="Resource" path="res://data/doctrines/siegecraft.tres" id="4_jq1af"]
 [ext_resource type="Script" path="res://scripts/data/age_def.gd" id="5_yffcg"]
 [ext_resource type="Script" path="res://scripts/data/turret_def.gd" id="6_kmxrt"]
-[ext_resource type="Resource" path="res://data/turrets/swivel_gun.tres" id="7_sobqm"]
-[ext_resource type="Resource" path="res://data/turrets/bombard.tres" id="8_a7h46"]
-[ext_resource type="Resource" path="res://data/turrets/smoke_battery.tres" id="9_0wcn5"]
+[ext_resource type="Resource" path="res://data/turrets/medieval_sentry.tres" id="7_sobqm"]
+[ext_resource type="Resource" path="res://data/turrets/medieval_artillery.tres" id="8_a7h46"]
+[ext_resource type="Resource" path="res://data/turrets/medieval_support.tres" id="9_0wcn5"]
 [ext_resource type="Script" path="res://scripts/data/unit_def.gd" id="10_sdbf1"]
-[ext_resource type="Resource" path="res://data/units/halberdier.tres" id="11_kbfaq"]
-[ext_resource type="Resource" path="res://data/units/musketeer.tres" id="12_0u4ai"]
-[ext_resource type="Resource" path="res://data/units/cuirassier.tres" id="13_cae2v"]
-[ext_resource type="Resource" path="res://data/units/mortar_team.tres" id="14_62ta7"]
+[ext_resource type="Resource" path="res://data/units/medieval_vanguard.tres" id="11_kbfaq"]
+[ext_resource type="Resource" path="res://data/units/medieval_ranged.tres" id="12_0u4ai"]
+[ext_resource type="Resource" path="res://data/units/medieval_heavy.tres" id="13_cae2v"]
+[ext_resource type="Resource" path="res://data/units/medieval_siege.tres" id="14_62ta7"]
 
 [resource]
 script = ExtResource("5_yffcg")
 index = 4
-display_name = "Gunpowder"
+display_name = "Medieval"
 evolve_cost = 700
 veterancy_base_xp = 1100
 base_max_hp = 4913.0

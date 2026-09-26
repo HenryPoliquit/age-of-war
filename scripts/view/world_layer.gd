@@ -6,7 +6,7 @@ extends Node2D
 
 const GROUND_Y := 760.0
 const UNIT_SCALE := 1.25
-const STRIDE := {"humanoid": 0.16, "mounted": 0.11, "chariot": 0.12, "mech": 0.09}
+const STRIDE := {"humanoid": 0.16, "mounted": 0.11, "chariot": 0.12, "golem": 0.09, "treant": 0.08}
 
 var view: MatchView
 var corpses: Array[Dictionary] = []
@@ -148,7 +148,7 @@ func _draw_overlay() -> void:
 			ov.draw_line(Vector2(x - def.width * 0.5 + k * 16, GROUND_Y - 130), Vector2(x - def.width * 0.5 + k * 16 + 8, GROUND_Y - 130), c, 2.0)
 		ov.draw_line(Vector2(x - def.width * 0.5, GROUND_Y - 130), Vector2(x - def.width * 0.5, GROUND_Y + 10), c, 2.0)
 		ov.draw_line(Vector2(x + def.width * 0.5, GROUND_Y - 130), Vector2(x + def.width * 0.5, GROUND_Y + 10), c, 2.0)
-		ov.draw_string(_font, Vector2(x - 60, GROUND_Y - 140), def.display_name, HORIZONTAL_ALIGNMENT_CENTER, 120, 18, c)
+		ov.draw_string(_font, Vector2(x - 60, GROUND_Y - 140), view.race_def(0).ability_name(def), HORIZONTAL_ALIGNMENT_CENTER, 120, 18, c)
 
 
 func _draw_base(s: SimSide, t: float) -> void:
@@ -194,7 +194,7 @@ func _draw_base(s: SimSide, t: float) -> void:
 
 
 func _pose(u: SimUnit, rt: float, t: float) -> Dictionary:
-	var rig: String = UnitArt.style_for(u.def).rig
+	var rig: String = UnitArt.style_for(u.def, view.race_of(u.side)).rig
 	var p: float = view.prev_progress.get(u.id, u.progress)
 	var prog := lerpf(p, u.progress, view.alpha)
 	var atk := -1.0
@@ -211,16 +211,16 @@ func _draw_unit(ci: CanvasItem, u: SimUnit, rt: float, t: float) -> void:
 	var dir := 1.0 if u.side == 0 else -1.0
 	var sc := UNIT_SCALE * (1.0 + 0.03 * (u.age - 1))
 	UnitArt.begin(ci, Transform2D(0.0, Vector2(dir * sc, sc), 0.0, pos))
-	UnitArt.draw_unit(ci, u.def, view.team_color(u.side), _pose(u, rt, t), u.id)
+	UnitArt.draw_unit(ci, u.def, view.team_color(u.side), _pose(u, rt, t), u.id, view.race_of(u.side))
 	ci.draw_set_transform(Vector2.ZERO)
 	if u.armour_buff_until > view.sim.time:
-		var h := UnitArt.height_for(u.def) * UNIT_SCALE
+		var h := UnitArt.height_for(u.def, view.race_of(u.side)) * UNIT_SCALE
 		ci.draw_arc(pos + Vector2(0, -h * 0.5), h * 0.6, 0, TAU, 24, Color(view.team_color(u.side).lightened(0.6), 0.55), 2.0)
 
 
 func _draw_bars(ci: CanvasItem, u: SimUnit) -> void:
 	var pos := unit_pos(u)
-	var h := UnitArt.height_for(u.def) * UNIT_SCALE + 10.0
+	var h := UnitArt.height_for(u.def, view.race_of(u.side)) * UNIT_SCALE + 10.0
 	if u.vet_rank > 0:
 		for i in u.vet_rank:
 			ci.draw_colored_polygon(PackedVector2Array([pos + Vector2(-8 + i * 7, -h - 8), pos + Vector2(-5 + i * 7, -h - 12), pos + Vector2(-2 + i * 7, -h - 8)]), Color("f2c14e"))
@@ -271,12 +271,12 @@ func _draw_corpse_node(i: int) -> void:
 	var n := _corpse_nodes[i]
 	var u: float = (view.anim_time - c.born) / 1.4
 	var def: UnitDef = c.def
-	var rig: String = UnitArt.style_for(def).rig
+	var race := view.race_of(c.side)
 	var dir := 1.0 if c.side == 0 else -1.0
 	var pos := Vector2(c.x, GROUND_Y + jitter(c.id))
-	var wreck := rig in ["car", "mech", "rail", "howitzer", "ram", "trebuchet", "mortar", "chariot"]
+	var wreck := UnitArt.wreck_kind(UnitArt.style_for(def, race)) != ""
 	var fall := 0.0 if wreck else -dir * ease(clampf(u / 0.25, 0.0, 1.0), 0.5) * PI * 0.5
 	UnitArt.begin(n, Transform2D(fall, Vector2(dir, 1) * UNIT_SCALE, 0.0, pos + Vector2(0, -2)))
 	var col := view.team_color(c.side).darkened(0.35)
-	UnitArt.draw_unit(n, def, col, {"walk": 0.0, "moving": false, "atk": -1.0, "t": 0.0, "flash": 0.0}, c.id)
+	UnitArt.draw_unit(n, def, col, {"walk": 0.0, "moving": false, "atk": -1.0, "t": 0.0, "flash": 0.0}, c.id, race)
 	n.draw_set_transform(Vector2.ZERO)

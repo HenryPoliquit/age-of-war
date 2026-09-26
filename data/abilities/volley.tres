@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ability_def.gd" id="1_3x7xg"]
+
+[resource]
+script = ExtResource("1_3x7xg")
+id = &"volley"
+display_name = "Volley"
+age = 3
+width = 250.0
+pulses = 3
+pulse_interval = 1.0
+damage = 123.0
+damage_type = "pierce"

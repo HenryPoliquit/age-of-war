@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="UnitDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/unit_def.gd" id="1_8vc1i"]
+
+[resource]
+script = ExtResource("1_8vc1i")
+id = &"iron_vanguard"
+display_name = "Iron Vanguard"
+age = 3
+role = "vanguard"
+armour = "light"
+damage_type = "slash"
+cost = 57
+train_time = 1.0
+hp = 289.0
+damage = 40.6
+attack_interval = 1.0
+range = 30.0
+min_range = 0.0
+speed = 70.0
+momentum_on_kill = 1

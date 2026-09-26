@@ -16,6 +16,8 @@ var personality_id: StringName = &"tactician"
 var difficulty_id: StringName = &"normal"
 var colourblind := false
 var start_age := 1
+## Race per side (cosmetic: names and looks only — GDD §5.7).
+var races: Array[StringName] = [&"human", &"elf"]
 
 var sim: MatchSim
 var ai: UtilityAI
@@ -67,8 +69,16 @@ func _ready() -> void:
 			speeds[0] = float(a.get_slice("=", 1))
 		elif a.begins_with("--start-age="):
 			start_age = int(a.get_slice("=", 1))
+		elif a.begins_with("--race="):
+			races[0] = StringName(a.get_slice("=", 1))
+		elif a.begins_with("--enemy-race="):
+			races[1] = StringName(a.get_slice("=", 1))
 	if start_age > 1:
 		sim.set_start_age(start_age)
+	for i in 2:
+		if not sim.data.races.has(races[i]):
+			races[i] = &"human"
+		sim.sides[i].race = races[i]
 	ai = UtilityAI.make(sim.data, personality_id, difficulty_id, MatchSim.RIGHT, seed + 17)
 	ai.setup(sim)
 	sim.sides[0].controller_name = "Player"
@@ -139,6 +149,14 @@ func apply_settings() -> void:
 
 func team_color(side: int) -> Color:
 	return (TEAM_ALT if colourblind else TEAM)[side]
+
+
+func race_of(side: int) -> StringName:
+	return sim.sides[side].race
+
+
+func race_def(side: int) -> RaceDef:
+	return sim.data.race(sim.sides[side].race)
 
 
 func set_speed(i: int) -> void:
@@ -373,9 +391,9 @@ func _on_event(ev: Dictionary) -> void:
 			base_rebuilt[side] = anim_time
 			hud.banner("%s Age" % sim.data.age(ev.age).display_name, team_color(side), side)
 		"ability":
-			fx.ability_cast(ev.ability, ev.x, ev.side)
+			fx.ability_cast(ev.ability, ev.x, ev.side, race_of(ev.side))
 			audio.play("ability_cast", Vector2(ev.x, GROUND_Y - 100))
-			hud.banner(sim.data.age(sim.sides[ev.side].age).ability.display_name + "!", team_color(ev.side), ev.side, true)
+			hud.banner(race_def(ev.side).ability_name(sim.data.age(sim.sides[ev.side].age).ability) + "!", team_color(ev.side), ev.side, true)
 		"match_end":
 			audio.target_intensity = 0.0
 		"turret_destroyed":
@@ -393,7 +411,7 @@ func _consume_fx() -> void:
 			"death":
 				_on_death(f)
 			"ability_pulse":
-				fx.ability_pulse(f.ability, f.lo, f.hi, f.side, team_color(f.side))
+				fx.ability_pulse(f.ability, f.lo, f.hi, f.side, team_color(f.side), race_of(f.side))
 				if f.ability != "shieldwall":
 					for u in sim.sides[1 - f.side].units:
 						var x := sim.to_world(u.side, u.progress)
@@ -402,34 +420,30 @@ func _consume_fx() -> void:
 	sim.fx.clear()
 
 
-const RANGED_KIND := {"sling": "stone", "javelin": "javelin", "bow": "arrow", "musket": "bullet", "rifle": "tracer", "pulse": "bolt"}
-const SIEGE_KIND := {"trebuchet": "shell", "mortar": "shell", "howitzer": "shell", "rail": "bolt", "mech": "bolt", "car": "bullet"}
-
-
 func _on_shot(f: Dictionary) -> void:
 	var def: UnitDef = f.def
 	var u: SimUnit = f.unit
-	var st := UnitArt.style_for(def)
+	var race := race_of(f.side)
+	var st := UnitArt.style_for(def, race)
 	var dir := 1.0 if f.side == 0 else -1.0
 	var L := WorldLayer.anim_len(def)
 	var target: SimUnit = f.target
 	var origin := Vector2(f.from_x, GROUND_Y + WorldLayer.jitter(u.id))
 	var to: Vector2
 	if target != null:
-		to = Vector2(f.to_x, GROUND_Y + WorldLayer.jitter(target.id) - UnitArt.height_for(target.def) * WorldLayer.UNIT_SCALE * 0.5)
+		to = Vector2(f.to_x, GROUND_Y + WorldLayer.jitter(target.id) - UnitArt.height_for(target.def, race_of(target.side)) * WorldLayer.UNIT_SCALE * 0.5)
 	else:
 		to = Vector2(f.to_x + dir * 40.0, GROUND_Y - 70.0)
 	var dtype: String = def.damage_type
 	var heavy: bool = def.role in ["heavy", "siege"]
 	var structure: bool = f.structure
 	var rig: String = st.rig
-	var weapon: String = st.get("weapon", "")
-	var kind: String = RANGED_KIND.get(weapon, SIEGE_KIND.get(rig, ""))
+	var kind: String = st.shot
 	var target_id := target.id if target != null else -1
 	var hit := func():
 		var vis := dtype
 		# Cavalry hits read as heavy blows, not explosions.
-		if dtype == "blast" and rig in ["mounted", "chariot"]:
+		if dtype == "blast" and rig in ["mounted", "chariot", "golem", "treant"]:
 			vis = "slash"
 		fx.impact("siege" if structure and heavy else vis, to, heavy, structure)
 		if target_id >= 0:
@@ -438,30 +452,23 @@ func _on_shot(f: Dictionary) -> void:
 		# Melee: the hit lands on the contact frame of the swing (GDD §13.3).
 		fx.later(L * 0.42, hit)
 		return
-	var muzzle := origin + Vector2(dir * 28.0, -42.0) * WorldLayer.UNIT_SCALE
-	var big := false
-	match rig:
-		"trebuchet":
-			muzzle = origin + Vector2(dir * 40.0, -110.0)
-		"mortar":
-			muzzle = origin + Vector2(dir * 22.0, -32.0)
-			big = true
-		"howitzer":
-			muzzle = origin + Vector2(dir * 46.0, -42.0)
-			big = true
-		"rail", "mech":
-			muzzle = origin + Vector2(dir * 56.0, -56.0)
-			big = true
-		"car":
-			muzzle = origin + Vector2(dir * 34.0, -50.0)
-	var gun := kind in ["bullet", "tracer", "bolt"] or rig in ["mortar", "howitzer"]
+	var m := UnitArt.muzzle_for(st)
+	var muzzle := origin + Vector2(dir * m.x, m.y) * WorldLayer.UNIT_SCALE
+	var info: Dictionary = UnitArt.RIGS.get(rig, {})
+	var big: bool = info.get("gun", false) and def.role == "siege"
+	var gun: bool = kind in ["bullet", "tracer"] or info.get("gun", false) or (kind == "bolt" and rig == "humanoid")
 	var col := team_color(f.side).lightened(0.5)
+	var magic: Color = RaceLook.look(race).glow
+	if kind in ["bolt", "orb"]:
+		col = magic if def.age >= 5 or kind == "orb" else col
+	if st.get("variant", "") == "flame":
+		col = Color(1.0, 0.55, 0.2)
 	fx.later(L * 0.35, func():
 		if gun:
-			fx.muzzle(muzzle, 0.0 if dir > 0 else PI, big, col if kind == "bolt" else Color(1.0, 0.8, 0.4),
+			fx.muzzle(muzzle, 0.0 if dir > 0 else PI, big, col if kind in ["bolt", "orb"] else Color(1.0, 0.8, 0.4),
 				"zap" if kind == "bolt" else ("cannon" if big else "gun"))
 		fx.shoot(kind, muzzle, to, dtype, hit, heavy)
-		if kind == "bolt":
+		if kind in ["bolt", "orb"]:
 			fx.projectiles[-1]["col"] = col)
 
 
@@ -479,7 +486,7 @@ func _on_turret_shot(f: Dictionary) -> void:
 	var sp := BaseArt.slot_pos(f.slot)
 	var from := Vector2(gate + dir * sp.x, GROUND_Y + 4 + sp.y - 8)
 	var target: SimUnit = f.target
-	var to := Vector2(f.to_x, GROUND_Y - (UnitArt.height_for(target.def) * 0.5 if target != null else 6.0))
+	var to := Vector2(f.to_x, GROUND_Y - (UnitArt.height_for(target.def, race_of(target.side)) * 0.5 if target != null else 6.0))
 	var kind: String = TURRET_KIND.get(def.kind, ["stone"])[clampi(def.age - 1, 0, 5)]
 	var tid := target.id if target != null else -1
 	var splash := def.kind == "artillery"
@@ -505,10 +512,10 @@ func _on_death(f: Dictionary) -> void:
 	var def: UnitDef = f.def
 	world.add_corpse(def, f.x, f.side, f.unit_id)
 	audio.play("death", Vector2(f.x, GROUND_Y), -4.0)
-	var rig: String = UnitArt.style_for(def).rig
-	if rig in ["car", "mech", "rail", "howitzer"]:
-		fx.impact("blast", Vector2(f.x, GROUND_Y - 24), true)
-	elif rig in ["ram", "trebuchet", "mortar", "chariot"]:
-		fx.impact("siege", Vector2(f.x, GROUND_Y - 20))
-	else:
-		fx.burst("smoke", Vector2(f.x, GROUND_Y - 4), 4, Color(0.7, 0.62, 0.5, 0.5), Vector2(10, 40), Vector2(0.4, 0.8), Vector2(6, 12), -10.0)
+	match UnitArt.wreck_kind(UnitArt.style_for(def, race_of(f.side))):
+		"blast":
+			fx.impact("blast", Vector2(f.x, GROUND_Y - 24), true)
+		"siege":
+			fx.impact("siege", Vector2(f.x, GROUND_Y - 20))
+		_:
+			fx.burst("smoke", Vector2(f.x, GROUND_Y - 4), 4, Color(0.7, 0.62, 0.5, 0.5), Vector2(10, 40), Vector2(0.4, 0.8), Vector2(6, 12), -10.0)

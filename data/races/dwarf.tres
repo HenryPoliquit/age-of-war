@@ -1,0 +1,59 @@
+[gd_resource type="Resource" script_class="RaceDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/race_def.gd" id="1_race"]
+
+[resource]
+script = ExtResource("1_race")
+id = &"dwarf"
+display_name = "Dwarves"
+description = "Mountain holds of stone and iron: shield walls, crossbows, war-bears, cannon and runes."
+unit_names = {
+"stone_vanguard": "Hammerer",
+"stone_ranged": "Stone Thrower",
+"stone_heavy": "Ram Rider",
+"bronze_vanguard": "Shieldbearer",
+"bronze_ranged": "Axe Thrower",
+"bronze_heavy": "Goat Chariot",
+"bronze_siege": "Battering Ram",
+"iron_vanguard": "Ironbreaker",
+"iron_ranged": "Crossbowman",
+"iron_heavy": "Boar Knight",
+"iron_siege": "Stone Hurler",
+"medieval_vanguard": "Hearthguard",
+"medieval_ranged": "Arbalester",
+"medieval_heavy": "Bear Knight",
+"medieval_siege": "Siege Bombard",
+"gunpowder_vanguard": "Longbeard",
+"gunpowder_ranged": "Thunderer",
+"gunpowder_heavy": "Ironhorn Rider",
+"gunpowder_siege": "Flame Cannon",
+"arcane_vanguard": "Runeguard",
+"arcane_ranged": "Rune Rifleman",
+"arcane_heavy": "Steam Golem",
+"arcane_siege": "Rune Cannon"
+}
+turret_names = {
+"stone_sentry": "Sling Post",
+"bronze_sentry": "Axe Tower",
+"iron_sentry": "Crossbow Bastion",
+"medieval_sentry": "Arbalest Tower",
+"gunpowder_sentry": "Organ Gun",
+"arcane_sentry": "Rune Turret",
+"bronze_artillery": "Rock Lobber",
+"iron_artillery": "Stone Hurler",
+"medieval_artillery": "Bombard",
+"gunpowder_artillery": "Flame Cannon",
+"arcane_artillery": "Thunder Mortar",
+"iron_support": "Pitch Trench",
+"medieval_support": "Smoke Vent",
+"gunpowder_support": "Steam Vents",
+"arcane_support": "Rune Ward"
+}
+ability_names = {
+"stampede": "Ram Charge",
+"shieldwall": "Shield Oath",
+"volley": "Axe Storm",
+"bombardment": "Rockslide",
+"cannonade": "Grand Cannonade",
+"starfall": "Thunder Rune"
+}

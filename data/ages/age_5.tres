@@ -1,22 +1,22 @@
 [gd_resource type="Resource" script_class="AgeDef" format=3]
 
-[ext_resource type="Resource" path="res://data/abilities/air_raid.tres" id="1_jtqw8"]
+[ext_resource type="Resource" path="res://data/abilities/cannonade.tres" id="1_jtqw8"]
 [ext_resource type="Script" path="res://scripts/data/doctrine_def.gd" id="2_31cal"]
 [ext_resource type="Script" path="res://scripts/data/age_def.gd" id="3_acuwc"]
 [ext_resource type="Script" path="res://scripts/data/turret_def.gd" id="4_67j1m"]
-[ext_resource type="Resource" path="res://data/turrets/machine_gun_nest.tres" id="5_iwmv1"]
-[ext_resource type="Resource" path="res://data/turrets/field_gun.tres" id="6_fwd7a"]
-[ext_resource type="Resource" path="res://data/turrets/barbed_wire.tres" id="7_yhgkv"]
+[ext_resource type="Resource" path="res://data/turrets/gunpowder_sentry.tres" id="5_iwmv1"]
+[ext_resource type="Resource" path="res://data/turrets/gunpowder_artillery.tres" id="6_fwd7a"]
+[ext_resource type="Resource" path="res://data/turrets/gunpowder_support.tres" id="7_yhgkv"]
 [ext_resource type="Script" path="res://scripts/data/unit_def.gd" id="8_aboh3"]
-[ext_resource type="Resource" path="res://data/units/trench_raider.tres" id="9_jqk68"]
-[ext_resource type="Resource" path="res://data/units/rifleman.tres" id="10_ws7f2"]
-[ext_resource type="Resource" path="res://data/units/armoured_car.tres" id="11_v5h3a"]
-[ext_resource type="Resource" path="res://data/units/field_howitzer.tres" id="12_ttlre"]
+[ext_resource type="Resource" path="res://data/units/gunpowder_vanguard.tres" id="9_jqk68"]
+[ext_resource type="Resource" path="res://data/units/gunpowder_ranged.tres" id="10_ws7f2"]
+[ext_resource type="Resource" path="res://data/units/gunpowder_heavy.tres" id="11_v5h3a"]
+[ext_resource type="Resource" path="res://data/units/gunpowder_siege.tres" id="12_ttlre"]
 
 [resource]
 script = ExtResource("3_acuwc")
 index = 5
-display_name = "Industrial"
+display_name = "Gunpowder"
 evolve_cost = 1100
 veterancy_base_xp = 2800
 base_max_hp = 8352.0

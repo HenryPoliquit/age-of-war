@@ -30,6 +30,8 @@ var income_bonus: float = 0.0
 var last_base_hit_time: float = -100.0
 ## Presentation/AI info.
 var controller_name: String = ""
+## Cosmetic: which race's names and looks this side uses (stats are shared, see RaceDef).
+var race: StringName = &"human"
 var age_times: PackedFloat32Array = PackedFloat32Array([0.0, -1, -1, -1, -1, -1])
 var stat_gold_earned: float = 0.0
 var stat_gold_spent: float = 0.0

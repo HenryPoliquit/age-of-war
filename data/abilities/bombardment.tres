@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="AbilityDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ability_def.gd" id="1_wma47"]
+
+[resource]
+script = ExtResource("1_wma47")
+id = &"bombardment"
+display_name = "Bombardment"
+age = 4
+width = 400.0
+telegraph = 0.6
+pulses = 4
+pulse_interval = 0.5
+sweep = true
+damage = 480.0
+knockback = 12.0
