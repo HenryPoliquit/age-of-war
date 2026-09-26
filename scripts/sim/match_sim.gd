@@ -11,6 +11,15 @@ const LEFT := 0
 const RIGHT := 1
 const DRAW := 2
 const ROLES: Array[String] = ["vanguard", "ranged", "heavy", "siege"]
+## Upgrade rows and the stats each offers (GDD §6.1). Unit rows are the four roles.
+const UPGRADES := {
+	"vanguard": ["attack", "health", "defence"],
+	"ranged": ["attack", "health", "defence"],
+	"heavy": ["attack", "health", "defence"],
+	"siege": ["attack", "health", "defence"],
+	"turret": ["attack", "health", "range"],
+	"income": ["income"],
+}
 
 var data: GameData
 var rules: RulesDef
@@ -104,19 +113,64 @@ func evolve_cost(side: int) -> float:
 	return float(data.age(s.age + 1).evolve_cost)
 
 
-func forge_cost(side: int) -> float:
-	var s := sides[side]
-	if s.forge_level >= rules.forge_costs.size():
-		return INF
-	return roundf(rules.forge_costs[s.forge_level] * rules.age_cost_mult(s.age))
-
-
 func slot_cost(side: int) -> float:
 	var s := sides[side]
 	if s.turret_slots >= max_turret_slots():
 		return INF
 	return roundf(rules.turret_slot_costs[s.turret_slots] * rules.age_cost_mult(s.age))
 
+
+
+func upgrade_level(side: int, row: String, stat: String) -> int:
+	return sides[side].upgrade_level(row, stat)
+
+
+## Gold for the next level; INF when maxed, unknown, or the row has no unit this age (PLAN D22).
+func upgrade_cost(side: int, row: String, stat: String) -> float:
+	if not UPGRADES.has(row) or not stat in UPGRADES[row]:
+		return INF
+	var s := sides[side]
+	var level := s.upgrade_level(row, stat)
+	if row == "income":
+		if level >= rules.income_upgrade_costs.size():
+			return INF
+		return roundf(rules.income_upgrade_costs[level] * rules.age_cost_mult(s.age))
+	if level >= rules.upgrade_cost_factors.size():
+		return INF
+	var basis := 0.0
+	if row == "turret":
+		var roster := turret_roster(side)
+		for t in roster:
+			basis += t.cost
+		basis /= maxf(1.0, roster.size())
+	else:
+		var def := data.unit_for_role(s.age, row)
+		if def == null:
+			return INF
+		basis = unit_price(side, def)
+	return roundf(rules.upgrade_cost_factors[level] * basis)
+
+
+func can_buy_upgrade(side: int, row: String, stat: String) -> bool:
+	return not is_over() and sides[side].gold >= upgrade_cost(side, row, stat)
+
+
+## Multipliers from upgrades; `row` is a role or "turret". Read at damage/HP time so they apply to
+## everything already fielded, whatever its age (PLAN D18).
+func attack_mult(side: int, row: String) -> float:
+	return 1.0 + rules.upgrade_attack_bonus * sides[side].upgrade_level(row, "attack")
+
+
+func health_mult(side: int, row: String) -> float:
+	return 1.0 + rules.upgrade_health_bonus * sides[side].upgrade_level(row, "health")
+
+
+func defence_mult(side: int, role: String) -> float:
+	return maxf(0.0, 1.0 - rules.upgrade_defence_bonus * sides[side].upgrade_level(role, "defence"))
+
+
+func turret_range_mult(side: int) -> float:
+	return 1.0 + rules.upgrade_range_bonus * sides[side].upgrade_level("turret", "range")
 
 
 func max_turret_slots() -> int:
@@ -126,7 +180,7 @@ func max_turret_slots() -> int:
 func income_rate(side: int) -> float:
 	var s := sides[side]
 	return rules.base_income * rules.tide_multiplier_at(time) \
-		* (1.0 + rules.forge_income_bonus * s.forge_level) * (1.0 + s.income_bonus)
+		* (1.0 + rules.income_upgrade_bonus * s.upgrade_level("income", "income")) * (1.0 + s.income_bonus)
 
 
 func can_queue(side: int, def: UnitDef) -> bool:
@@ -191,15 +245,29 @@ func evolve(side: int) -> bool:
 	return true
 
 
-func buy_forge(side: int) -> bool:
-	var s := sides[side]
-	var c := forge_cost(side)
-	if is_over() or s.gold < c:
+func buy_upgrade(side: int, row: String, stat: String) -> bool:
+	if not can_buy_upgrade(side, row, stat):
 		return false
+	var s := sides[side]
+	var c := upgrade_cost(side, row, stat)
+	var old_hp := health_mult(side, row)
 	s.gold -= c
 	s.stat_gold_spent += c
-	s.forge_level += 1
-	_emit({"type": "forge", "side": side, "level": s.forge_level})
+	s.set_upgrade_level(row, stat, s.upgrade_level(row, stat) + 1)
+	if stat == "health":
+		# Max HP rises for everything already fielded; current HP keeps its percentage (PLAN D19).
+		var ratio := health_mult(side, row) / old_hp
+		if row == "turret":
+			for t in s.turrets:
+				if t != null:
+					t.max_hp *= ratio
+					t.hp *= ratio
+		else:
+			for u in s.units:
+				if u.def.role == row:
+					u.max_hp *= ratio
+					u.hp *= ratio
+	_emit({"type": "upgrade", "side": side, "row": row, "stat": stat, "level": s.upgrade_level(row, stat)})
 	return true
 
 
@@ -225,8 +293,8 @@ func build_turret(side: int, slot: int, def: TurretDef) -> bool:
 	var t := SimTurret.new()
 	t.def = def
 	t.slot = slot
-	t.max_hp = def.hp
-	t.hp = def.hp
+	t.max_hp = def.hp * health_mult(side, "turret")
+	t.hp = t.max_hp
 	s.turrets[slot] = t
 	_emit({"type": "turret_build", "side": side, "slot": slot, "turret": String(def.id)})
 	return true
@@ -397,7 +465,7 @@ func _spawn(s: SimSide, def: UnitDef, paid: float) -> SimUnit:
 	u.def = def
 	u.age = def.age
 	u.cost_paid = paid
-	u.max_hp = def.hp
+	u.max_hp = def.hp * health_mult(s.index, def.role)
 	u.hp = u.max_hp
 	u.base_damage = def.damage
 	s.units.append(u)
@@ -422,7 +490,7 @@ func _apply_auras() -> void:
 			if t == null or t.def.kind != "support":
 				continue
 			for u in sides[enemy_of(s.index)].units:
-				if rules.lane_length - u.progress <= t.def.aura_radius:
+				if rules.lane_length - u.progress <= t.def.aura_radius * turret_range_mult(s.index):
 					u.slow = maxf(u.slow, t.def.aura_slow)
 
 
@@ -461,7 +529,7 @@ func _units_act(s: SimSide, enemy_front: SimUnit, dt: float) -> void:
 					fx.append({"type": "shot", "side": u.side, "unit": u, "def": def, "from_x": to_world(u.side, u.progress),
 						"to_x": to_x, "structure": target_unit == null, "target": target_unit})
 				if target_unit != null:
-					_hit_unit(u, target_unit, u.base_damage, def.damage_type)
+					_hit_unit(u, target_unit, u.base_damage * attack_mult(u.side, def.role), def.damage_type)
 				else:
 					_hit_structures(u, enemy)
 		# Melee presses in to contact distance while fighting so the allies behind it come into reach;
@@ -492,7 +560,7 @@ func _hit_unit(attacker: SimUnit, target: SimUnit, raw: float, dtype: String) ->
 func _damage_unit(target: SimUnit, raw: float, dtype: String, by_side: int) -> float:
 	if not target.alive():
 		return 0.0
-	var dmg := raw * rules.matrix(dtype, target.def.armour)
+	var dmg := raw * rules.matrix(dtype, target.def.armour) * defence_mult(target.side, target.def.role)
 	dmg = minf(dmg, target.hp)
 	target.hp -= dmg
 	target.stat_damage_taken += dmg
@@ -519,7 +587,7 @@ func _on_kill(victim: SimUnit, by_side: int) -> void:
 
 
 func _hit_structures(u: SimUnit, enemy: SimSide) -> void:
-	var raw := u.base_damage * rules.matrix(u.def.damage_type, "structure")
+	var raw := u.base_damage * attack_mult(u.side, u.def.role) * rules.matrix(u.def.damage_type, "structure")
 	raw *= 1.0 + rules.escalation_structure_bonus * escalation
 	# Any unit at the gate knocks out turrets (lowest slot first) before the base; the matrix makes
 	# Siege the structure-breaker (spec §2.3, superseding PLAN D3).
@@ -564,11 +632,12 @@ func _turrets_act(s: SimSide, dt: float) -> void:
 		if t.cooldown > 0.0:
 			continue
 		var mult := 1.0 - rules.escalation_turret_penalty * escalation
-		var raw: float = t.def.damage * mult
+		var raw: float = t.def.damage * mult * attack_mult(s.index, "turret")
+		var reach: float = t.def.range * turret_range_mult(s.index)
 		if t.def.kind == "sentry":
 			# Enemy unit closest to our base = the most advanced enemy.
 			var target := _front_unit(enemy.index)
-			if target != null and lane - target.progress <= t.def.range:
+			if target != null and lane - target.progress <= reach:
 				t.cooldown = t.def.attack_interval
 				t.last_fire_time = time
 				t.last_target_x = to_world(enemy.index, target.progress)
@@ -580,7 +649,7 @@ func _turrets_act(s: SimSide, dt: float) -> void:
 			var best_count := 0
 			for u in enemy.units:
 				var d := lane - u.progress
-				if not u.alive() or d < t.def.min_range or d > t.def.range:
+				if not u.alive() or d < t.def.min_range or d > reach:
 					continue
 				var count := 0
 				for v in enemy.units:

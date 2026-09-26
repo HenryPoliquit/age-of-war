@@ -154,15 +154,16 @@ func _structural_want(sim: MatchSim, pressure: bool) -> Dictionary:
 			var def := _best_turret(sim)
 			if def != null:
 				return {"kind": "turret", "slot": slot, "def": def, "cost": float(def.cost)}
-	if s.forge_level < personality.forge_target and sim.time >= personality.forge_after + s.forge_level * 90.0 and not pressure:
-		return {"kind": "forge", "cost": sim.forge_cost(side)}
+	var inc := s.upgrade_level("income", "income")
+	if inc < personality.income_target and sim.time >= personality.income_after + inc * 90.0 and not pressure:
+		return {"kind": "income", "cost": sim.upgrade_cost(side, "income", "income")}
 	return {}
 
 
 func _do_want(sim: MatchSim, want: Dictionary) -> void:
 	match want.kind:
-		"forge":
-			sim.buy_forge(side)
+		"income":
+			sim.buy_upgrade(side, "income", "income")
 		"slot":
 			sim.unlock_slot(side)
 		"turret":

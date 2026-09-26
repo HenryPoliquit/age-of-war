@@ -14,7 +14,7 @@ role_mix = {
 }
 reserve_seconds = 1.0
 age_plan = "fast"
-forge_target = 1
-forge_after = 60.0
+income_target = 1
+income_after = 60.0
 turret_target = 2
 turret_after = 90.0

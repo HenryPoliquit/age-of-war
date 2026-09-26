@@ -13,5 +13,5 @@ role_mix = {
 "vanguard": 0.4
 }
 reserve_seconds = 6.0
-forge_target = 3
-forge_after = 10.0
+income_target = 3
+income_after = 10.0

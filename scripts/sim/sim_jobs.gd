@@ -5,7 +5,7 @@ extends RefCounted
 ##
 ## Job: {suite, left, right, left_diff, right_diff, seed, pair_a, start_age}
 ## Temporary data overrides (applied in every worker, never saved):
-##   --set=rules.forge_income_bonus=0.1          --set=rules.bounty_fraction=0.4
+##   --set=rules.income_upgrade_bonus=0.25          --set=rules.bounty_fraction=0.4
 ##   --scale=units:role=heavy.hp=0.9             --scale=turrets:kind=sentry.damage=0.8
 ##   --scale=ages:index=*.base_max_hp=1.5
 

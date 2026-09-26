@@ -6,7 +6,8 @@ var index: int
 var gold: float = 0.0
 var xp: float = 0.0
 var age: int = 1
-var forge_level: int = 0
+## Upgrade levels: row -> {stat -> level}; missing = 0 (MatchSim.UPGRADES lists rows and stats).
+var upgrades: Dictionary = {}
 var turret_slots: int = 1
 var turrets: Array = [null, null, null, null]
 var base_hp: float = 1000.0
@@ -33,6 +34,17 @@ var stat_xp_earned: float = 0.0
 
 func is_evolving() -> bool:
 	return evolve_left > 0.0
+
+
+
+func upgrade_level(row: String, stat: String) -> int:
+	return upgrades.get(row, {}).get(stat, 0)
+
+
+func set_upgrade_level(row: String, stat: String, level: int) -> void:
+	if not upgrades.has(row):
+		upgrades[row] = {}
+	upgrades[row][stat] = level
 
 
 func turret_count() -> int:

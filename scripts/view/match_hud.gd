@@ -1,7 +1,7 @@
 class_name MatchHud
 extends CanvasLayer
 ## Match HUD (GDD §13.9): top status bar with both bases, lane minimap, unit cards with portraits,
-## command panel (economy, ability, evolve, Forge, turrets, speed),
+## command panel (economy, ability, evolve, Income, turrets, speed),
 ## event banners and the post-match screen. Reads MatchSim; acts only through its commands.
 
 const ACCENT := UiStyle.ACCENT
@@ -29,7 +29,7 @@ var _xp: Label
 var _ability: Button
 var _evolve: Button
 var _evolve_meter: Meter
-var _forge: Button
+var _income: Button
 var _slots: Array[Button] = []
 var _speed_buttons: Array[Button] = []
 var _slot_menu: PopupMenu
@@ -231,8 +231,8 @@ func _build_commands() -> void:
 	ev.add_child(_evolve_meter)
 	var row3 := HBoxContainer.new()
 	v.add_child(row3)
-	_forge = _btn(row3, "", func(): feedback(sim.buy_forge(0)))
-	_forge.custom_minimum_size = Vector2(170, 34)
+	_income = _btn(row3, "", func(): feedback(sim.buy_upgrade(0, "income", "income")))
+	_income.custom_minimum_size = Vector2(170, 34)
 	for i in 3:
 		var b := Button.new()
 		b.text = ["1×", "2×", "❚❚"][i]
@@ -371,9 +371,10 @@ func _process(delta: float) -> void:
 			_evolve.text = "Evolving… %.1fs" % me.evolve_left
 		_evolve.disabled = not sim.can_evolve(0)
 		_evolve_meter.value = clampf(me.xp / cost, 0.0, 1.0)
-	_forge.text = "⚒ Forge %s  %s" % ["●".repeat(me.forge_level) + "○".repeat(3 - me.forge_level), "" if me.forge_level >= 3 else "%dg" % sim.forge_cost(0)]
-	_forge.tooltip_text = "Forge [F]: +20% passive income per level."
-	_forge.disabled = me.gold < sim.forge_cost(0)
+	var inc := sim.upgrade_level(0, "income", "income")
+	_income.text = "💰 Income %s  %s" % ["●".repeat(inc) + "○".repeat(3 - inc), "" if inc >= 3 else "%dg" % sim.upgrade_cost(0, "income", "income")]
+	_income.tooltip_text = "Income: +20% passive income per level. Unit and turret upgrades arrive with the new HUD."
+	_income.disabled = not sim.can_buy_upgrade(0, "income", "income")
 	for i in 3:
 		_speed_buttons[i].button_pressed = view.speed_index == i
 	for i in 4:

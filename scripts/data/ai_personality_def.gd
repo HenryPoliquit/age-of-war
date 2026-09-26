@@ -12,7 +12,7 @@ extends Resource
 @export var role_mix: Dictionary = {"vanguard": 0.45, "ranged": 0.3, "heavy": 0.2, "siege": 0.05}
 ## If set, only this role is ever queued (spam bots).
 @export var spam_role: String = ""
-## Gold kept back for turrets/Forge/etc. before spending on units, as seconds of income.
+## Gold kept back for turrets/Income/etc. before spending on units, as seconds of income.
 @export var reserve_seconds: float = 4.0
 
 ## What to build against each enemy role. Derived from the single-role duel matrix
@@ -28,9 +28,9 @@ extends Resource
 @export var skill_eager: bool = false
 
 @export_group("Economy & defence")
-## Forge levels to target, and the earliest time to buy each.
-@export var forge_target: int = 2
-@export var forge_after: float = 45.0
+## Income upgrade levels to target, and the earliest time to buy each (was the Forge).
+@export var income_target: int = 2
+@export var income_after: float = 45.0
 @export var turret_target: int = 2
 @export var turret_after: float = 60.0
 ## Build turrets sooner if own base HP fraction falls below this.

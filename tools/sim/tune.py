@@ -25,7 +25,7 @@ PARAMS = [
     ("ranged_dmg", "scale", ["units:role=ranged.damage"], 1.0, [0.88, 1.14]),
     ("vanguard_hp", "scale", ["units:role=vanguard.hp"], 1.0, [0.88, 1.14]),
     ("siege_dmg", "scale", ["units:role=siege.damage"], 1.0, [0.85, 1.2]),
-    ("forge_bonus", "set", ["rules.forge_income_bonus"], 0.2, "rel:0.8,1.25"),
+    ("income_bonus", "set", ["rules.income_upgrade_bonus"], 0.2, "rel:0.8,1.25"),
     ("counter", "set_all", ["counter_strength"], 1.5, "rel:0.67,1.5"),
     ("turtle_turrets", "set", ["ai/personalities/turtle.turret_target"], 4, [3, 2]),
 ]

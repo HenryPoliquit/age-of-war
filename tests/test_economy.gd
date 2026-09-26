@@ -16,15 +16,6 @@ func test_passive_income() -> void:
 	check_near(sim.sides[0].gold, 150.0 + 20.0, 0.01)
 
 
-func test_forge_raises_income_and_scales_with_age() -> void:
-	var sim := new_sim()
-	check_near(sim.forge_cost(0), 100.0, 0.01)
-	check(sim.buy_forge(0), "forge")
-	check_near(sim.income_rate(0), 2.4, 1e-4)
-	sim.sides[0].age = 3
-	check_near(sim.forge_cost(0), 250.0 * 1.7 * 1.7, 1.0)
-
-
 func test_kill_pays_bounty_and_xp() -> void:
 	var sim := new_sim(false)
 	var victim := place(sim, 1, "heavy", 100.0)
