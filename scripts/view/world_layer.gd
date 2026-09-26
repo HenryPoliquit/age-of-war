@@ -13,6 +13,10 @@ var corpses: Array[Dictionary] = []
 ## Per-unit eased walk amount (0 idle … 1 walking): state changes blend over ~0.12 s (PRD §11).
 var move_amt := {}
 const BLEND_TIME := 0.12
+## Base HP bar above each base (GDD §13.9), in world space: centred this far behind the gate, this high.
+const BASE_BAR_BACK := 110.0
+const BASE_BAR_HEIGHT := 470.0
+const BASE_BAR_SIZE := Vector2(230, 12)
 var _font: Font
 
 
@@ -130,6 +134,22 @@ func _draw_overlay() -> void:
 	for s in sim.sides:
 		for u in s.units:
 			_draw_bars(_overlay, u)
+	for s in sim.sides:
+		_draw_base_bar(_overlay, s)
+
+
+
+func _draw_base_bar(ci: CanvasItem, s: SimSide) -> void:
+	var dir := 1.0 if s.index == 0 else -1.0
+	var centre := Vector2(view.sim.to_world(s.index, 0.0) - dir * BASE_BAR_BACK, GROUND_Y - BASE_BAR_HEIGHT)
+	var r := Rect2(centre - BASE_BAR_SIZE * 0.5, BASE_BAR_SIZE)
+	ci.draw_rect(r.grow(2.0), Color(0, 0, 0, 0.7))
+	var frac := clampf(s.base_hp / s.base_max_hp, 0.0, 1.0)
+	var fill := Rect2(r.position, Vector2(r.size.x * frac, r.size.y))
+	if s.index == 1:
+		fill.position.x = r.end.x - fill.size.x
+	ci.draw_rect(fill, view.team_color(s.index))
+	ci.draw_string(_font, Vector2(r.position.x, r.position.y - 4.0), "%d / %d" % [s.base_hp, s.base_max_hp], HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 14, Color(1, 1, 1, 0.85))
 
 
 func _draw_base(s: SimSide, t: float) -> void:
