@@ -15,6 +15,12 @@ extends Resource
 ## Gold kept back for turrets/Forge/etc. before spending on units, as seconds of income.
 @export var reserve_seconds: float = 4.0
 
+## What to build against each enemy role. Derived from the single-role duel matrix
+## (balance log B11): Vanguard beats Heavy, Heavy beats Ranged, Ranged beats Vanguard.
+@export var counter_table: Dictionary = {"vanguard": "ranged", "ranged": "heavy", "heavy": "vanguard", "siege": "vanguard"}
+## How strongly Hard+ AIs shift their mix toward counters (share of enemy army value × this).
+@export var counter_strength: float = 1.5
+
 @export_group("Evolution")
 ## "balanced" | "fast" (evolve immediately, never veterancy) | "strong" (all 3 ranks first)
 @export_enum("balanced", "fast", "strong") var age_plan: String = "balanced"
@@ -34,6 +40,9 @@ extends Resource
 @export var uses_hold: bool = false
 ## Army value (as seconds of income) to amass before releasing a Hold.
 @export var hold_release_seconds: float = 20.0
+## Staged pushes: gather just outside enemy turret range and attack the gate together once the
+## gathered group outweighs the defence by this ratio (0 = never stage; walk straight in).
+@export var push_ratio: float = 1.3
 
 @export_group("Doctrines")
 ## Preferred doctrine ids; empty = random (the harness randomises).

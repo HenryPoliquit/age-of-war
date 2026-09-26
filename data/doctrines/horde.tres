@@ -6,7 +6,7 @@
 script = ExtResource("1_bt36j")
 id = &"horde"
 display_name = "Horde"
-description = "Units −20% cost, −15% HP, −10% damage."
-unit_cost_mult = 0.8
+description = "Units −27% cost, −15% HP, −10% damage."
+unit_cost_mult = 0.73
 unit_hp_mult = 0.85
 unit_damage_mult = 0.9

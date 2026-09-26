@@ -15,8 +15,15 @@ Every change from the GDD baselines, and why. Harness numbers are from `run_sim.
 | B9 | Tactician role mix 45/30/20/5 → 35/30/30/5 (V/R/H/S); counter weights cubed and clamped 0.25–3 | The Tactician barely changed its build against Heavy spam |
 | B10 | Rusher: Hold releases at 45 s of income (was 20); 2 turrets from 1:30; Forge from 1:00 | Rusher sent units one by one into early turrets and fed the opponent XP. 17% aggregate at n=20. Open |
 
+| B11 | Horde cost multiplier 0.8 → **0.73** | Forced Horde-vs-Elite Tactician mirrors, n=60: 0.80 → 10%, 0.76 → 25%, 0.74 → 38%, 0.72 → 57%. On one lane only the front few units fight, so per-unit strength beats unit count; Horde needs a bigger per-gold edge than Lanchester arithmetic suggests |
+| B12 | AI: staged pushes. Gather just outside enemy turret range, attack together once the group outweighs the defence (`push_ratio`, default 1.3); needed margin shrinks as the enemy base weakens; never stage more than 30 s | Stalled matches showed armies arriving strung out by speed and dying one at a time at the gate. Turtle mirror escalation 45% → 5–15% |
+| B13 | AI: buy the best affordable unit instead of hoarding for an expensive pick when the army is thin, under pressure, or the wait is over 8 s | A defending AI sat on 1,500+ gold for minutes, saving for a 1,700 g Strider while being pushed. Fixing it cut escalation from 36% to ~2% and median length from 14:23 to ~7:30 |
+| B14 | AI counters from a data table (`counter_table`), derived from single-role duels: Vanguard > Heavy (100% in every age), Heavy > Ranged (100% through Age 4; flips in Age 6), Ranged > Vanguard (100%, 31% in Age 6) | The matrix-reasoned counters answered Heavies with Heavies, which loses; Heavy spam beat the Hard Tactician 95%. The role triangle is legible rock-paper-scissors |
+
 ## Findings for the design docs
 
 - **Army size.** The GDD economy gives about 2–10 units per side on the lane, not the 30-vs-30 that PRD §6 and §11 budget for. See PLAN §9.
 - **GDD §4.3 pacing model** overestimates early XP: it assumes average Forge levels from 0:00 and ignores gold spent on turrets and the Forge.
 - **Doctrine parity** has to be checked per gold (HP × damage ÷ cost), not by eye: the v2 numbers were a 45% swing apart.
+- **The role triangle is rock-paper-scissors in practice** (B14): Vanguards swarm Heavies, Heavies hold Ranged, Ranged shred Vanguards. The damage matrix alone suggests "Heavies beat Heavies", which is true per hit but loses to cheap mass on one lane. GDD §5.2's "reading it" line should be updated once balance settles.
+- **Hoarding and trickling, not numbers, caused most stalemates** (B12, B13). With the AI spending properly and pushing together, matches resolve — now too fast (see the next tuning pass).

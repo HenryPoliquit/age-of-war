@@ -10,9 +10,13 @@ var side: int
 var rng := RandomNumberGenerator.new()
 ## Harness override: when true, doctrine picks are random instead of personality preferences.
 var random_doctrines := false
+## Harness override: doctrine ids to pick whenever offered (wins over everything else).
+var forced_doctrines: Array = []
 
 var _timer := 0.0
 var _released_hold := false
+var _pushing := false
+var _staged_since := 0.0
 
 
 func _init(p_personality: AiPersonalityDef, p_difficulty: AiDifficultyDef, p_side: int, p_seed: int = 1) -> void:
@@ -60,6 +64,9 @@ func _decide(sim: MatchSim) -> void:
 func _pick_doctrine(sim: MatchSim) -> DoctrineDef:
 	var s := sim.sides[side]
 	var options := sim.data.age(s.age + 1).doctrine_options
+	for d in options:
+		if String(d.id) in forced_doctrines.map(func(x): return String(x)):
+			return d
 	if not random_doctrines:
 		for pref in personality.doctrine_prefs:
 			for d in options:
@@ -114,21 +121,56 @@ func _spend_xp(sim: MatchSim, pressure: bool) -> void:
 
 
 func _manage_stance(sim: MatchSim, pressure: bool) -> void:
-	if not personality.uses_hold:
-		return
 	var s := sim.sides[side]
-	var threshold := sim.income_rate(side) * personality.hold_release_seconds
-	var army := s.army_value()
 	if pressure:
 		sim.set_stance(side, &"advance")
-		_released_hold = true
+		_pushing = false
 		return
-	if s.stance == &"hold":
-		if army >= threshold:
-			sim.set_stance(side, &"advance")
+	# Early massing (Rusher): hold near home until the first wave is big enough.
+	if personality.uses_hold and not _released_hold:
+		var threshold := sim.income_rate(side) * personality.hold_release_seconds
+		if s.army_value() >= threshold:
 			_released_hold = true
-	elif army < threshold * 0.3:
-		sim.set_stance(side, &"hold", sim.to_world(side, sim.rules.lane_length * 0.35))
+		else:
+			sim.set_stance(side, &"hold", sim.to_world(side, sim.rules.lane_length * 0.35))
+			return
+	if personality.push_ratio <= 0.0 or s.units.is_empty():
+		sim.set_stance(side, &"advance")
+		return
+	# Staged push (GDD §10 coordinated push): gather outside enemy turret range, then go together,
+	# instead of trickling units into the gate one at a time.
+	var lane := sim.rules.lane_length
+	var enemy := sim.sides[sim.enemy_of(side)]
+	var reach := 300.0
+	var defence := 0.0
+	for t in enemy.turrets:
+		if t != null:
+			reach = maxf(reach, t.def.range)
+			defence += t.def.cost
+	for u in enemy.units:
+		if lane - u.progress < reach + 300.0 or u.progress < reach + 300.0:
+			defence += u.cost_paid
+	var staging := lane - reach - 80.0
+	var front := 0.0
+	for u in s.units:
+		front = maxf(front, u.progress)
+	var group := 0.0
+	for u in s.units:
+		if u.progress >= front - 450.0:
+			group += u.cost_paid
+	# Go for the kill: a weak base needs a smaller margin; and never wait at the staging line forever.
+	var needed := defence * personality.push_ratio * lerpf(0.2, 1.0, enemy.base_hp / enemy.base_max_hp)
+	if _pushing:
+		# Keep pushing until the attacking group is spent.
+		if group < needed * 0.3:
+			_pushing = false
+			_staged_since = sim.time
+	elif group >= needed or sim.time - _staged_since > 30.0:
+		_pushing = true
+	if _pushing:
+		sim.set_stance(side, &"advance")
+	else:
+		sim.set_stance(side, &"hold", sim.to_world(side, staging))
 
 
 # ---------------------------------------------------------------------------
@@ -150,11 +192,25 @@ func _spend_gold(sim: MatchSim, pressure: bool) -> void:
 	var guard := 0
 	while guard < sim.rules.queue_slots:
 		guard += 1
-		var def := _pick_unit(sim)
-		if def == null:
+		var ranked := _ranked_units(sim)
+		if ranked.is_empty():
 			break
+		var def: UnitDef = ranked[0]
 		var price := sim.unit_price(side, def)
 		var army := s.army_value() + s.queued_value()
+		if s.gold < price:
+			# Don't hoard for an expensive pick while the lane is thin: take the best affordable one.
+			var wait := (price - s.gold) / maxf(income, 0.01)
+			if not (army < floor_value or pressure or wait > 8.0):
+				break
+			def = null
+			for d in ranked.slice(1):
+				if s.gold >= sim.unit_price(side, d):
+					def = d
+					break
+			if def == null:
+				break
+			price = sim.unit_price(side, def)
 		var saving := reserve > 0.0 and s.gold - price < reserve
 		if saving and not pressure and army >= floor_value:
 			break
@@ -221,12 +277,15 @@ func _best_turret(sim: MatchSim) -> TurretDef:
 	return null
 
 
-func _pick_unit(sim: MatchSim) -> UnitDef:
+## This side's unit options, best first.
+func _ranked_units(sim: MatchSim) -> Array[UnitDef]:
 	var s := sim.sides[side]
+	var out: Array[UnitDef] = []
 	if personality.spam_role != "":
 		var d := sim.data.unit_for_role(s.age, personality.spam_role)
 		# Siege spam has nothing to queue in Age 1; it falls back to Vanguards until Age 2.
-		return d if d != null else sim.data.unit_for_role(s.age, "vanguard")
+		out.append(d if d != null else sim.data.unit_for_role(s.age, "vanguard"))
+		return out
 	var enemy := sim.sides[sim.enemy_of(side)]
 	var weights := {}
 	for role in MatchSim.ROLES:
@@ -259,7 +318,8 @@ func _pick_unit(sim: MatchSim) -> UnitDef:
 	for r in weights:
 		total += weights[r]
 	if total <= 0.0:
-		return sim.data.unit_for_role(s.age, "vanguard")
+		out.append(sim.data.unit_for_role(s.age, "vanguard"))
+		return out
 	var have := {}
 	var have_total := 1.0
 	for u in s.units:
@@ -268,18 +328,18 @@ func _pick_unit(sim: MatchSim) -> UnitDef:
 	for q in s.queue:
 		have[q.role] = have.get(q.role, 0.0) + q.cost
 		have_total += q.cost
-	var best_role := ""
-	var best_score := -INF
+	var scored := []
 	for r in weights:
 		var target: float = weights[r] / total
 		var share: float = have.get(r, 0.0) / have_total
 		var score := target - share
 		# Seeded noise: Easy is erratic; everyone else varies slightly so sim runs aren't identical.
 		score += rng.randf_range(-0.15, 0.15) if difficulty.counter_level == 0 else rng.randf_range(-0.03, 0.03)
-		if score > best_score:
-			best_score = score
-			best_role = r
-	return sim.data.unit_for_role(s.age, best_role)
+		scored.append([score, r])
+	scored.sort_custom(func(a, b): return a[0] > b[0])
+	for pair in scored:
+		out.append(sim.data.unit_for_role(s.age, pair[1]))
+	return out
 
 
 func _apply_counters(sim: MatchSim, weights: Dictionary) -> void:
@@ -291,37 +351,27 @@ func _apply_counters(sim: MatchSim, weights: Dictionary) -> void:
 		total += u.cost_paid
 	if total <= 0.0:
 		return
+	var table := personality.counter_table
 	if difficulty.counter_level == 1:
+		# Normal: react to the enemy's majority role.
 		var majority := ""
 		var mv := 0.0
 		for r in by_role:
 			if by_role[r] > mv:
 				mv = by_role[r]
 				majority = r
-		var counter := {"vanguard": "ranged", "ranged": "heavy", "heavy": "heavy", "siege": "vanguard"}
-		var c: String = counter.get(majority, "")
+		var c: String = table.get(majority, "")
 		if weights.has(c):
 			weights[c] *= 1.8
 		return
-	# Matrix-aware: value each of our roles by damage it deals into the enemy's armour mix and
-	# damage it absorbs from the enemy's damage mix, per gold.
-	var armour_share := {"light": 0.0, "heavy": 0.0}
-	var dtype_share := {}
-	for u in enemy.units:
-		armour_share[u.def.armour] += u.cost_paid / total
-		dtype_share[u.def.damage_type] = dtype_share.get(u.def.damage_type, 0.0) + u.cost_paid / total
-	var rules := sim.rules
-	for role in weights.keys():
-		var d := sim.data.unit_for_role(sim.sides[side].age, role)
-		var offence := 0.0
-		for a in armour_share:
-			offence += armour_share[a] * rules.matrix(d.damage_type, a)
-		var defence := 0.0
-		for dt in dtype_share:
-			defence += dtype_share[dt] * rules.matrix(dt, d.armour)
-		# Cubed so a 15–30% matrix edge actually changes the build.
-		var edge := pow(offence / maxf(0.3, defence), 3.0)
-		weights[role] *= clampf(edge, 0.25, 3.0)
+	# Hard+: shift the mix toward the counter of every enemy role, in proportion to its share.
+	var wsum := 0.0
+	for r in weights:
+		wsum += weights[r]
+	for r in by_role:
+		var c: String = table.get(r, "")
+		if weights.has(c):
+			weights[c] += by_role[r] / total * personality.counter_strength * wsum
 
 
 # ---------------------------------------------------------------------------

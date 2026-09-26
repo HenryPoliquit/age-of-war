@@ -12,6 +12,9 @@ var events: Array[Dictionary] = []
 var unit_stats: Array[Dictionary] = [{}, {}]
 var base_damage: PackedFloat32Array = PackedFloat32Array([0.0, 0.0])
 var ability_pulses: PackedInt32Array = PackedInt32Array([0, 0])
+## Gold value of units that died, by where they died: 12 buckets of 200 px of the victim's own
+## progress (0 = at its own gate, 11 = at the enemy gate). Shows whether pushes die at the gates.
+var deaths: PackedFloat32Array = PackedFloat32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
 
 func sample(sim: MatchSim) -> void:
@@ -57,6 +60,10 @@ func count_damage(side: int, def: UnitDef, dmg: float) -> void:
 
 func count_absorbed(side: int, def: UnitDef, dmg: float) -> void:
 	_stat(side, def).absorbed += dmg
+
+
+func count_death(progress: float, lane: float, value: float) -> void:
+	deaths[clampi(int(progress / lane * 12.0), 0, 11)] += value
 
 
 func count_base_damage(by_side: int, dmg: float) -> void:

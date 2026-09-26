@@ -4,13 +4,16 @@ extends RefCounted
 
 
 ## Returns {winner, duration, escalated, age_times: [PackedFloat32Array x2], doctrines: [[ids],[ids]], log}.
-static func run(data: GameData, left: Dictionary, right: Dictionary, seed: int, random_doctrines := false) -> Dictionary:
+static func run(data: GameData, left: Dictionary, right: Dictionary, seed: int, random_doctrines := false, start_age := 1) -> Dictionary:
 	var sim := MatchSim.new(data, seed)
+	if start_age > 1:
+		sim.set_start_age(start_age)
 	var ais: Array[UtilityAI] = []
 	var cfgs := [left, right]
 	for i in 2:
 		var ai := UtilityAI.make(data, cfgs[i].personality, cfgs[i].get("difficulty", &"hard"), i, seed * 31 + i * 7919)
 		ai.random_doctrines = random_doctrines or cfgs[i].get("random_doctrines", false)
+		ai.forced_doctrines = cfgs[i].get("doctrines", [])
 		ai.setup(sim)
 		ais.append(ai)
 	var dt := data.rules.tick_dt

@@ -525,6 +525,7 @@ func _damage_unit(target: SimUnit, raw: float, dtype: String, by_side: int) -> f
 
 func _on_kill(victim: SimUnit, by_side: int) -> void:
 	var s := sides[by_side]
+	match_log.count_death(victim.progress, rules.lane_length, victim.cost_paid)
 	var bounty := victim.cost_paid * rules.bounty_fraction
 	s.gold += bounty
 	s.stat_gold_earned += bounty

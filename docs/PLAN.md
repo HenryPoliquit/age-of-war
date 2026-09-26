@@ -76,12 +76,18 @@ All weights are in `data/ai/personalities/*.tres`. The sim-only archetypes (fast
 | Suite | Matches | Feeds |
 | --- | --- | --- |
 | Round robin of the 4 personalities | 6 pairs × N | aggregate and pairing win rates |
-| Tactician mirror, random doctrines | 2N | match length, Age 6 arrival, doctrine win rates |
+| Tactician mirror, random doctrines | 3N | match length, Age 6 arrival, doctrine win rates |
 | Fast-age vs. strong-age | 2N | decisions check |
 | Each spam bot vs. Tactician | 4 × N | dominant-unit check |
 | Turtle mirror (both Bastion by preference) | N | worst-case defence |
 
-Sides alternate every match. Draws score 0.5. The escalation share is measured over round robin + mirror + fast/strong. Output: `reports/sim_report.md` (targets table, length histogram, age arrival, per-unit damage dealt/absorbed per gold) and `.json`. It exits 1 if any target fails. About 1 s per match; N=20 is about 5 minutes. `--logs` writes every match log to `logs/sim/`.
+Sides alternate every match. Draws score 0.5. The escalation share is measured over round robin + mirror + fast/strong. Jobs run across `--workers` headless Godot processes (`scripts/sim/sim_jobs.gd`, `tools/sim/sim_worker.gd`), with results identical to a single process for the same seed. Output: `reports/sim_report.md` (targets table, length histogram, age arrival, where units die along the lane, per-unit damage dealt/absorbed per gold) and `.json` (the same plus numeric `metrics`). It exits 1 if any target fails. N=20 takes about a minute on 4 cores.
+
+Balance tooling on top of it:
+
+- **Overrides** (`--set=doctrines/horde.unit_cost_mult=0.75`, `--scale=units:role=heavy.hp=0.9`, `--scale=ages:index=*.base_max_hp=1.5`) change data in memory for one run; the report lists them. Nothing is written to `data/`.
+- **`tools/sim/experiment.gd`**: any matchup, forced doctrines, start age, win rate / length / escalation / death locations. Used for targeted questions (e.g. the role duel matrix, balance log B11).
+- **`tools/sim/tune.py`**: coordinate descent over ~19 data and AI knobs, minimising distance outside every PRD §6 band, on fixed seeds (common random numbers). It proposes overrides; a human applies them to `data/` and records them in the balance log. Always validate the result on a different seed.
 
 ## 7. Match logs (GDD §15.4)
 
