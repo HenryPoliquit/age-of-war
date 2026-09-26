@@ -112,11 +112,15 @@ func _init() -> void:
 		metrics["pairs"][k] = pair_rates[k][0] / pair_rates[k][1]
 	checks.append(_check("Balance", "Any single personality pairing (first-named side's win rate)", "30–70%", "; ".join(pair_txt), pair_ok))
 
+	# Only count a doctrine against the opponent's different pick from the same offer. Otherwise an
+	# Age 4 doctrine is credited whenever the opponent never reached Age 4, i.e. was already losing.
+	var docs_def := GameData.get_default().doctrines
 	var doc := {}
 	for r in mirror:
 		for s in 2:
 			for d in r.doctrines[s]:
-				if d in r.doctrines[1 - s]:
+				var age: int = docs_def[StringName(d)].pick_age
+				if not r.doctrines[1 - s].any(func(o): return o != d and docs_def[StringName(o)].pick_age == age):
 					continue
 				if not doc.has(d):
 					doc[d] = [0.0, 0]

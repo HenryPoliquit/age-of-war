@@ -17,6 +17,8 @@ var _timer := 0.0
 var _released_hold := false
 var _pushing := false
 var _staged_since := 0.0
+var _hp_seen := -1.0
+var _hp_loss_rate := 0.0  # own base HP lost per second, smoothed over decisions
 
 
 func _init(p_personality: AiPersonalityDef, p_difficulty: AiDifficultyDef, p_side: int, p_seed: int = 1) -> void:
@@ -54,6 +56,10 @@ func update(sim: MatchSim, dt: float) -> void:
 
 func _decide(sim: MatchSim) -> void:
 	var s := sim.sides[side]
+	if _hp_seen >= 0.0:
+		var lost := maxf(0.0, _hp_seen - s.base_hp) / difficulty.decision_interval
+		_hp_loss_rate = lerpf(_hp_loss_rate, lost, 0.5)
+	_hp_seen = s.base_hp
 	var pressure := _under_pressure(sim)
 	_try_ability(sim)
 	_spend_xp(sim, pressure)
@@ -181,11 +187,16 @@ func _spend_gold(sim: MatchSim, pressure: bool) -> void:
 	var income := sim.income_rate(side)
 	var want := _structural_want(sim, pressure)
 	var reserve := 0.0
+	# Under pressure a turret beats trickling single units into an army camped at the gate:
+	# only Siege can hurt it, and each lone unit just feeds the attacker XP. Only worth it if the
+	# turret is affordable well before the base falls.
+	var defend: bool = pressure and want.get("kind", "") in ["turret", "replace"] \
+			and (want.cost - s.gold) / maxf(income, 0.01) < 0.5 * s.base_hp / maxf(_hp_loss_rate, 0.01)
 	if not want.is_empty():
 		if s.gold >= want.cost:
 			_do_want(sim, want)
 		# Only save for purchases that take a reasonable time to afford.
-		elif want.cost - s.gold <= income * 30.0:
+		elif defend or want.cost - s.gold <= income * 30.0:
 			reserve = want.cost
 	# Keep a minimum army on the lane even while saving.
 	var floor_value := income * 12.0
@@ -201,7 +212,9 @@ func _spend_gold(sim: MatchSim, pressure: bool) -> void:
 		if s.gold < price:
 			# Don't hoard for an expensive pick while the lane is thin: take the best affordable one.
 			var wait := (price - s.gold) / maxf(income, 0.01)
-			if not (army < floor_value or pressure or wait > 8.0):
+			# Siege costs several units' worth but is what breaks a base: worth a longer save.
+			var max_wait := 30.0 if def.role == "siege" else 8.0
+			if not (army < floor_value or pressure or wait > max_wait):
 				break
 			def = null
 			for d in ranked.slice(1):
@@ -212,7 +225,7 @@ func _spend_gold(sim: MatchSim, pressure: bool) -> void:
 				break
 			price = sim.unit_price(side, def)
 		var saving := reserve > 0.0 and s.gold - price < reserve
-		if saving and not pressure and army >= floor_value:
+		if saving and (defend or (not pressure and army >= floor_value)):
 			break
 		if s.queue.size() >= 2 and not pressure and s.units.size() + s.queue.size() >= sim.rules.field_cap:
 			break

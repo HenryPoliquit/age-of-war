@@ -5,12 +5,12 @@ Scores each run by how far every PRD §6 metric sits outside its target band, an
 data/AI knobs expressed as SimJobs overrides (--scale / --set). Nothing is written to data/: the
 result is a list of overrides to review and apply by hand (and record in docs/balance_log.md).
 
-  python3 tools/sim/tune.py --matches=12 --passes=2 --log=/tmp/tune.jsonl
+  python3 tools/sim/tune.py --matches=12 --passes=2 --log=/tmp/tune.jsonl   (GODOT=path overrides tools/godot; --workers=K)
 """
 import argparse, json, os, subprocess, sys, tempfile, time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-GODOT = os.path.join(ROOT, "tools", "godot")
+GODOT = os.environ.get("GODOT", os.path.join(ROOT, "tools", "godot"))
 PERSONALITIES = ["tactician", "rusher", "turtle", "economist", "fast_age", "strong_age",
                  "spam_vanguard", "spam_ranged", "spam_heavy", "spam_siege"]
 
@@ -75,15 +75,15 @@ def args_for(state):
 _cache = {}
 
 
-def evaluate(state, matches, seed):
+def evaluate(state, matches, seed, workers=4):
     extra = args_for(state)
     key = (tuple(extra), matches, seed)
     if key in _cache:
         return _cache[key]
     out = tempfile.mkdtemp(prefix="tune_")
-    cmd = ["timeout", "1200", GODOT, "--headless", "--path", ROOT, "-s", "tools/sim/run_sim.gd", "--",
-           f"--matches={matches}", f"--seed={seed}", f"--out={out}"] + extra
-    subprocess.run(cmd, cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    cmd = [GODOT, "--headless", "--path", ROOT, "-s", "tools/sim/run_sim.gd", "--",
+           f"--matches={matches}", f"--seed={seed}", f"--workers={workers}", f"--out={out}"] + extra
+    subprocess.run(cmd, cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=1200)
     with open(os.path.join(out, "sim_report.json")) as f:
         rep = json.load(f)
     res = (loss(rep["metrics"]), rep["metrics"], sum(1 for c in rep["checks"] if c["pass"]))
@@ -109,12 +109,13 @@ def main():
     ap.add_argument("--matches", type=int, default=12)
     ap.add_argument("--seed", type=int, default=3)
     ap.add_argument("--passes", type=int, default=2)
+    ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--log", default="/tmp/tune.jsonl")
     ap.add_argument("--only", default="", help="comma-separated param names to search")
     a = ap.parse_args()
     state = {p[0]: p[3] for p in PARAMS}
     only = set(a.only.split(",")) if a.only else None
-    best, metrics, passed = evaluate(state, a.matches, a.seed)
+    best, metrics, passed = evaluate(state, a.matches, a.seed, a.workers)
     logf = open(a.log, "a")
 
     def log(msg, **kw):
@@ -133,7 +134,7 @@ def main():
             for v in candidates(param, state[name]):
                 trial = dict(state)
                 trial[name] = v
-                l, m, ok = evaluate(trial, a.matches, a.seed)
+                l, m, ok = evaluate(trial, a.matches, a.seed, a.workers)
                 log("try", param=name, value=v, loss=round(l, 3), passed=ok)
                 if l < best - 0.05:
                     best, state, metrics, passed = l, trial, m, ok
