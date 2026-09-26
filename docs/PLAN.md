@@ -56,7 +56,7 @@ All stats are per-age final values; the ×1.7 cost / ×1.9 HP-damage scaling was
 | D14 | Units queued before evolving still train as old-age units | They were paid for |
 | D15 | Sim time limit 30:00 = draw | Safety net; any match that long already fails §6 |
 | D16 | In-repo test runner instead of GUT/gdUnit4 | Zero dependencies in fresh cloud sessions; 60 lines |
-| D17 | Compatibility renderer for the graybox | Runs under Xvfb for screenshots. **Revisit at M2**: 2D lights and glow behave differently between renderers (GDD §13.4, PRD §10.1) |
+| D17 | Compatibility renderer for the graybox | Runs under Xvfb for screenshots. **Revisit at M2**: 2D lights and glow behave differently between renderers (GDD §13.4, PRD §10.1) Also: 2D MSAA is not supported on this renderer in Godot 4.7 ("not yet supported for GLES3"), so procedurally drawn unit art has jagged edges when the 1920×1080 design is scaled down (e.g. to 1600×900) |
 | D18 | Upgrades are per role (slot), stored on the side, and read at damage/HP time, so they apply to fielded and older-age units at once | Spec §2.2: "applied immediately", "carry over" |
 | D19 | Health upgrades multiply max and current HP by the same ratio | Same rule evolving uses for bases; no free heals |
 | D20 | A skill's zone is fixed when it fires (area: densest enemy window by gold value; strip: enemy front unit back toward their base; sweep: whole lane, one slice per pulse, away from the caster) | Auto-aim with a readable telegraph |
