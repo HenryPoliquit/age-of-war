@@ -7,6 +7,16 @@ uniform float seam = 0.5;
 uniform float side = 0.0;
 uniform float softness = 0.035;
 uniform float dissolve = 1.0;
+// Brush grain: horizontal strokes of slight value variation over the flat shapes.
+uniform float grain = 0.09;
+// The backdrop's left half is opaque underneath; overlay layers (weather, props) mask both sides.
+uniform bool opaque_left = true;
+
+varying vec2 local_pos;
+
+void vertex() {
+	local_pos = VERTEX;
+}
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -26,9 +36,11 @@ void fragment() {
 	float m = smoothstep(-softness, softness, d);
 	// The left half is drawn opaque underneath; only the right half is masked on top of it, so the
 	// seam never composites two part-transparent layers over the clear colour.
-	float keep = side < 0.5 ? 1.0 : m;
+	float keep = side < 0.5 ? (opaque_left ? 1.0 : 1.0 - m) : m;
 	if (dissolve < 1.0) {
 		keep *= 1.0 - smoothstep(dissolve - 0.08, dissolve, n);
 	}
+	float g = noise(local_pos * vec2(0.012, 0.07)) * 0.6 + noise(local_pos * vec2(0.09, 0.4)) * 0.4;
+	COLOR.rgb *= 1.0 - grain * 0.5 + g * grain;
 	COLOR.a *= keep;
 }

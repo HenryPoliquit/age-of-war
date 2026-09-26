@@ -35,6 +35,10 @@ var age: int
 var palette: Dictionary
 var layers: Array = []
 var anims: Array = []
+## Foreground props drawn in front of the lane (parallax FRONT_FACTOR) and the age's weather.
+var front: Array = []
+var weather: Dictionary = {}
+const FRONT_FACTOR := 1.35
 var rng := RandomNumberGenerator.new()
 
 static var _cache := {}
@@ -62,12 +66,28 @@ func build(p_age: int) -> void:
 		5: _industrial()
 		6: _future()
 	_ground()
+	_front()
 
 
 # ---------------------------------------------------------------------------
 # Shape helpers
 
 func _add(layer: int, shape: Dictionary) -> void:
+	# Painterly shading: tall shapes get a vertical gradient, lit from above, shadowed at the base.
+	if shape.has("poly") and not shape.has("cols"):
+		var pts: PackedVector2Array = shape.poly
+		var lo := INF
+		var hi := -INF
+		for v in pts:
+			lo = minf(lo, v.y)
+			hi = maxf(hi, v.y)
+		if hi - lo > 14.0:
+			var col: Color = shape.col
+			var cols := PackedColorArray()
+			for v in pts:
+				var k := (v.y - lo) / (hi - lo)
+				cols.append(col.lightened(0.1 * (1.0 - k)).darkened(0.16 * k))
+			shape["cols"] = cols
 	layers[layer].shapes.append(shape)
 
 
@@ -326,3 +346,44 @@ func _ground() -> void:
 	if age == 6:
 		_line(4, Vector2(X0, GROUND_Y + 24), Vector2(X1, GROUND_Y + 24), 2, Color("37e7ff", 0.55))
 		_line(4, Vector2(X0, GROUND_Y + 30), Vector2(X1, GROUND_Y + 30), 1, Color("ff4fd8", 0.45))
+
+
+func _front() -> void:
+	var p := palette
+	var dark: Color = p.ground[1].darkened(0.45)
+	var y0 := GROUND_Y + 130.0
+	for x: float in _xs(760, 260):
+		match age:
+			1, 2:
+				for k in 7:
+					var h := rng.randf_range(40, 110)
+					var bx := x + k * 9.0
+					front.append({"poly": PackedVector2Array([Vector2(bx - 4, y0 + 200), Vector2(bx + rng.randf_range(-14, 14), y0 - h), Vector2(bx + 5, y0 + 200)]), "col": dark.lerp(Color("4f5a2a"), 0.3)})
+				front.append({"poly": _blob(Vector2(x + 120, y0 + 60), Vector2(70, 40), 10), "col": dark})
+			3:
+				for k in 9:
+					var h := rng.randf_range(50, 130)
+					var bx := x + k * 7.0
+					front.append({"poly": PackedVector2Array([Vector2(bx - 3, y0 + 200), Vector2(bx + rng.randf_range(-20, 20), y0 - h), Vector2(bx + 4, y0 + 200)]), "col": dark.lerp(Color("2e4020"), 0.5)})
+			4:
+				front.append({"poly": _blob(Vector2(x, y0 + 50), Vector2(110, 60), 9), "col": dark})
+				front.append({"poly": PackedVector2Array([Vector2(x + 60, y0 + 100), Vector2(x + 90, y0 - 70), Vector2(x + 100, y0 - 66), Vector2(x + 80, y0 + 100)]), "col": dark.lightened(0.05)})
+			5:
+				for k in 5:
+					front.append({"poly": _blob(Vector2(x + k * 34, y0 + 40 - (k % 2) * 22), Vector2(22, 14), 8), "col": dark.lightened(0.04 * (k % 2))})
+				var wire := PackedVector2Array()
+				for k in 16:
+					wire.append(Vector2(x + 180 + k * 12, y0 + (6 if k % 2 == 0 else -6)))
+				front.append({"polyline": wire, "w": 2.5, "col": dark})
+				front.append({"line": Vector2(x + 180, y0 - 40), "to": Vector2(x + 184, y0 + 100), "w": 5, "col": dark})
+			6:
+				front.append({"poly": PackedVector2Array([Vector2(x, y0 + 200), Vector2(x + 20, y0 - 40), Vector2(x + 260, y0 - 40), Vector2(x + 280, y0 + 200)]), "col": Color("0c0d18")})
+				front.append({"line": Vector2(x + 20, y0 - 40), "to": Vector2(x + 260, y0 - 40), "w": 2, "col": Color("37e7ff", 0.8)})
+	weather = [
+		{"kind": "motes", "n": 60, "col": Color(1.0, 0.9, 0.7, 0.5)},
+		{"kind": "gulls", "n": 7, "col": Color(0.2, 0.25, 0.3, 0.8)},
+		{"kind": "drizzle", "n": 120, "col": Color(0.85, 0.9, 0.95, 0.22)},
+		{"kind": "rain", "n": 240, "col": Color(0.75, 0.8, 0.95, 0.35)},
+		{"kind": "ash", "n": 90, "col": Color(0.35, 0.32, 0.3, 0.6)},
+		{"kind": "neon_rain", "n": 140, "col": Color("37e7ff", 0.35)},
+	][age - 1]

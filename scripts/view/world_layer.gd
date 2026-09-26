@@ -16,8 +16,32 @@ const BLEND_TIME := 0.12
 var _font: Font
 
 
+const OUTLINE := preload("res://shaders/unit_outline.gdshader")
+
+## One CanvasGroup per side so each side's units get an ink outline with a team rim.
+var _groups: Array[CanvasGroup] = []
+var _drawers: Array[Node2D] = []
+var _overlay: Node2D
+
+
 func _ready() -> void:
 	_font = ThemeDB.fallback_font
+	for side in 2:
+		var g := CanvasGroup.new()
+		g.fit_margin = 6.0
+		g.clear_margin = 6.0
+		var m := ShaderMaterial.new()
+		m.shader = OUTLINE
+		g.material = m
+		add_child(g)
+		var d := Node2D.new()
+		d.draw.connect(_draw_side_units.bind(side, d))
+		g.add_child(d)
+		_groups.append(g)
+		_drawers.append(d)
+	_overlay = Node2D.new()
+	_overlay.draw.connect(_draw_overlay)
+	add_child(_overlay)
 
 
 static func jitter(id: int) -> float:
@@ -51,6 +75,12 @@ func _process(delta: float) -> void:
 	corpses = corpses.filter(func(c): return t - c.born < 1.4)
 	_update_corpse_nodes()
 	queue_redraw()
+	for side in 2:
+		var m: ShaderMaterial = _groups[side].material
+		m.set_shader_parameter("rim", view.team_color(side))
+		m.set_shader_parameter("width", 2.0 * view.camera.zoom.x)
+		_drawers[side].queue_redraw()
+	_overlay.queue_redraw()
 
 
 func _draw() -> void:
@@ -70,26 +100,36 @@ func _draw() -> void:
 	# Front-line marker: a small standard where the seam meets the ground.
 	var fx := sim.front_x
 	draw_line(Vector2(fx, GROUND_Y + 16), Vector2(fx, GROUND_Y - 34), Color(1, 1, 1, 0.35), 2.0)
-	# Units back-to-front by lane depth.
-	var all: Array[SimUnit] = []
+
+
+## Units of one side, back-to-front by lane depth.
+func _draw_side_units(side: int, n: Node2D) -> void:
+	var units: Array[SimUnit] = view.sim.sides[side].units.duplicate()
+	units.sort_custom(func(a, b): return jitter(a.id) < jitter(b.id) or (jitter(a.id) == jitter(b.id) and a.id < b.id))
+	var rt := view.render_time()
+	var t := view.anim_time
+	for u in units:
+		_draw_unit(n, u, rt, t)
+	n.draw_set_transform(Vector2.ZERO)
+
+
+## HP bars, veterancy chevrons and the ability aim marker, drawn over the outlined units.
+func _draw_overlay() -> void:
+	var sim := view.sim
 	for s in sim.sides:
-		all.append_array(s.units)
-	all.sort_custom(func(a, b): return jitter(a.id) < jitter(b.id) or (jitter(a.id) == jitter(b.id) and a.id < b.id))
-	for u in all:
-		_draw_unit(u, rt, t)
-	for u in all:
-		_draw_bars(u)
-	draw_set_transform(Vector2.ZERO)
+		for u in s.units:
+			_draw_bars(_overlay, u)
 	if view.aiming:
+		var ov := _overlay
 		var def := sim.data.age(sim.sides[0].age).ability
 		var x := view.aim_x
 		var c := view.team_color(0).lightened(0.5)
-		draw_rect(Rect2(x - def.width * 0.5, GROUND_Y - 6, def.width, 16), Color(c, 0.35))
+		ov.draw_rect(Rect2(x - def.width * 0.5, GROUND_Y - 6, def.width, 16), Color(c, 0.35))
 		for k in int(def.width / 16):
-			draw_line(Vector2(x - def.width * 0.5 + k * 16, GROUND_Y - 130), Vector2(x - def.width * 0.5 + k * 16 + 8, GROUND_Y - 130), c, 2.0)
-		draw_line(Vector2(x - def.width * 0.5, GROUND_Y - 130), Vector2(x - def.width * 0.5, GROUND_Y + 10), c, 2.0)
-		draw_line(Vector2(x + def.width * 0.5, GROUND_Y - 130), Vector2(x + def.width * 0.5, GROUND_Y + 10), c, 2.0)
-		draw_string(_font, Vector2(x - 60, GROUND_Y - 140), def.display_name, HORIZONTAL_ALIGNMENT_CENTER, 120, 18, c)
+			ov.draw_line(Vector2(x - def.width * 0.5 + k * 16, GROUND_Y - 130), Vector2(x - def.width * 0.5 + k * 16 + 8, GROUND_Y - 130), c, 2.0)
+		ov.draw_line(Vector2(x - def.width * 0.5, GROUND_Y - 130), Vector2(x - def.width * 0.5, GROUND_Y + 10), c, 2.0)
+		ov.draw_line(Vector2(x + def.width * 0.5, GROUND_Y - 130), Vector2(x + def.width * 0.5, GROUND_Y + 10), c, 2.0)
+		ov.draw_string(_font, Vector2(x - 60, GROUND_Y - 140), def.display_name, HORIZONTAL_ALIGNMENT_CENTER, 120, 18, c)
 
 
 func _draw_base(s: SimSide, t: float) -> void:
@@ -147,29 +187,29 @@ func _pose(u: SimUnit, rt: float, t: float) -> Dictionary:
 	return {"walk": prog * STRIDE.get(rig, 0.1), "move": move_amt.get(u.id, 1.0 if u.state == &"walk" else 0.0), "atk": atk, "t": t + u.id * 0.37, "flash": fl}
 
 
-func _draw_unit(u: SimUnit, rt: float, t: float) -> void:
+func _draw_unit(ci: CanvasItem, u: SimUnit, rt: float, t: float) -> void:
 	var pos := unit_pos(u)
 	var dir := 1.0 if u.side == 0 else -1.0
 	var sc := UNIT_SCALE * (1.0 + 0.03 * (u.age - 1))
-	UnitArt.begin(self, Transform2D(0.0, Vector2(dir * sc, sc), 0.0, pos))
-	UnitArt.draw_unit(self, u.def, view.team_color(u.side), _pose(u, rt, t), u.id)
-	draw_set_transform(Vector2.ZERO)
+	UnitArt.begin(ci, Transform2D(0.0, Vector2(dir * sc, sc), 0.0, pos))
+	UnitArt.draw_unit(ci, u.def, view.team_color(u.side), _pose(u, rt, t), u.id)
+	ci.draw_set_transform(Vector2.ZERO)
 	if u.armour_buff_until > view.sim.time:
 		var h := UnitArt.height_for(u.def) * UNIT_SCALE
-		draw_arc(pos + Vector2(0, -h * 0.5), h * 0.6, 0, TAU, 24, Color(view.team_color(u.side).lightened(0.6), 0.55), 2.0)
+		ci.draw_arc(pos + Vector2(0, -h * 0.5), h * 0.6, 0, TAU, 24, Color(view.team_color(u.side).lightened(0.6), 0.55), 2.0)
 
 
-func _draw_bars(u: SimUnit) -> void:
+func _draw_bars(ci: CanvasItem, u: SimUnit) -> void:
 	var pos := unit_pos(u)
 	var h := UnitArt.height_for(u.def) * UNIT_SCALE + 10.0
 	if u.vet_rank > 0:
 		for i in u.vet_rank:
-			draw_colored_polygon(PackedVector2Array([pos + Vector2(-8 + i * 7, -h - 8), pos + Vector2(-5 + i * 7, -h - 12), pos + Vector2(-2 + i * 7, -h - 8)]), Color("f2c14e"))
+			ci.draw_colored_polygon(PackedVector2Array([pos + Vector2(-8 + i * 7, -h - 8), pos + Vector2(-5 + i * 7, -h - 12), pos + Vector2(-2 + i * 7, -h - 8)]), Color("f2c14e"))
 	if u.hp >= u.max_hp:
 		return
 	var w := 26.0 if u.def.role != "heavy" else 38.0
-	draw_rect(Rect2(pos + Vector2(-w * 0.5 - 1, -h - 1), Vector2(w + 2, 5)), Color(0, 0, 0, 0.65))
-	draw_rect(Rect2(pos + Vector2(-w * 0.5, -h), Vector2(w * u.hp / u.max_hp, 3)), view.team_color(u.side).lightened(0.35))
+	ci.draw_rect(Rect2(pos + Vector2(-w * 0.5 - 1, -h - 1), Vector2(w + 2, 5)), Color(0, 0, 0, 0.65))
+	ci.draw_rect(Rect2(pos + Vector2(-w * 0.5, -h), Vector2(w * u.hp / u.max_hp, 3)), view.team_color(u.side).lightened(0.35))
 
 
 func add_corpse(def: UnitDef, x: float, side: int, id: int) -> void:

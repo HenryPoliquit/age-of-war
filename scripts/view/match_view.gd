@@ -24,6 +24,7 @@ var left_ai: UtilityAI
 var hud: MatchHud
 var camera: Camera2D
 var backdrops: Array[Backdrop] = []
+var fronts: Array[FrontLayer] = []
 var world: WorldLayer
 var fx: FxLayer
 var lights: LightPool
@@ -98,6 +99,11 @@ func _ready() -> void:
 	fx.lights = lights
 	add_child(fx)
 	apply_settings()
+	for i in 2:
+		var fl := FrontLayer.new()
+		fl.setup(i, sim.sides[i].age)
+		add_child(fl)
+		fronts.append(fl)
 	var post := CanvasLayer.new()
 	post.layer = 1
 	var vig := ColorRect.new()
@@ -194,7 +200,7 @@ func _process(delta: float) -> void:
 	_pan(delta)
 	_place_camera(delta)
 	var cam_x := camera.get_screen_center_position().x
-	for b in backdrops:
+	for b in backdrops + fronts:
 		b.cam_x = cam_x
 		b.seam_x = sim.front_x
 		b.time = anim_time
@@ -353,6 +359,7 @@ func _on_event(ev: Dictionary) -> void:
 		"evolve":
 			var side: int = ev.side
 			backdrops[side].set_age(ev.age)
+			fronts[side].set_age(ev.age)
 			if side == 0:
 				audio.set_age(ev.age)
 			base_rebuilt[side] = anim_time

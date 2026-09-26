@@ -20,6 +20,8 @@ timeout 60   tools/godot --headless --path . -s tools/export_csv.gd             
 # Screenshots of the running game (Xvfb is installed in cloud sessions). --autoplay makes an AI play
 # the left side and the camera follow the front; --start-age=N, --cam=X, --shots=N --every=S optional.
 timeout 90 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolution 1920x1080 -- --autoplay --speed=3 --start-age=3 --screenshot=/tmp/shot.png --after=20
+# Unit gallery (colour / greyscale / silhouette of every unit) for the PRD §11 silhouette check:
+timeout 90 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolution 1920x1080 -s tools/unit_gallery.gd -- --out=reports/unit_gallery.png
 ```
 
 After adding a new `class_name` script, run `timeout 100 tools/godot --headless --path . --import` once so the class is registered.

@@ -32,7 +32,7 @@ func set_age(new_age: int) -> void:
 		return
 	if _old != null:
 		_old.queue_free()
-	_old = Backdrop.new()
+	_old = get_script().new()
 	_old.setup(side, age)
 	_old.show_behind_parent = true
 	add_child(_old)
@@ -92,7 +92,9 @@ func _draw() -> void:
 
 
 func _draw_shape(sh: Dictionary) -> void:
-	if sh.has("poly"):
+	if sh.has("cols"):
+		draw_polygon(sh.poly, sh.cols)
+	elif sh.has("poly"):
 		draw_colored_polygon(sh.poly, sh.col)
 	elif sh.has("circle"):
 		draw_circle(sh.circle, sh.r, sh.col)

@@ -22,27 +22,27 @@ const AGE_CLOTH := [
 
 ## Unit styles by id. rig: humanoid | mounted | chariot | car | mech | ram | trebuchet | mortar | howitzer | rail
 const STYLES := {
-	&"brawler": {"rig": "humanoid", "helmet": "hair", "weapon": "club", "build": 1.1},
-	&"slinger": {"rig": "humanoid", "helmet": "band", "weapon": "sling"},
+	&"brawler": {"rig": "humanoid", "helmet": "hair", "weapon": "club", "shield": "hide"},
+	&"slinger": {"rig": "humanoid", "helmet": "band", "weapon": "sling", "pack": "pouch"},
 	&"tusk_rider": {"rig": "mounted", "beast": "boar", "helmet": "hair", "weapon": "spear"},
 	&"hoplite": {"rig": "humanoid", "helmet": "crest", "weapon": "spear", "shield": "round"},
-	&"javelineer": {"rig": "humanoid", "helmet": "cap", "weapon": "javelin"},
+	&"javelineer": {"rig": "humanoid", "helmet": "cap", "weapon": "javelin", "pack": "javelins"},
 	&"chariot": {"rig": "chariot"},
 	&"ram_crew": {"rig": "ram"},
 	&"man_at_arms": {"rig": "humanoid", "helmet": "kettle", "weapon": "sword", "shield": "kite"},
-	&"longbowman": {"rig": "humanoid", "helmet": "hood", "weapon": "bow"},
+	&"longbowman": {"rig": "humanoid", "helmet": "hood", "weapon": "bow", "pack": "quiver"},
 	&"knight": {"rig": "mounted", "beast": "warhorse", "helmet": "greathelm", "weapon": "lance"},
 	&"trebuchet": {"rig": "trebuchet"},
 	&"halberdier": {"rig": "humanoid", "helmet": "morion", "weapon": "halberd"},
-	&"musketeer": {"rig": "humanoid", "helmet": "tricorne", "weapon": "musket"},
+	&"musketeer": {"rig": "humanoid", "helmet": "tricorne", "weapon": "musket", "pack": "backpack"},
 	&"cuirassier": {"rig": "mounted", "beast": "horse", "helmet": "morion", "weapon": "saber"},
 	&"mortar_team": {"rig": "mortar"},
-	&"trench_raider": {"rig": "humanoid", "helmet": "brodie", "weapon": "shovel", "build": 1.05},
-	&"rifleman": {"rig": "humanoid", "helmet": "brodie", "weapon": "rifle"},
+	&"trench_raider": {"rig": "humanoid", "helmet": "brodie", "weapon": "shovel", "shield": "plate"},
+	&"rifleman": {"rig": "humanoid", "helmet": "brodie", "weapon": "rifle", "pack": "backpack"},
 	&"armoured_car": {"rig": "car"},
 	&"field_howitzer": {"rig": "howitzer"},
-	&"aegis_trooper": {"rig": "humanoid", "helmet": "visor", "weapon": "baton", "shield": "energy", "build": 1.1},
-	&"pulse_rifleman": {"rig": "humanoid", "helmet": "visor", "weapon": "pulse"},
+	&"aegis_trooper": {"rig": "humanoid", "helmet": "visor", "weapon": "baton", "shield": "energy"},
+	&"pulse_rifleman": {"rig": "humanoid", "helmet": "visor", "weapon": "pulse", "pack": "cell"},
 	&"strider_mech": {"rig": "mech"},
 	&"rail_artillery": {"rig": "rail"},
 }
@@ -55,8 +55,21 @@ const ROLE_FALLBACK := {
 }
 
 
+## Role silhouettes (PRD §11: role identifiable by shape alone): Vanguards are broad and shielded
+## (or carry an upright polearm); Ranged are slighter and carry a pack on the back.
+const ROLE_BUILD := {"vanguard": 1.16, "ranged": 0.94}
+
+static var _style_cache := {}
+
+
 static func style_for(def: UnitDef) -> Dictionary:
-	return STYLES.get(def.id, ROLE_FALLBACK.get(def.role, ROLE_FALLBACK.vanguard))
+	if _style_cache.has(def.id):
+		return _style_cache[def.id]
+	var st: Dictionary = STYLES.get(def.id, ROLE_FALLBACK.get(def.role, ROLE_FALLBACK.vanguard)).duplicate()
+	if not st.has("build") and ROLE_BUILD.has(def.role):
+		st["build"] = ROLE_BUILD[def.role]
+	_style_cache[def.id] = st
+	return st
 
 
 ## Visual height in px (for HP bars and selection).
@@ -190,6 +203,7 @@ static func humanoid(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, po
 			_limb(ci, hip, knee, 5.5 * build, leg_col)
 			_limb(ci, knee, foot, 5.0 * build, leg_col)
 			ci.draw_line(foot, foot + Vector2(5 * build, 0), Color(0.12, 0.1, 0.08), 3.5 * build)
+	_pack(ci, st.get("pack", ""), sh, hip, build, pal, tm, pose, t)
 	# Back arm swings opposite the front leg.
 	var arm_sw := sin(walk) * 0.5 * mv
 	var back_hand := sh + Vector2(-2, 15 * build).rotated(arm_sw)
@@ -216,11 +230,43 @@ static func humanoid(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, po
 			var c := sh + Vector2(10, 9) * build
 			_poly(ci, [c + Vector2(-7, -8), c + Vector2(7, -8), c + Vector2(6, 4), c + Vector2(0, 14), c + Vector2(-6, 4)], metal.darkened(0.3))
 			_poly(ci, [c + Vector2(-5.5, -6.5), c + Vector2(5.5, -6.5), c + Vector2(4.5, 3.5), c + Vector2(0, 11.5), c + Vector2(-4.5, 3.5)], tm)
+		"hide":
+			var c := sh + Vector2(10, 12) * build
+			_ellipse(ci, c, Vector2(8.5, 11) * build, _c(Color("6e4a2c"), pose))
+			_ellipse(ci, c, Vector2(6.5, 9) * build, _c(Color("8d6a45"), pose))
+			ci.draw_line(c + Vector2(-5, -2) * build, c + Vector2(5, -2) * build, tm, 2.5 * build)
+		"plate":
+			var c := sh + Vector2(11, 8) * build
+			ci.draw_rect(Rect2(c + Vector2(-6, -11) * build, Vector2(12, 24) * build), metal.darkened(0.35))
+			ci.draw_rect(Rect2(c + Vector2(-2, -6) * build, Vector2(6, 2) * build), Color(0.05, 0.05, 0.05))
+			ci.draw_rect(Rect2(c + Vector2(-6, 6) * build, Vector2(12, 3) * build), tm)
 		"energy":
 			var c := sh + Vector2(13, 10) * build
 			var g := Color(team.lightened(0.5), 0.35 + 0.1 * sin(t * 6.0))
 			_ellipse(ci, c, Vector2(4, 17) * build, g)
 			ci.draw_line(c + Vector2(0, -16) * build, c + Vector2(0, 16) * build, Color(team.lightened(0.7), 0.9), 2.0)
+
+
+static func _pack(ci: CanvasItem, kind: String, sh: Vector2, hip: Vector2, b: float, pal: Array, tm: Color, pose: Dictionary, t: float) -> void:
+	var back := sh + Vector2(-8, 4) * b
+	match kind:
+		"quiver", "javelins":
+			var leather := _c(Color("6b4a2b"), pose)
+			_poly(ci, [back + Vector2(-3, -6) * b, back + Vector2(3, -8) * b, back + Vector2(1, 16) * b, back + Vector2(-5, 14) * b], leather)
+			for i in 3:
+				var tip := back + Vector2(-2 + i * 2.5, -16 - (i % 2) * 3) * b
+				ci.draw_line(back + Vector2(-1 + i * 1.5, -4) * b, tip, _c(Color("c9b28a"), pose), 1.6 * b)
+				if kind == "javelins":
+					ci.draw_line(tip, tip + Vector2(0.5, -4) * b, _c(pal[2], pose), 2.2 * b)
+		"pouch":
+			_ellipse(ci, hip + Vector2(-7, -4) * b, Vector2(4.5, 5.5) * b, _c(Color("7a5a3a"), pose))
+			_ellipse(ci, back + Vector2(1, 2) * b, Vector2(4, 7) * b, _c(pal[1], pose).darkened(0.2))
+		"backpack":
+			ci.draw_rect(Rect2(back + Vector2(-6, -4) * b, Vector2(9, 16) * b), _c(pal[1], pose).darkened(0.25))
+			ci.draw_rect(Rect2(back + Vector2(-7, -6) * b, Vector2(10, 4) * b), _c(pal[1], pose).darkened(0.4))
+		"cell":
+			ci.draw_rect(Rect2(back + Vector2(-6, -4) * b, Vector2(9, 16) * b), _c(Color("2a2f3c"), pose))
+			ci.draw_rect(Rect2(back + Vector2(-4, -1) * b, Vector2(4, 10) * b), Color(tm.lightened(0.6), 0.6 + 0.3 * sin(t * 4.0)))
 
 
 static func _helmet(ci: CanvasItem, kind: String, head: Vector2, b: float, pal: Array, tm: Color, pose: Dictionary, t: float, seed: int) -> void:
@@ -301,6 +347,15 @@ static func _weapon(ci: CanvasItem, kind: String, sh: Vector2, b: float, s: floa
 				"baton":
 					ci.draw_line(hand, tip, Color(0.15, 0.15, 0.2), 4.0 * b)
 					ci.draw_line(hand + dirv * 8, tip, Color(tm.lightened(0.6), 0.9), 2.5 * b)
+		"halberd" when atk < 0.0:
+			# At rest the halberd stands upright: a tall vertical line in silhouette.
+			var hand := sh + Vector2(10, 8) * b
+			_limb(ci, sh + Vector2(2, 1), hand, 4.5 * b, sleeve)
+			ci.draw_line(hand + Vector2(0, 22) * b, hand + Vector2(0, -44) * b, wood, 2.8 * b)
+			var top := hand + Vector2(0, -44) * b
+			_poly(ci, [top + Vector2(0, -2), top + Vector2(8, 3), top + Vector2(8, 12), top + Vector2(0, 8)], metal)
+			_poly(ci, [top + Vector2(-1.5, 0), top + Vector2(0, -10), top + Vector2(1.5, 0)], metal.lightened(0.2))
+			ci.draw_circle(hand, 2.6 * b, skin)
 		"spear", "halberd", "lance":
 			# Thrust: pulled back, then driven forward.
 			var reach := s * 9.0
@@ -331,6 +386,7 @@ static func _weapon(ci: CanvasItem, kind: String, sh: Vector2, b: float, s: floa
 			var spin := t * (22.0 if atk >= 0.0 and atk < 0.4 else 5.0)
 			var stone := hand + Vector2(cos(spin), sin(spin) * 0.5) * 10 * b
 			ci.draw_line(hand, stone, Color("c9b28a"), 1.2)
+			ci.draw_arc(hand, 10 * b, 0, TAU, 16, Color(0.8, 0.75, 0.6, 0.35), 1.5)
 			if atk < 0.4 or atk > 0.9:
 				ci.draw_circle(stone, 2.2 * b, Color("7b7466"))
 		"bow":
