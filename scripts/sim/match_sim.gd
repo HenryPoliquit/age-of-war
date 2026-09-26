@@ -516,20 +516,20 @@ func _on_kill(victim: SimUnit, by_side: int) -> void:
 func _hit_structures(u: SimUnit, enemy: SimSide) -> void:
 	var raw := u.base_damage * rules.matrix(u.def.damage_type, "structure")
 	raw *= 1.0 + rules.escalation_structure_bonus * escalation
-	if u.def.role == "siege":
-		# Only Siege reaches turrets; it knocks them out before the base (PLAN D3).
-		for t in enemy.turrets:
-			if t != null and t.alive():
-				var dmg := minf(raw, t.hp)
-				t.hp -= dmg
-				u.stat_damage_dealt += dmg
-				match_log.count_damage(u.side, u.def, dmg)
-				if t.hp <= 0.0:
-					enemy.turrets[t.slot] = null
-					_emit({"type": "turret_destroyed", "side": enemy.index, "slot": t.slot, "turret": String(t.def.id)})
-				if record_fx:
-					fx.append({"type": "hit", "x": to_world(enemy.index, 0.0), "dtype": u.def.damage_type, "side": enemy.index, "structure": true})
-				return
+	# Any unit at the gate knocks out turrets (lowest slot first) before the base; the matrix makes
+	# Siege the structure-breaker (spec §2.3, superseding PLAN D3).
+	for t in enemy.turrets:
+		if t != null and t.alive():
+			var dmg := minf(raw, t.hp)
+			t.hp -= dmg
+			u.stat_damage_dealt += dmg
+			match_log.count_damage(u.side, u.def, dmg)
+			if t.hp <= 0.0:
+				enemy.turrets[t.slot] = null
+				_emit({"type": "turret_destroyed", "side": enemy.index, "slot": t.slot, "turret": String(t.def.id)})
+			if record_fx:
+				fx.append({"type": "hit", "x": to_world(enemy.index, 0.0), "dtype": u.def.damage_type, "side": enemy.index, "structure": true})
+			return
 	u.stat_damage_dealt += minf(raw, enemy.base_hp)
 	match_log.count_damage(u.side, u.def, minf(raw, enemy.base_hp))
 	damage_base(enemy, raw, u.side)

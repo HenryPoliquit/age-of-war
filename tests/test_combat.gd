@@ -49,19 +49,18 @@ func test_base_damage_gives_xp() -> void:
 	check_near(sim.sides[0].xp, dmg * 0.1, 0.01, "1 XP per 10 damage")
 
 
-func test_only_siege_damages_turrets() -> void:
+func test_all_units_damage_turrets_before_base() -> void:
 	var sim := new_sim()
 	sim.sides[1].age = 2
 	sim.build_turret(1, 0, sim.data.turret_for_kind(2, "sentry"))
 	var t: SimTurret = sim.sides[1].turrets[0]
 	var v := place(sim, 0, "vanguard", sim.rules.lane_length - 5.0, 2)
 	v.hp = 1e9
+	var base_hp := sim.sides[1].base_hp
+	sim.step()
+	check_near(t.max_hp - t.hp, v.def.damage * sim.rules.matrix(v.def.damage_type, "structure"), 0.01, "vanguard hits the turret at its structure multiplier")
 	run_for(sim, 2.0)
-	check_near(t.hp, t.max_hp, 0.01, "vanguard must not hit turrets")
-	var ram := place(sim, 0, "siege", sim.rules.lane_length - 5.0, 2)
-	ram.hp = 1e9
-	run_for(sim, 3.0)
-	check(t.hp < t.max_hp, "ram hits turret")
+	check_near(sim.sides[1].base_hp, base_hp, 0.01, "base untouched while a turret stands")
 
 
 func test_ranged_siege_min_range() -> void:

@@ -89,8 +89,8 @@ func _spend_gold(sim: MatchSim, pressure: bool) -> void:
 	var want := _structural_want(sim, pressure)
 	var reserve := 0.0
 	# Under pressure a turret beats trickling single units into an army camped at the gate:
-	# only Siege can hurt it, and each lone unit just feeds the attacker XP. Only worth it if the
-	# turret is affordable well before the base falls.
+	# it takes hits for the base and shoots every attacker, while each lone unit just feeds the
+	# attacker XP. Only worth it if the turret is affordable well before the base falls.
 	var defend: bool = pressure and want.get("kind", "") in ["turret", "replace"] \
 			and (want.cost - s.gold) / maxf(income, 0.01) < 0.5 * s.base_hp / maxf(_hp_loss_rate, 0.01)
 	if not want.is_empty():

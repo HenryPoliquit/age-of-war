@@ -1,6 +1,6 @@
 class_name SimTurret
 extends RefCounted
-## A turret in a base slot. Only Siege units can damage turrets (PLAN D3).
+## A turret in a base slot. Any unit at the gate damages turrets before the base.
 
 var def: TurretDef
 var slot: int
