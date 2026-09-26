@@ -1,26 +1,42 @@
 class_name BaseArt
 extends RefCounted
-## Bases and turrets per race and age: human forts (hide camp → temple → Roman castrum → castle →
-## star fort → wizard citadel), elven tree-halls and dwarven mountain holds that grow with each age.
-## Local space: the gate is at x = 0 on the ground (y = 0), the base extends toward −x, and the enemy
-## is toward +x (the right base is drawn mirrored).
+## Bases, towers and turrets per race and age: human forts (hide camp → temple → Roman castrum →
+## castle → star fort → wizard citadel), elven tree-halls and dwarven mountain holds that grow with
+## each age. Turrets stand on their own towers on the ground in front of the base, one per slot, so
+## base art never has to leave room for mounts. Local space: the gate is at x = 0 on the ground
+## (y = 0), the base extends toward −x, and the enemy is toward +x (the right base is drawn mirrored).
 
-const SLOTS := [Vector2(-38, -118), Vector2(-96, -150), Vector2(-150, -118), Vector2(-66, -196), Vector2(-126, -196)]
+## Tower foot per turret slot, in front of the gate; odd slots stand a step further back in depth.
+const PADS := [Vector2(44, -4), Vector2(104, -16), Vector2(164, -4), Vector2(224, -16), Vector2(284, -4)]
 const SCALE := 1.35
+const TOWER_SCALE := 1.2
+## Tower height (before TOWER_SCALE) per race and age.
+const TOWER_H := {
+	&"human": [46.0, 50.0, 62.0, 70.0, 50.0, 78.0],
+	&"elf": [62.0, 64.0, 80.0, 84.0, 92.0, 94.0],
+	&"dwarf": [36.0, 40.0, 46.0, 48.0, 50.0, 52.0],
+}
 
 
-## Slot position in the base's local space, after BaseArt.SCALE.
-
-
+## Foot of a slot's tower, relative to the gate on the ground.
 static func slot_pos(i: int) -> Vector2:
-	return SLOTS[i] * SCALE
+	return PADS[i]
+
+
+## Where a slot's turret sits: the top of its tower.
+static func mount_pos(i: int, race: StringName, age: int) -> Vector2:
+	return PADS[i] + Vector2(0, -tower_height(race, age) * TOWER_SCALE)
+
+
+static func tower_height(race: StringName, age: int) -> float:
+	return TOWER_H.get(race, TOWER_H[&"human"])[clampi(age - 1, 0, 5)]
 
 
 static func _poly(ci: CanvasItem, pts: Array, col: Color) -> void:
 	ci.draw_colored_polygon(PackedVector2Array(pts), col)
 
 
-static func draw_base(ci: CanvasItem, age: int, team: Color, hp_frac: float, t: float, build: float, slots: int, host: Node = null, race: StringName = &"human") -> void:
+static func draw_base(ci: CanvasItem, age: int, team: Color, hp_frac: float, t: float, build: float, host: Node = null, race: StringName = &"human") -> void:
 	# `build` 0→1 plays the rebuild after evolving: the new structure rises out of the ground.
 	var rise := (1.0 - ease(build, 0.4)) * 240.0
 	if host != null:
@@ -34,14 +50,6 @@ static func draw_base(ci: CanvasItem, age: int, team: Color, hp_frac: float, t: 
 	dynamic_pass = true
 	_art(ci, race, age, team, t)
 	dynamic_pass = false
-	# Turret platforms.
-	for i in slots:
-		# Timber turret mount with a lit top edge and two braces.
-		var p: Vector2 = SLOTS[i]
-		ci.draw_rect(Rect2(p + Vector2(-17, 10), Vector2(34, 6)), Color("5a4028"))
-		ci.draw_line(p + Vector2(-17, 10), p + Vector2(17, 10), Color("8a6a44"), 1.5)
-		ci.draw_line(p + Vector2(-12, 16), p + Vector2(-6, 24), Color("4a3320"), 2.0)
-		ci.draw_line(p + Vector2(12, 16), p + Vector2(6, 24), Color("4a3320"), 2.0)
 	# Damage: cracks, smoke and fire as HP falls.
 	if hp_frac < 0.66:
 		for i in 3:
@@ -665,3 +673,113 @@ static func draw_turret(ci: CanvasItem, def: TurretDef, team: Color, aim: float,
 				_:
 					ci.draw_rect(Rect2(-10, -24, 20, 26), metal.darkened(0.3 + dim))
 					ci.draw_circle(Vector2(0, -26), 6.0, Color((glow if arcane else team.lightened(0.4)), 0.5 + 0.4 * pulse))
+
+
+## An unlocked slot with nothing built: a marked foundation on the ground.
+static func draw_pad(ci: CanvasItem, race: StringName) -> void:
+	var col: Color = {&"elf": Color("6a5a3a"), &"dwarf": Color("6e6a64")}.get(race, Color("7a6a54"))
+	UnitArt._ellipse(ci, Vector2(0, 2), Vector2(22, 5), Color(0, 0, 0, 0.25))
+	ci.draw_rect(Rect2(-18, -5, 36, 6), col)
+	ci.draw_line(Vector2(-18, -5), Vector2(18, -5), col.lightened(0.2), 1.2)
+	for x in [-14.0, 14.0]:
+		ci.draw_line(Vector2(x, -5), Vector2(x, -14), col.darkened(0.2), 2.0)
+
+
+## A turret's tower, feet at the origin, drawn at TOWER_SCALE by the caller. Each race builds its own:
+## human posts, plinths and stone towers up to an arcane pylon; elven living-wood stands and white
+## spires; squat dwarven stone bastions. `dim` darkens an outclassed tower.
+static func draw_tower(ci: CanvasItem, race: StringName, age: int, team: Color, t: float, dim := 0.0) -> void:
+	var h := tower_height(race, age)
+	var glow: Color = RaceLook.look(race).glow
+	var tm := team.darkened(0.1 + dim)
+	UnitArt._ellipse(ci, Vector2(0, 2), Vector2(24, 5), Color(0, 0, 0, 0.3))
+	match race:
+		&"elf":
+			var wood := Color("8a6a44").darkened(dim)
+			var white := Color("e6e2d8").darkened(dim)
+			if age <= 2:
+				# Living-wood stand: a twisted trunk opening into a cradle of branches.
+				_sp(ci, [Vector2(-14, 0), Vector2(-6, -10), Vector2(-7, -h + 12), Vector2(-16, -h), Vector2(16, -h), Vector2(7, -h + 12), Vector2(6, -10), Vector2(14, 0)], wood)
+				ci.draw_polyline(PackedVector2Array([Vector2(-2, -4), Vector2(2, -h * 0.5), Vector2(-1, -h + 12)]), Color(0, 0, 0, 0.25), 1.5)
+				for x in [-18.0, 18.0]:
+					UnitArt._ellipse(ci, Vector2(x, -h + 2), Vector2(8, 5), Color("4f7a3a").darkened(dim))
+			else:
+				var col := wood.lightened(0.1) if age <= 4 else white
+				_sp(ci, [Vector2(-12, 0), Vector2(-8, -h + 8), Vector2(-15, -h), Vector2(15, -h), Vector2(8, -h + 8), Vector2(12, 0)], col)
+				ci.draw_line(Vector2(-10, -h * 0.4), Vector2(10, -h * 0.4), Color("d9b25c").darkened(dim), 2.0)
+				for k in 3:
+					ci.draw_arc(Vector2(0, -12 - k * (h - 24) / 3.0), 9.0, 0.3, 2.8, 8, Color("4f7a3a").darkened(dim), 2.0)
+				if age >= 5:
+					var k := 0.6 + 0.4 * sin(t * 2.0)
+					ci.draw_circle(Vector2(0, -h * 0.6), 5.0, Color(glow, 0.35 * k))
+					ci.draw_line(Vector2(0, -h * 0.75), Vector2(0, -h * 0.45), Color(glow, 0.7 * k), 1.5)
+			_sp(ci, _rect_pts(Rect2(-17, -h - 3, 34, 5)), wood.darkened(0.1))
+			_sp(ci, [Vector2(-6, -h * 0.55), Vector2(6, -h * 0.55), Vector2(0, -h * 0.4)], tm)
+		&"dwarf":
+			var stone := (Color("8a8278") if age != 2 else Color("9a6a4a")).darkened(dim)
+			if age == 6:
+				stone = Color("5a5a68").darkened(dim)
+			if age <= 1:
+				# Stacked-stone cairn tower.
+				for k in 4:
+					var w := 22.0 - k * 2.0
+					_sp(ci, UnitArt._ellipse_pts(Vector2(0, -5 - k * 9.5), Vector2(w, 6), 0.0, 10), stone.darkened(0.05 * (k % 2)))
+			else:
+				_masonry(ci, Rect2(-22, -h, 44, h), stone, 9, 15)
+				for k in 4:
+					_sp(ci, _rect_pts(Rect2(-24 + k * 13, -h - 7, 9, 7)), stone.darkened(0.08))
+				var band := Color("b87a3a") if age == 2 else (Color("b8914a") if age == 5 else Color("4a4c52"))
+				ci.draw_line(Vector2(-23, -h * 0.35), Vector2(23, -h * 0.35), band.darkened(dim), 3.0)
+				# Team shield on the face.
+				ci.draw_circle(Vector2(0, -h * 0.62), 7.0, Color("4a4c52").darkened(dim))
+				ci.draw_circle(Vector2(0, -h * 0.62), 5.5, tm)
+				if age == 6:
+					var k := 0.55 + 0.45 * sin(t * 1.6)
+					ci.draw_polyline(PackedVector2Array([Vector2(-14, -10), Vector2(-9, -18), Vector2(-4, -10), Vector2(1, -18)]), Color(glow, 0.85 * k), 2.0)
+				if age == 5:
+					ci.draw_polyline(PackedVector2Array([Vector2(18, -4), Vector2(18, -h * 0.5), Vector2(26, -h * 0.5)]), Color("b8914a").darkened(dim), 3.0)
+		_:
+			var wood := Color("6b4a2b").darkened(dim)
+			match age:
+				1:
+					# Lookout on lashed posts.
+					for x in [-12.0, 12.0]:
+						ci.draw_line(Vector2(x, 0), Vector2(x * 0.8, -h), wood, 4.0)
+					ci.draw_line(Vector2(-12, -6), Vector2(10, -h + 6), wood.darkened(0.2), 2.5)
+					ci.draw_line(Vector2(12, -6), Vector2(-10, -h + 6), wood.darkened(0.2), 2.5)
+					_planks(ci, Rect2(-17, -h - 4, 34, 6), wood.lightened(0.1), 6)
+					ci.draw_line(Vector2(-10, -h * 0.5), Vector2(10, -h * 0.5), Color("b09060").darkened(dim), 1.5)
+				2:
+					_masonry(ci, Rect2(-15, -h, 30, h), Color("e1d3b3").darkened(dim), 10, 15)
+					_sp(ci, _rect_pts(Rect2(-18, -h - 5, 36, 6)), Color("c9a060").darkened(dim))
+					ci.draw_circle(Vector2(0, -h * 0.5), 5.0, Color("c28c3e").darkened(dim))
+				3:
+					_masonry(ci, Rect2(-16, -h * 0.45, 32, h * 0.45), Color("c2b08e").darkened(dim), 10, 16)
+					for x in [-14.0, 14.0]:
+						ci.draw_line(Vector2(x, -h * 0.45), Vector2(x, -h), wood, 4.0)
+					ci.draw_line(Vector2(-14, -h * 0.45), Vector2(14, -h), wood.darkened(0.2), 2.5)
+					_sp(ci, [Vector2(-20, -h), Vector2(20, -h), Vector2(16, -h + 6), Vector2(-16, -h + 6)], Color("b0583a").darkened(dim))
+					_sp(ci, _rect_pts(Rect2(-9, -h * 0.4, 18, 12)), tm)
+				4:
+					_masonry(ci, Rect2(-18, -h, 36, h), Color("8d8e8a").darkened(dim), 10, 14)
+					for k in 3:
+						_sp(ci, _rect_pts(Rect2(-20 + k * 15, -h - 7, 10, 7)), Color("8d8e8a").darkened(0.08 + dim))
+					_window(ci, Rect2(-2, -h * 0.6, 4, 12))
+					ci.draw_rect(Rect2(-8, -h * 0.35, 16, 12), tm)
+				5:
+					# Earthwork bastion with a brick cap and gabions.
+					_sp(ci, [Vector2(-24, 0), Vector2(-16, -h + 8), Vector2(16, -h + 8), Vector2(24, 0)], Color("8a7b66").darkened(dim))
+					_masonry(ci, Rect2(-18, -h, 36, 9), Color("8a5a44").darkened(dim), 4.5, 9)
+					for x in [-28.0, 28.0]:
+						_sp(ci, _rect_pts(Rect2(x - 6, -14, 12, 14)), Color("6a5a40").darkened(dim))
+					ci.draw_rect(Rect2(-8, -h * 0.5, 16, 10), tm)
+				_:
+					# Arcane pylon: slender stone, brass rings, a glowing crystal band.
+					_sp(ci, [Vector2(-14, 0), Vector2(-9, -h), Vector2(9, -h), Vector2(14, 0)], Color("6e6582").darkened(dim))
+					for k in 3:
+						var y := -14.0 - k * (h - 24) / 2.0
+						ci.draw_line(Vector2(-13 + k * 1.5, y), Vector2(13 - k * 1.5, y), Color("c9a45c").darkened(dim), 2.5)
+					var k := 0.6 + 0.4 * sin(t * 2.2)
+					ci.draw_rect(Rect2(-3, -h * 0.7, 6, h * 0.3), Color(glow, 0.5 + 0.4 * k))
+					ci.draw_rect(Rect2(-8, -h * 0.25, 16, 9), tm)
+					_sp(ci, _rect_pts(Rect2(-14, -h - 4, 28, 5)), Color("c9a45c").darkened(dim))

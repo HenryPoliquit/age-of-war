@@ -1,5 +1,5 @@
 extends SceneTree
-## Renders every base (rows = races, columns = ages) with its age's turrets mounted, for art review.
+## Renders every base (rows = races, columns = ages) with its age's turret towers in front, for art review.
 ## Needs a display (use Xvfb in the cloud):
 ##   xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolution 1920x1080 -s tools/base_gallery.gd -- --out=reports/base_gallery.png
 
@@ -30,18 +30,29 @@ func _draw(n: Node2D) -> void:
 	for r in RaceLook.IDS.size():
 		var race: StringName = RaceLook.IDS[r]
 		for age in range(1, 7):
-			var gate := Vector2(40 + age * 312 - 20, 330 + r * 350)
-			n.draw_rect(Rect2(gate.x - 312, gate.y, 312, 12), Color("5a4a3a"))
-			UnitArt.begin(n, Transform2D(0.0, Vector2(0.62, 0.62), 0.0, gate))
-			BaseArt.draw_base(n, age, MatchView.TEAM[0], 1.0, 0.7, 1.0, 5, null, race)
+			var col_x := (age - 1) * 320.0
+			var gate := Vector2(col_x + 150, 330 + r * 350)
+			var k := 0.5
+			n.draw_rect(Rect2(col_x, gate.y, 320, 12), Color("5a4a3a"))
+			var xf := Transform2D(0.0, Vector2(k, k), 0.0, gate)
+			UnitArt.begin(n, xf)
+			BaseArt.draw_base(n, age, MatchView.TEAM[0], 1.0, 0.7, 1.0, null, race)
+			# Five towers: this age's sentry, artillery and support, then two empty pads.
 			var turrets: Array = gd.age(age).turrets
-			for i in 5:
-				var def: TurretDef = turrets[i % turrets.size()]
-				UnitArt.begin(n, Transform2D(0.0, Vector2(0.62, 0.62), 0.0, gate) * Transform2D(0.0, BaseArt.slot_pos(i)))
-				BaseArt.draw_turret(n, def, MatchView.TEAM[0], -0.2, 0.0, 0.7, false, race)
+			for row in [1, 0]:
+				for i in 5:
+					if i % 2 != row:
+						continue
+					var foot := BaseArt.slot_pos(i)
+					UnitArt.begin(n, xf * Transform2D(0.0, Vector2.ONE * BaseArt.TOWER_SCALE, 0.0, foot))
+					if i >= turrets.size():
+						BaseArt.draw_pad(n, race)
+						continue
+					BaseArt.draw_tower(n, race, age, MatchView.TEAM[0], 0.7)
+					UnitArt.begin(n, xf * Transform2D(0.0, BaseArt.mount_pos(i, race, age)))
+					BaseArt.draw_turret(n, turrets[i], MatchView.TEAM[0], -0.2, 0.0, 0.7, false, race)
 			n.draw_set_transform(Vector2.ZERO)
-			n.draw_string(f, gate + Vector2(-300, 34), "%s · %s" % [gd.race(race).display_name, gd.age(age).display_name], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.1, 0.1, 0.1))
-
+			n.draw_string(f, Vector2(col_x + 10, gate.y + 34), "%s · %s" % [gd.race(race).display_name, gd.age(age).display_name], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.1, 0.1, 0.1))
 
 func _capture() -> void:
 	for i in 3:

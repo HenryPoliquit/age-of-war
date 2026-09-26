@@ -159,7 +159,7 @@ func _draw_base(s: SimSide, t: float) -> void:
 	var build := clampf((t - view.base_rebuilt.get(s.index, -10.0)) / 1.1, 0.0, 1.0)
 	var xf := Transform2D(0.0, Vector2(dir, 1), 0.0, Vector2(gate, GROUND_Y + 4))
 	UnitArt.begin(self, xf)
-	BaseArt.draw_base(self, s.age, team, s.base_hp / s.base_max_hp, t, build, s.turret_slots, self, s.race)
+	BaseArt.draw_base(self, s.age, team, s.base_hp / s.base_max_hp, t, build, self, s.race)
 	# Doctrine banners hang on the base (GDD §9: shown so the player can counter-plan).
 	for i in s.doctrines.size():
 		var p := Vector2(-170 + i * 40, -60)
@@ -168,28 +168,37 @@ func _draw_base(s: SimSide, t: float) -> void:
 		draw_set_transform_matrix(xf * Transform2D(0.0, Vector2(dir, 1), 0.0, p + Vector2(14, 26)))
 		draw_string(_font, Vector2(-12 if dir > 0 else -12, 0), String(s.doctrines[i].display_name).left(2), HORIZONTAL_ALIGNMENT_CENTER, 24, 14, Color.WHITE)
 		draw_set_transform_matrix(xf)
-	for i in s.turret_slots:
-		var tur: SimTurret = s.turrets[i]
-		if tur == null:
-			continue
-		var sp := BaseArt.slot_pos(i)
-		var world := xf * sp
-		var key := s.index * 10 + i
-		var target_x: float = tur.last_target_x if tur.last_fire_time > -5.0 else gate + dir * 300.0
-		var aim := atan2((GROUND_Y - 20) - world.y, absf(target_x - world.x))
-		var kick := clampf(1.0 - (sim.time - tur.last_fire_time) / 0.25, 0.0, 1.0)
-		draw_set_transform_matrix(xf * Transform2D(0.0, sp))
-		BaseArt.draw_turret(self, tur.def, team, aim, kick, t, tur.def.age < s.age, s.race)
-		if tur.hp < tur.max_hp:
-			draw_rect(Rect2(-14, 16, 28, 3), Color(0, 0, 0, 0.6))
-			draw_rect(Rect2(-14, 16, 28 * tur.hp / tur.max_hp, 3), Color("e05050"))
-		draw_set_transform_matrix(xf)
-		if tur.def.kind == "support":
-			draw_set_transform(Vector2.ZERO)
-			var r := tur.def.aura_radius
-			var x0 := gate if dir > 0 else gate - r
-			draw_rect(Rect2(x0, GROUND_Y + 2, r, 10), Color(team.lightened(0.3), 0.12 + 0.05 * sin(t * 2.0)))
+	# Turrets stand on their own towers on the ground in front of the gate (drawn behind the units).
+	# Back-row towers first so the front row overlaps them.
+	for row in [1, 0]:
+		for i in s.turret_slots:
+			if i % 2 != row:
+				continue
+			var tur: SimTurret = s.turrets[i]
+			var foot := BaseArt.slot_pos(i)
+			draw_set_transform_matrix(xf * Transform2D(0.0, Vector2.ONE * BaseArt.TOWER_SCALE, 0.0, foot))
+			if tur == null:
+				BaseArt.draw_pad(self, s.race)
+				continue
+			var outclassed := tur.def.age < s.age
+			BaseArt.draw_tower(self, s.race, tur.def.age, team, t, 0.3 if outclassed else 0.0)
+			var mp := BaseArt.mount_pos(i, s.race, tur.def.age)
+			var world := xf * mp
+			var target_x: float = tur.last_target_x if tur.last_fire_time > -5.0 else gate + dir * 300.0
+			var aim := atan2((GROUND_Y - 20) - world.y, absf(target_x - world.x))
+			var kick := clampf(1.0 - (sim.time - tur.last_fire_time) / 0.25, 0.0, 1.0)
+			draw_set_transform_matrix(xf * Transform2D(0.0, mp))
+			BaseArt.draw_turret(self, tur.def, team, aim, kick, t, outclassed, s.race)
+			if tur.hp < tur.max_hp:
+				draw_rect(Rect2(-14, -30, 28, 3), Color(0, 0, 0, 0.6))
+				draw_rect(Rect2(-14, -30, 28 * tur.hp / tur.max_hp, 3), Color("e05050"))
 			draw_set_transform_matrix(xf)
+			if tur.def.kind == "support":
+				draw_set_transform(Vector2.ZERO)
+				var r := tur.def.aura_radius
+				var x0 := gate if dir > 0 else gate - r
+				draw_rect(Rect2(x0, GROUND_Y + 2, r, 10), Color(team.lightened(0.3), 0.12 + 0.05 * sin(t * 2.0)))
+				draw_set_transform_matrix(xf)
 	draw_set_transform(Vector2.ZERO)
 
 

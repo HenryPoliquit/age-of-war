@@ -485,7 +485,7 @@ func _on_turret_shot(f: Dictionary) -> void:
 	var side: int = f.side
 	var dir := 1.0 if side == 0 else -1.0
 	var gate := sim.to_world(side, 0.0)
-	var sp := BaseArt.slot_pos(f.slot)
+	var sp := BaseArt.mount_pos(f.slot, race_of(side), def.age)
 	var from := Vector2(gate + dir * sp.x, GROUND_Y + 4 + sp.y - 8)
 	var target: SimUnit = f.target
 	var to := Vector2(f.to_x, GROUND_Y - (UnitArt.height_for(target.def, race_of(target.side)) * 0.5 if target != null else 6.0))
