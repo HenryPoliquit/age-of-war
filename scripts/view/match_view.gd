@@ -327,12 +327,6 @@ func _hotkey(k: Key) -> void:
 			hud.feedback(sim.evolve(0))
 		KEY_SPACE:
 			hud.feedback(sim.fire_ability(0))
-		KEY_F1:
-			set_speed(0)
-		KEY_F2:
-			set_speed(1)
-		KEY_F3:
-			set_speed(2)
 		KEY_ESCAPE:
 			hud.open_settings()
 

@@ -1,8 +1,7 @@
 class_name MatchHud
 extends CanvasLayer
-## Match HUD (GDD §13.9): top status bar with both bases, lane minimap, unit cards with portraits,
-## command panel (economy, ability, evolve, Income, turrets, speed),
-## event banners and the post-match screen. Reads MatchSim; acts only through its commands.
+## Match HUD (GDD §13.9): top bar, upgrade grid, unit cards, lane map with training queue, turret slots,
+## event banners and the post-match screen. Panels render HudModel values; actions go through MatchSim.
 
 const ACCENT := UiStyle.ACCENT
 const PANEL_BG := Color(0.06, 0.07, 0.1, 0.84)
@@ -17,21 +16,12 @@ var shake_scale := 1.0
 
 var _root: Control
 var _theme: Theme
-var _hp: Array[ProgressBar] = []
-var _age_labels: Array[Label] = []
-var _clock: Label
-var _tide: TidePips
+var _top: TopBar
 var _minimap: Minimap
 var _cards: Array[UnitCard] = []
 var _queue: QueueStrip
-var _gold: Label
-var _xp: Label
-var _ability: Button
-var _evolve: Button
-var _evolve_meter: Meter
 var _income: Button
 var _slots: Array[Button] = []
-var _speed_buttons: Array[Button] = []
 var _slot_menu: PopupMenu
 var _slot_menu_index := -1
 var _banner: Label
@@ -48,7 +38,9 @@ func _ready() -> void:
 	_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_root)
-	_build_top()
+	_top = TopBar.new(self)
+	_root.add_child(_top)
+	_build_minimap()
 	_build_cards()
 	_build_commands()
 	_build_banner()
@@ -101,66 +93,14 @@ func _btn(parent: Control, text: String, cb: Callable) -> Button:
 	return b
 
 
-func _build_top() -> void:
-	var bar := _panel(_root)
-	bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	bar.offset_left = 12
-	bar.offset_right = -12
-	bar.offset_top = 8
-	bar.offset_bottom = 70
-	var h := HBoxContainer.new()
-	h.add_theme_constant_override("separation", 18)
-	bar.add_child(h)
-	for i in 2:
-		var v := VBoxContainer.new()
-		v.add_theme_constant_override("separation", 2)
-		v.custom_minimum_size = Vector2(430, 0)
-		var row := HBoxContainer.new()
-		v.add_child(row)
-		var name := _label(row, "You" if i == 0 else "Enemy", 15, view.team_color(i).lightened(0.35))
-		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		_age_labels.append(_label(row, "", 16, ACCENT, true))
-		var bar_hp := ProgressBar.new()
-		bar_hp.custom_minimum_size = Vector2(0, 16)
-		bar_hp.show_percentage = false
-		bar_hp.fill_mode = ProgressBar.FILL_BEGIN_TO_END if i == 0 else ProgressBar.FILL_END_TO_BEGIN
-		var fill := StyleBoxFlat.new()
-		fill.bg_color = view.team_color(i)
-		fill.border_color = view.team_color(i).lightened(0.4)
-		fill.border_width_top = 2
-		fill.border_width_bottom = 2
-		bar_hp.add_theme_stylebox_override("fill", fill)
-		v.add_child(bar_hp)
-		_hp.append(bar_hp)
-		if i == 1:
-			row.move_child(name, 2)
-			name.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		h.add_child(v)
-		if i == 0:
-			var mid := VBoxContainer.new()
-			mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			mid.alignment = BoxContainer.ALIGNMENT_CENTER
-			_clock = _label(mid, "0:00", 26, UiStyle.TEXT, true)
-			_clock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			_tide = TidePips.new()
-			_tide.hud = self
-			_tide.custom_minimum_size = Vector2(0, 16)
-			mid.add_child(_tide)
-			h.add_child(mid)
-			var gear := Button.new()
-			gear.text = "⚙"
-			gear.tooltip_text = "Settings (Esc)"
-			gear.custom_minimum_size = Vector2(40, 40)
-			gear.alignment = HORIZONTAL_ALIGNMENT_CENTER
-			gear.pressed.connect(open_settings)
-			h.add_child(gear)
+func _build_minimap() -> void:
 	_minimap = Minimap.new()
 	_minimap.hud = self
 	_minimap.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_minimap.offset_left = -300
 	_minimap.offset_right = 300
-	_minimap.offset_top = 76
-	_minimap.offset_bottom = 98
+	_minimap.offset_top = 62
+	_minimap.offset_bottom = 84
 	_root.add_child(_minimap)
 
 
@@ -195,53 +135,15 @@ func _build_commands() -> void:
 	p.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	p.offset_left = -560
 	p.offset_right = -12
-	p.offset_top = -268
+	p.offset_top = -150
 	p.offset_bottom = -12
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 6)
 	p.add_child(v)
-	var res := HBoxContainer.new()
-	res.add_theme_constant_override("separation", 10)
-	v.add_child(res)
-	var gi := Icon.new()
-	gi.kind = "gold"
-	res.add_child(gi)
-	_gold = _label(res, "", 20, GOLD)
-	_gold.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var xi := Icon.new()
-	xi.kind = "xp"
-	res.add_child(xi)
-	_xp = _label(res, "", 20, XP)
-	_xp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var row1 := HBoxContainer.new()
-	v.add_child(row1)
-	_ability = _btn(row1, "", func(): feedback(sim.fire_ability(0)))
-	_ability.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_ability.custom_minimum_size = Vector2(0, 38)
-	var row2 := HBoxContainer.new()
-	v.add_child(row2)
-	var ev := VBoxContainer.new()
-	ev.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row2.add_child(ev)
-	_evolve = _btn(ev, "", func(): feedback(sim.evolve(0)))
-	_evolve.custom_minimum_size = Vector2(0, 36)
-	_evolve_meter = Meter.new()
-	_evolve_meter.col = XP
-	_evolve_meter.custom_minimum_size = Vector2(0, 6)
-	ev.add_child(_evolve_meter)
 	var row3 := HBoxContainer.new()
 	v.add_child(row3)
 	_income = _btn(row3, "", func(): feedback(sim.buy_upgrade(0, "income", "income")))
 	_income.custom_minimum_size = Vector2(170, 34)
-	for i in 3:
-		var b := Button.new()
-		b.text = ["1×", "2×", "❚❚"][i]
-		b.tooltip_text = ["Normal speed (F1)", "Double speed (F2)", "Pause (F3)"][i]
-		b.custom_minimum_size = Vector2(38, 34)
-		b.toggle_mode = true
-		b.pressed.connect(func(): view.set_speed(i))
-		row3.add_child(b)
-		_speed_buttons.append(b)
 	var tl := _label(v, "Turrets — click an empty slot to build, a turret to sell (Q W E R)", 13, Color(1, 1, 1, 0.6))
 	tl.autowrap_mode = TextServer.AUTOWRAP_WORD
 	var row4 := HBoxContainer.new()
@@ -341,42 +243,17 @@ func _process(delta: float) -> void:
 	if sim == null:
 		return
 	var me := sim.sides[0]
-	for i in 2:
-		var s := sim.sides[i]
-		_hp[i].max_value = s.base_max_hp
-		_hp[i].value = s.base_hp
-		_age_labels[i].text = "%s Age  " % sim.data.age(s.age).display_name if i == 0 else "  %s Age" % sim.data.age(s.age).display_name
-	_clock.text = "%d:%02d" % [int(sim.time) / 60, int(sim.time) % 60]
+	_top.refresh()
+	_flash = maxf(0.0, _flash - delta)
 	for c in _cards:
 		c.queue_redraw()
 		c.refresh()
 	_queue.queue_redraw()
 	_minimap.queue_redraw()
-	_tide.queue_redraw()
-	_gold.text = "%d  +%.1f/s" % [me.gold, sim.income_rate(0)]
-	_gold.modulate = Color(1, 0.45, 0.45) if _flash > 0.0 else Color.WHITE
-	_flash = maxf(0.0, _flash - delta)
-	_xp.text = "%d XP" % me.xp
-	var ab := sim.data.age(me.age).ability
-	_ability.text = "⚡ %s  %d XP  [Space]%s" % [view.race_def(0).ability_name(ab), ab.xp_cost, "" if me.ability_cooldown <= 0 else "   %ds" % ceili(me.ability_cooldown)]
-	_ability.disabled = not sim.can_fire_ability(0)
-	if me.age >= GameData.AGE_COUNT:
-		_evolve.text = "Final age"
-		_evolve.disabled = true
-		_evolve_meter.value = 1.0
-	else:
-		var cost := sim.evolve_cost(0)
-		_evolve.text = "▲ Evolve → %s   %d XP  [T]" % [sim.data.age(me.age + 1).display_name, cost]
-		if me.is_evolving():
-			_evolve.text = "Evolving… %.1fs" % me.evolve_left
-		_evolve.disabled = not sim.can_evolve(0)
-		_evolve_meter.value = clampf(me.xp / cost, 0.0, 1.0)
 	var inc := sim.upgrade_level(0, "income", "income")
 	_income.text = "💰 Income %s  %s" % ["●".repeat(inc) + "○".repeat(3 - inc), "" if inc >= 3 else "%dg" % sim.upgrade_cost(0, "income", "income")]
 	_income.tooltip_text = "Income: +20% passive income per level. Unit and turret upgrades arrive with the new HUD."
 	_income.disabled = not sim.can_buy_upgrade(0, "income", "income")
-	for i in 3:
-		_speed_buttons[i].button_pressed = view.speed_index == i
 	for i in 4:
 		var b := _slots[i]
 		var key := "QWER"[i]
@@ -488,25 +365,6 @@ class Meter extends Control:
 			var f := UiStyle.font("bold")
 			draw_string_outline(f, Vector2(8, size.y * 0.5 + 6), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, 4, Color(0, 0, 0, 0.7))
 			draw_string(f, Vector2(8, size.y * 0.5 + 6), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color.WHITE)
-
-
-class TidePips extends Control:
-	var hud: MatchHud
-
-	func _draw() -> void:
-		var sim := hud.sim
-		var level := sim.rules.tide_level_at(sim.time)
-		var n := sim.rules.tide_multipliers.size()
-		var w := 16.0
-		var x0 := size.x * 0.5 - (n * w) * 0.5 - 40
-		var f := UiStyle.font("bold")
-		draw_string(f, Vector2(x0 - 44, 13), "Tide", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1, 1, 1, 0.6))
-		for i in n:
-			var c := Vector2(x0 + i * w + 6, 8)
-			draw_circle(c, 5.5, Color("5fc6ff") if i < level else Color(1, 1, 1, 0.15))
-		draw_string(f, Vector2(x0 + n * w + 6, 13), "×%.1f" % sim.rules.tide_multipliers[level - 1], HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("5fc6ff"))
-		if sim.escalation > 0:
-			draw_string(f, Vector2(x0 + n * w + 52, 13), "ESCALATION %d/4" % sim.escalation, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("ff6a5a"))
 
 
 class Minimap extends Control:
