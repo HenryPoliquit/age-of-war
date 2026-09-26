@@ -6,13 +6,11 @@ func test_front_line_rules() -> void:
 	sim.step()
 	check_near(sim.front_x, 1200.0, 0.01, "holds when empty")
 	var a := place(sim, 0, "vanguard", 400.0)
-	sim.set_stance(0, &"hold", 400.0)
 	sim.step()
 	check_near(sim.front_x, sim.rules.lane_length, 0.01, "no enemy units -> enemy gate")
-	place(sim, 1, "vanguard", 400.0)
-	sim.set_stance(1, &"hold", sim.to_world(1, 400.0))
+	var b := place(sim, 1, "vanguard", 400.0)
 	sim.step()
-	check_near(sim.front_x, (400.0 + 2000.0) * 0.5, 0.01)
+	check_near(sim.front_x, (a.progress + sim.rules.lane_length - b.progress) * 0.5, 0.01, "midpoint of the two fronts")
 	a.hp = 0.0
 	sim._remove_dead()
 	sim.step()
@@ -22,7 +20,6 @@ func test_front_line_rules() -> void:
 func test_push_momentum() -> void:
 	var sim := new_sim()
 	place(sim, 0, "vanguard", 1500.0)
-	sim.set_stance(0, &"hold", 1500.0)
 	run_for(sim, 5.0)
 	check_near(sim.sides[0].momentum, 10.0, 0.05)
 
@@ -39,12 +36,11 @@ func test_escalation_stacks() -> void:
 func test_ability_spends_momentum_and_cools_down() -> void:
 	var sim := new_sim()
 	var e := place(sim, 1, "vanguard", 1000.0)
-	sim.set_stance(1, &"hold", sim.to_world(1, 1000.0))
 	check(not sim.fire_ability(0, 1400.0), "needs momentum")
 	sim.sides[0].momentum = 100.0
 	check(sim.fire_ability(0, 1400.0))
 	check_near(sim.sides[0].momentum, 0.0, 0.01)
-	run_for(sim, 1.0)
+	run_pinned(sim, 1.0, [e])
 	check(e.hp < e.max_hp or not e.alive(), "stampede hit")
 	sim.sides[0].momentum = 100.0
 	check(not sim.fire_ability(0, 1400.0), "cooldown")

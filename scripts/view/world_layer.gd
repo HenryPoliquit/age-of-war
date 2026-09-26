@@ -108,14 +108,6 @@ func _draw() -> void:
 	var rt := view.render_time()
 	for s in sim.sides:
 		_draw_base(s, t)
-	# Hold rally line flags.
-	for s in sim.sides:
-		if s.stance == &"hold":
-			var rx := sim.to_world(s.index, s.rally_progress)
-			draw_line(Vector2(rx, GROUND_Y + 10), Vector2(rx, GROUND_Y - 70), Color(0.2, 0.15, 0.1), 3.0)
-			BaseArt._banner(self, Vector2(rx, GROUND_Y - 70), view.team_color(s.index), t, 18)
-			for k in 8:
-				draw_line(Vector2(rx - 2, GROUND_Y + 14 + k * 0.0), Vector2(rx + 2, GROUND_Y + 14), view.team_color(s.index), 2.0)
 	# Front-line marker: a small standard where the seam meets the ground.
 	var fx := sim.front_x
 	draw_line(Vector2(fx, GROUND_Y + 16), Vector2(fx, GROUND_Y - 34), Color(1, 1, 1, 0.35), 2.0)

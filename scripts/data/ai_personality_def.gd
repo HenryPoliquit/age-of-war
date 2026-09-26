@@ -35,11 +35,3 @@ extends Resource
 @export var turret_after: float = 60.0
 ## Build turrets sooner if own base HP fraction falls below this.
 @export var turret_panic_hp: float = 0.8
-
-@export_group("Stance")
-@export var uses_hold: bool = false
-## Army value (as seconds of income) to amass before releasing a Hold.
-@export var hold_release_seconds: float = 20.0
-## Staged pushes: gather just outside enemy turret range and attack the gate together once the
-## gathered group outweighs the defence by this ratio (0 = never stage; walk straight in).
-@export var push_ratio: float = 1.3

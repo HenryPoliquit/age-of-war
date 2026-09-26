@@ -19,9 +19,6 @@ var queue_paid: Array[float] = []
 var train_progress: float = 0.0
 ## Seconds left in the evolution transition; 0 when not evolving.
 var evolve_left: float = 0.0
-var stance: StringName = &"advance"
-## Hold stance rally line, as progress from own gate.
-var rally_progress: float = 800.0
 var ability_cooldown: float = 0.0
 var units: Array[SimUnit] = []
 var income_bonus: float = 0.0

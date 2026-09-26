@@ -1,7 +1,7 @@
 class_name MatchHud
 extends CanvasLayer
 ## Match HUD (GDD §13.9): top status bar with both bases, lane minimap, unit cards with portraits,
-## command panel (economy, ability, evolve/veterancy, Forge, turrets, stance, speed),
+## command panel (economy, ability, evolve/veterancy, Forge, turrets, speed),
 ## event banners and the post-match screen. Reads MatchSim; acts only through its commands.
 
 const ACCENT := UiStyle.ACCENT
@@ -33,7 +33,6 @@ var _evolve_meter: Meter
 var _vet: Button
 var _forge: Button
 var _slots: Array[Button] = []
-var _stance: Button
 var _speed_buttons: Array[Button] = []
 var _slot_menu: PopupMenu
 var _slot_menu_index := -1
@@ -242,8 +241,6 @@ func _build_commands() -> void:
 	v.add_child(row3)
 	_forge = _btn(row3, "", func(): feedback(sim.buy_forge(0)))
 	_forge.custom_minimum_size = Vector2(170, 34)
-	_stance = _btn(row3, "", func(): view.toggle_stance())
-	_stance.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for i in 3:
 		var b := Button.new()
 		b.text = ["1×", "2×", "❚❚"][i]
@@ -390,7 +387,6 @@ func _process(delta: float) -> void:
 	_forge.text = "⚒ Forge %s  %s" % ["●".repeat(me.forge_level) + "○".repeat(3 - me.forge_level), "" if me.forge_level >= 3 else "%dg" % sim.forge_cost(0)]
 	_forge.tooltip_text = "Forge [F]: +20% passive income per level."
 	_forge.disabled = me.gold < sim.forge_cost(0)
-	_stance.text = "⚑ Hold the line [S]" if me.stance == &"hold" else "➜ Advance [S]"
 	for i in 3:
 		_speed_buttons[i].button_pressed = view.speed_index == i
 	for i in 5:

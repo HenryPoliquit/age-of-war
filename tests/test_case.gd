@@ -43,3 +43,12 @@ func place(sim: MatchSim, side: int, role: String, progress: float, age := 1) ->
 	var u := sim._spawn(sim.sides[side], def, def.cost)
 	u.progress = progress
 	return u
+
+
+## Like run_for, but each unit in `pinned` is put back at its starting progress after every step.
+func run_pinned(sim: MatchSim, seconds: float, pinned: Array) -> void:
+	var at := pinned.map(func(u): return u.progress)
+	for i in roundi(seconds / sim.rules.tick_dt):
+		sim.step()
+		for k in pinned.size():
+			pinned[k].progress = at[k]

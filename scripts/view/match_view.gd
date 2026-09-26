@@ -319,8 +319,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			# Drag the marker on the lane, release to fire (GDD §10).
 			sim.fire_ability(0, aim_x)
 			aiming = false
-		elif event.button_index == MOUSE_BUTTON_LEFT and event.pressed and sim.sides[0].stance == &"hold" and event.shift_pressed:
-			sim.set_stance(0, &"hold", get_global_mouse_position().x)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
 			_cam_x -= 120.0
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
@@ -348,8 +346,6 @@ func _hotkey(k: Key) -> void:
 			hud.feedback(sim.buy_forge(0))
 		KEY_SPACE:
 			begin_aim()
-		KEY_S:
-			toggle_stance()
 		KEY_F1:
 			set_speed(0)
 		KEY_F2:
@@ -361,16 +357,6 @@ func _hotkey(k: Key) -> void:
 				aiming = false
 			else:
 				hud.open_settings()
-
-
-func toggle_stance() -> void:
-	if sim.sides[0].stance == &"advance":
-		var x := get_global_mouse_position().x
-		if x < 100.0 or x > sim.rules.lane_length - 100.0:
-			x = sim.rules.lane_length * 0.35
-		sim.set_stance(0, &"hold", x)
-	else:
-		sim.set_stance(0, &"advance")
 
 
 # ---------------------------------------------------------------------------

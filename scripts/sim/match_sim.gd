@@ -44,7 +44,6 @@ func _init(p_data: GameData = null, p_seed: int = 1) -> void:
 		s.turret_slots = rules.start_turret_slots
 		s.base_max_hp = data.age(1).base_max_hp
 		s.base_hp = s.base_max_hp
-		s.rally_progress = rules.lane_length * 0.35
 		sides.append(s)
 	match_log = MatchLog.new()
 	match_log.seed = p_seed
@@ -274,15 +273,6 @@ func first_free_slot(side: int) -> int:
 	return -1
 
 
-func set_stance(side: int, stance: StringName, rally_world_x: float = NAN) -> void:
-	var s := sides[side]
-	if stance != s.stance:
-		_emit({"type": "stance", "side": side, "stance": String(stance)})
-	s.stance = stance
-	if not is_nan(rally_world_x):
-		s.rally_progress = clampf(to_progress(side, rally_world_x), 0.0, rules.lane_length)
-
-
 func fire_ability(side: int, world_x: float) -> bool:
 	if not can_fire_ability(side):
 		return false
@@ -445,14 +435,12 @@ func _units_act(s: SimSide, enemy_front: SimUnit, dt: float) -> void:
 		# ranged units hold at their range.
 		var melee := def.range <= rules.melee_range_max and not def.is_ranged_siege()
 		if not attacking or melee:
-			# Movement is code-driven; blocked by the ally ahead, the nearest enemy and a Hold rally line.
+			# Movement is code-driven; blocked by the ally ahead and the nearest enemy.
 			var limit := lane - rules.melee_contact
 			if ahead != null:
 				limit = minf(limit, ahead.progress - rules.unit_spacing)
 			if enemy_front != null and enemy_front.alive():
 				limit = minf(limit, lane - enemy_front.progress - rules.melee_contact)
-			if s.stance == &"hold" and not attacking:
-				limit = minf(limit, s.rally_progress)
 			var target_p := u.progress + def.speed * (1.0 - u.slow) * dt
 			var new_p := maxf(u.progress, minf(target_p, limit))
 			if not attacking:

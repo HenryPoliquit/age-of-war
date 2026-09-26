@@ -18,5 +18,3 @@ forge_target = 1
 forge_after = 60.0
 turret_target = 2
 turret_after = 90.0
-uses_hold = true
-hold_release_seconds = 45.0

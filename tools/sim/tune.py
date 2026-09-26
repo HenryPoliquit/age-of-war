@@ -27,10 +27,8 @@ PARAMS = [
     ("siege_dmg", "scale", ["units:role=siege.damage"], 1.0, [0.85, 1.2]),
     ("vet_bonus", "set", ["rules.veterancy_bonus"], 0.1, "rel:0.8,1.25"),
     ("forge_bonus", "set", ["rules.forge_income_bonus"], 0.2, "rel:0.8,1.25"),
-    ("push_ratio", "set_all", ["push_ratio"], 1.3, "rel:0.75,1.35"),
     ("counter", "set_all", ["counter_strength"], 1.5, "rel:0.67,1.5"),
     ("turtle_turrets", "set", ["ai/personalities/turtle.turret_target"], 4, [3, 2]),
-    ("rusher_hold", "set", ["ai/personalities/rusher.hold_release_seconds"], 45.0, "rel:0.7,1.4"),
 ]
 
 

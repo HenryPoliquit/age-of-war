@@ -10,9 +10,6 @@ var side: int
 var rng := RandomNumberGenerator.new()
 
 var _timer := 0.0
-var _released_hold := false
-var _pushing := false
-var _staged_since := 0.0
 var _hp_seen := -1.0
 var _hp_loss_rate := 0.0  # own base HP lost per second, smoothed over decisions
 
@@ -55,7 +52,6 @@ func _decide(sim: MatchSim) -> void:
 	var pressure := _under_pressure(sim)
 	_try_ability(sim)
 	_spend_xp(sim, pressure)
-	_manage_stance(sim, pressure)
 	_spend_gold(sim, pressure)
 
 
@@ -95,59 +91,6 @@ func _spend_xp(sim: MatchSim, pressure: bool) -> void:
 			and enemy.age <= s.age and s.base_hp / s.base_max_hp > 0.25:
 		return
 	sim.evolve(side)
-
-
-func _manage_stance(sim: MatchSim, pressure: bool) -> void:
-	var s := sim.sides[side]
-	if pressure:
-		sim.set_stance(side, &"advance")
-		_pushing = false
-		return
-	# Early massing (Rusher): hold near home until the first wave is big enough.
-	if personality.uses_hold and not _released_hold:
-		var threshold := sim.income_rate(side) * personality.hold_release_seconds
-		if s.army_value() >= threshold:
-			_released_hold = true
-		else:
-			sim.set_stance(side, &"hold", sim.to_world(side, sim.rules.lane_length * 0.35))
-			return
-	if personality.push_ratio <= 0.0 or s.units.is_empty():
-		sim.set_stance(side, &"advance")
-		return
-	# Staged push (GDD §10 coordinated push): gather outside enemy turret range, then go together,
-	# instead of trickling units into the gate one at a time.
-	var lane := sim.rules.lane_length
-	var enemy := sim.sides[sim.enemy_of(side)]
-	var reach := 300.0
-	var defence := 0.0
-	for t in enemy.turrets:
-		if t != null:
-			reach = maxf(reach, t.def.range)
-			defence += t.def.cost
-	for u in enemy.units:
-		if lane - u.progress < reach + 300.0 or u.progress < reach + 300.0:
-			defence += u.cost_paid
-	var staging := lane - reach - 80.0
-	var front := 0.0
-	for u in s.units:
-		front = maxf(front, u.progress)
-	var group := 0.0
-	for u in s.units:
-		if u.progress >= front - 450.0:
-			group += u.cost_paid
-	# Go for the kill: a weak base needs a smaller margin; and never wait at the staging line forever.
-	var needed := defence * personality.push_ratio * lerpf(0.2, 1.0, enemy.base_hp / enemy.base_max_hp)
-	if _pushing:
-		# Keep pushing until the attacking group is spent.
-		if group < needed * 0.3:
-			_pushing = false
-			_staged_since = sim.time
-	elif group >= needed or sim.time - _staged_since > 30.0:
-		_pushing = true
-	if _pushing:
-		sim.set_stance(side, &"advance")
-	else:
-		sim.set_stance(side, &"hold", sim.to_world(side, staging))
 
 
 # ---------------------------------------------------------------------------
