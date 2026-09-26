@@ -164,6 +164,13 @@ func _build_top() -> void:
 			_tide.custom_minimum_size = Vector2(0, 16)
 			mid.add_child(_tide)
 			h.add_child(mid)
+			var gear := Button.new()
+			gear.text = "⚙"
+			gear.tooltip_text = "Settings (Esc)"
+			gear.custom_minimum_size = Vector2(40, 40)
+			gear.alignment = HORIZONTAL_ALIGNMENT_CENTER
+			gear.pressed.connect(open_settings)
+			h.add_child(gear)
 	_minimap = Minimap.new()
 	_minimap.hud = self
 	_minimap.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
@@ -327,6 +334,26 @@ func banner(text: String, col: Color, side: int, small := false) -> void:
 func feedback(ok: bool) -> void:
 	if not ok:
 		_flash = 0.3
+	if view.audio != null:
+		view.audio.play("ui_click" if ok else "ui_error")
+
+
+var _settings_open := false
+var _speed_before := 0
+
+
+## Opens the settings panel and pauses; closing restores the previous speed.
+func open_settings() -> void:
+	if _settings_open:
+		return
+	_settings_open = true
+	_speed_before = view.speed_index
+	view.set_speed(2)
+	var panel := GameSettings.make_panel(func():
+		_settings_open = false
+		view.apply_settings()
+		view.set_speed(_speed_before))
+	_root.add_child(panel)
 
 
 func slot_pressed(i: int) -> void:

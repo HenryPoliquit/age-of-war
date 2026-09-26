@@ -85,7 +85,7 @@ func _draw() -> void:
 				_draw_anim(a, t, off, left, right)
 	draw_set_transform(Vector2.ZERO)
 	for a in sc.anims:
-		if a.type == "lightning":
+		if a.type == "lightning" and not GameSettings.get_value("flash_reduction"):
 			var k := fmod(t, 7.3)
 			if k < 0.12 or (k > 0.2 and k < 0.27):
 				draw_rect(Rect2(left, -400, right - left, Scenery.GROUND_Y + 800), Color(0.85, 0.9, 1.0, 0.18))

@@ -9,6 +9,7 @@ const MAX_DECALS := 40
 const GROUND_Y := 760.0
 
 var view: MatchView
+var lights: LightPool
 var particles: Array[Dictionary] = []
 var projectiles: Array[Dictionary] = []
 var decals: Array[Dictionary] = []
@@ -17,6 +18,7 @@ var scheduled: Array[Dictionary] = [] # {at, fn: Callable}
 var glow: Node2D
 var rng := RandomNumberGenerator.new()
 var intensity := 1.0                  # VFX preset scale (Low halves particle counts)
+var flash_scale := 1.0                # 0.5 with "Reduce flashing" (GDD §14)
 
 
 func _ready() -> void:
@@ -55,6 +57,7 @@ func burst(kind: String, pos: Vector2, n: int, col: Color, speed: Vector2, life:
 
 
 func flash(pos: Vector2, r: float, col: Color, life := 0.12) -> void:
+	col.a *= flash_scale
 	_p({"kind": "flash", "pos": pos, "vel": Vector2.ZERO, "life": life, "size": r, "col": col, "g": 0.0, "add": true, "rot": 0.0, "spin": 0.0})
 
 
@@ -71,7 +74,14 @@ func scorch(x: float, w: float) -> void:
 # ---------------------------------------------------------------------------
 # Impacts per damage type
 
+func _sound(name: String, pos: Vector2, db := 0.0) -> void:
+	if view.audio != null:
+		view.audio.play(name, pos, db)
+
+
 func impact(dtype: String, pos: Vector2, heavy := false, structure := false) -> void:
+	_sound({"slash": "slash", "pierce": "pierce", "blast": "blast", "siege": "siege"}.get(dtype, "pierce"), pos,
+		0.0 if heavy or structure else -5.0)
 	match dtype:
 		"slash":
 			_p({"kind": "arc", "pos": pos + Vector2(0, -6), "vel": Vector2.ZERO, "life": 0.14, "size": 16.0, "col": Color(1, 1, 1, 0.9), "g": 0.0, "add": true, "rot": rng.randf_range(-0.6, 0.6), "spin": 0.0})
@@ -84,6 +94,7 @@ func impact(dtype: String, pos: Vector2, heavy := false, structure := false) -> 
 		"blast":
 			var s := 1.6 if heavy else 1.0
 			flash(pos, 42 * s, Color(1.0, 0.72, 0.4, 0.6), 0.14)
+			_light(pos, Color(1.0, 0.62, 0.3), 1.4 * s, 260.0 * s, 0.35)
 			flash(pos, 18 * s, Color(1.0, 0.95, 0.8, 0.9), 0.08)
 			burst("fire", pos, 8, Color("ff8a2a"), Vector2(40, 160), Vector2(0.2, 0.4), Vector2(8, 16) * s, -60.0, PI, -PI * 0.5, true)
 			burst("chunk", pos, 7, Color("3b3026"), Vector2(150, 340), Vector2(0.5, 0.9), Vector2(3, 6), 900.0, 1.1)
@@ -101,9 +112,11 @@ func impact(dtype: String, pos: Vector2, heavy := false, structure := false) -> 
 		view.hitstop(0.05)
 
 
-func muzzle(pos: Vector2, dir: float, big := false, col := Color(1.0, 0.8, 0.4)) -> void:
+func muzzle(pos: Vector2, dir: float, big := false, col := Color(1.0, 0.8, 0.4), sound := "gun") -> void:
+	_sound(sound, pos, 0.0 if big else -3.0)
 	var s := 1.8 if big else 1.0
 	flash(pos, 18 * s, Color(col, 0.9), 0.07)
+	_light(pos, col, 0.9 * s, 150.0 * s, 0.12)
 	_p({"kind": "cone", "pos": pos, "vel": Vector2.ZERO, "life": 0.07, "size": 22 * s, "col": col, "g": 0.0, "add": true, "rot": dir, "spin": 0.0})
 	burst("smoke", pos, 3 if not big else 6, Color(0.85, 0.85, 0.82, 0.45), Vector2(10, 40), Vector2(0.5, 1.0), Vector2(5, 10) * s, -20.0, 0.6, dir)
 	if big:
@@ -117,6 +130,8 @@ func muzzle(pos: Vector2, dir: float, big := false, col := Color(1.0, 0.8, 0.4))
 func shoot(kind: String, from: Vector2, to: Vector2, dtype: String, on_hit: Callable, heavy := false) -> void:
 	var dist := from.distance_to(to)
 	var speed := {"arrow": 760.0, "stone": 620.0, "javelin": 660.0, "bullet": 2400.0, "tracer": 2600.0, "ball": 700.0, "shell": 520.0, "bolt": 1500.0}.get(kind, 800.0) as float
+	if kind in ["arrow", "stone", "javelin"]:
+		_sound("bow", from, -6.0)
 	var arc := {"arrow": 0.22, "stone": 0.2, "javelin": 0.2, "ball": 0.18, "shell": 0.55}.get(kind, 0.0) as float
 	projectiles.append({"kind": kind, "from": from, "to": to, "born": now(), "dur": maxf(0.06, dist / speed),
 		"arc": dist * arc, "dtype": dtype, "on_hit": on_hit, "heavy": heavy})
@@ -135,6 +150,7 @@ func ability_pulse(ability: String, lo: float, hi: float, side: int, team: Color
 	var dir := 1.0 if side == 0 else -1.0
 	match ability:
 		"stampede":
+			_sound("stampede", Vector2((lo + hi) * 0.5, GROUND_Y))
 			for i in 8:
 				var start := (lo if dir > 0 else hi) - dir * rng.randf_range(80, 220)
 				actors.append({"kind": "beast", "x": start, "y": GROUND_Y + rng.randf_range(-6, 8), "vx": dir * rng.randf_range(620, 760),
@@ -161,6 +177,7 @@ func ability_pulse(ability: String, lo: float, hi: float, side: int, team: Color
 		"orbital_lance":
 			var c := Vector2((lo + hi) * 0.5, GROUND_Y)
 			actors.append({"kind": "beam", "x": c.x, "w": hi - lo, "born": now(), "life": 0.6, "col": team})
+			_light(c + Vector2(0, -60), team.lightened(0.6), 2.5, 700.0, 0.8)
 			impact("blast", c + Vector2(0, -10), true)
 			ring(c, 260, Color(team.lightened(0.6), 0.8), 0.6, 8.0)
 			view.add_shake(16.0)
@@ -173,7 +190,13 @@ func ability_cast(ability: String, x: float, side: int) -> void:
 		actors.append({"kind": "bomber", "x": x - dir * 1400, "y": 330.0, "vx": dir * 900.0, "born": now(), "life": 3.2, "side": side})
 
 
+func _light(pos: Vector2, col: Color, energy: float, radius: float, life: float) -> void:
+	if lights != null:
+		lights.flash(pos, col, energy, radius, life, now())
+
+
 func evolution_wave(x: float, team: Color) -> void:
+	_light(Vector2(x, GROUND_Y - 120), team.lightened(0.5), 2.0, 900.0, 1.2)
 	ring(Vector2(x, GROUND_Y - 80), 1200, Color(team.lightened(0.6), 0.75), 1.1, 10.0)
 	ring(Vector2(x, GROUND_Y - 80), 700, Color(1, 1, 1, 0.6), 0.8, 5.0)
 	flash(Vector2(x, GROUND_Y - 120), 220, Color(team.lightened(0.5), 0.6), 0.4)

@@ -10,6 +10,9 @@ const STRIDE := {"humanoid": 0.16, "mounted": 0.11, "chariot": 0.12, "mech": 0.0
 
 var view: MatchView
 var corpses: Array[Dictionary] = []
+## Per-unit eased walk amount (0 idle … 1 walking): state changes blend over ~0.12 s (PRD §11).
+var move_amt := {}
+const BLEND_TIME := 0.12
 var _font: Font
 
 
@@ -32,8 +35,19 @@ func unit_pos(u: SimUnit) -> Vector2:
 	return Vector2(sim.to_world(u.side, prog), GROUND_Y + jitter(u.id))
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	var t := view.anim_time
+	var step := delta * float(view.speeds[view.speed_index]) / BLEND_TIME
+	var seen := {}
+	for s in view.sim.sides:
+		for u in s.units:
+			var target := 1.0 if u.state == &"walk" else 0.0
+			move_amt[u.id] = move_toward(move_amt.get(u.id, target), target, step)
+			seen[u.id] = true
+	if move_amt.size() > seen.size() + 64:
+		for k in move_amt.keys():
+			if not seen.has(k):
+				move_amt.erase(k)
 	corpses = corpses.filter(func(c): return t - c.born < 1.4)
 	_update_corpse_nodes()
 	queue_redraw()
@@ -129,8 +143,8 @@ func _pose(u: SimUnit, rt: float, t: float) -> Dictionary:
 	var L := anim_len(u.def)
 	if since >= 0.0 and since < L:
 		atk = since / L
-	var fl := clampf(1.0 - (t - view.flash_at.get(u.id, -10.0)) / 0.09, 0.0, 1.0)
-	return {"walk": prog * STRIDE.get(rig, 0.1), "moving": u.state == &"walk", "atk": atk, "t": t + u.id * 0.37, "flash": fl}
+	var fl := clampf(1.0 - (t - view.flash_at.get(u.id, -10.0)) / 0.09, 0.0, 1.0) * view.fx.flash_scale
+	return {"walk": prog * STRIDE.get(rig, 0.1), "move": move_amt.get(u.id, 1.0 if u.state == &"walk" else 0.0), "atk": atk, "t": t + u.id * 0.37, "flash": fl}
 
 
 func _draw_unit(u: SimUnit, rt: float, t: float) -> void:

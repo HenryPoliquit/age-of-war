@@ -4,7 +4,7 @@ extends RefCounted
 ## mech, siege engines) dressed per unit — GDD §13.2's modular-rig idea, drawn with canvas calls
 ## until painted parts exist. Local space: feet at y = 0, facing +x, up is −y.
 ##
-## pose = {walk: float (stride phase, radians), moving: bool, atk: float (0..1 attack progress, <0 idle),
+## pose = {walk: float (stride phase, radians), move: float (0 idle … 1 walking, blended by the caller), atk: float (0..1 attack progress, <0 idle),
 ##         t: float (seconds, for idle motion), flash: float (0..1 hit flash)}
 
 const SKIN := [Color("e0b48c"), Color("c68e62"), Color("8d5a3b"), Color("f1cfae"), Color("a86e48")]
@@ -116,6 +116,11 @@ static func draw_unit(ci: CanvasItem, def: UnitDef, team: Color, pose: Dictionar
 # ---------------------------------------------------------------------------
 # Helpers
 
+## Walk blend 0..1. Callers pass `move` (eased per unit); `moving` is the legacy on/off form.
+static func _mv(pose: Dictionary) -> float:
+	return pose.get("move", 1.0 if pose.get("moving", false) else 0.0)
+
+
 static func _c(col: Color, pose: Dictionary) -> Color:
 	var f: float = pose.get("flash", 0.0)
 	return col.lerp(Color.WHITE, f * 0.85) if f > 0.0 else col
@@ -160,7 +165,7 @@ static func _shadow(ci: CanvasItem, w: float) -> void:
 
 static func humanoid(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pose: Dictionary, seed: int, scale := 1.0, legs := true) -> void:
 	var build: float = st.get("build", 1.0) * scale
-	var moving: bool = pose.get("moving", false)
+	var mv := _mv(pose)
 	var walk: float = pose.get("walk", 0.0)
 	var t: float = pose.get("t", 0.0)
 	var atk: float = pose.get("atk", -1.0)
@@ -169,7 +174,7 @@ static func humanoid(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, po
 	var trim: Color = _c(pal[1], pose)
 	var metal: Color = _c(pal[2], pose)
 	var tm: Color = _c(team, pose)
-	var bob := absf(sin(walk)) * 2.2 if moving else sin(t * 2.1 + seed) * 0.7
+	var bob := lerpf(sin(t * 2.1 + seed) * 0.7, absf(sin(walk)) * 2.2, mv)
 	var hip := Vector2(0, -25 * build + bob * 0.5)
 	var sh := Vector2(1.5, -44 * build + bob)
 	var head := sh + Vector2(1.5, -8 * build)
@@ -177,16 +182,16 @@ static func humanoid(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, po
 		_shadow(ci, 12 * build)
 		for i in [1, 0]:
 			var ph: float = walk + PI * i
-			var thigh := sin(ph) * 0.6 if moving else (0.12 if i == 0 else -0.1)
+			var thigh := lerpf(0.12 if i == 0 else -0.1, sin(ph) * 0.6, mv)
 			var knee := hip + Vector2(0, 12 * build).rotated(-thigh)
-			var bend := maxf(0.0, cos(ph)) * 0.9 if moving else 0.05
+			var bend := lerpf(0.05, maxf(0.0, cos(ph)) * 0.9, mv)
 			var foot := knee + Vector2(0, 13 * build).rotated(-thigh + bend)
 			var leg_col := trim.darkened(0.25 if i == 1 else 0.0)
 			_limb(ci, hip, knee, 5.5 * build, leg_col)
 			_limb(ci, knee, foot, 5.0 * build, leg_col)
 			ci.draw_line(foot, foot + Vector2(5 * build, 0), Color(0.12, 0.1, 0.08), 3.5 * build)
 	# Back arm swings opposite the front leg.
-	var arm_sw := sin(walk) * 0.5 if moving else 0.0
+	var arm_sw := sin(walk) * 0.5 * mv
 	var back_hand := sh + Vector2(-2, 15 * build).rotated(arm_sw)
 	_limb(ci, sh + Vector2(-3, 1), back_hand, 4.5 * build, cloth.darkened(0.3))
 	# Torso with team tabard.
@@ -371,7 +376,7 @@ static func _weapon(ci: CanvasItem, kind: String, sh: Vector2, b: float, s: floa
 # Mounted rig (Tusk Rider, Knight, Cuirassier)
 
 static func quadruped(ci: CanvasItem, kind: String, team: Color, pose: Dictionary, seed: int) -> Vector2:
-	var moving: bool = pose.get("moving", false)
+	var mv := _mv(pose)
 	var walk: float = pose.get("walk", 0.0)
 	var t: float = pose.get("t", 0.0)
 	var atk: float = pose.get("atk", -1.0)
@@ -379,7 +384,7 @@ static func quadruped(ci: CanvasItem, kind: String, team: Color, pose: Dictionar
 	var tm := _c(team, pose)
 	var len := 22.0 if kind == "boar" else 25.0
 	var h := 26.0 if kind == "boar" else 34.0
-	var bob := absf(sin(walk * 2.0)) * 2.0 if moving else sin(t * 1.5 + seed) * 0.5
+	var bob := lerpf(sin(t * 1.5 + seed) * 0.5, absf(sin(walk * 2.0)) * 2.0, mv)
 	var lunge := maxf(0.0, swing(atk)) * 5.0
 	var body := Vector2(lunge, -h - 8 + bob)
 	_shadow(ci, 30)
@@ -388,9 +393,9 @@ static func quadruped(ci: CanvasItem, kind: String, team: Color, pose: Dictionar
 		var front := i >= 2
 		var ph: float = walk * 1.0 + (PI if i % 2 == 1 else 0.0) + (PI * 0.5 if front else 0.0)
 		var hip := body + Vector2(len * (0.7 if front else -0.7), 6)
-		var a := sin(ph) * 0.55 if moving else 0.05
+		var a := lerpf(0.05, sin(ph) * 0.55, mv)
 		var knee := hip + Vector2(0, h * 0.5).rotated(-a)
-		var foot := knee + Vector2(0, h * 0.5 - 2).rotated(-a + (maxf(0.0, cos(ph)) * 0.7 if moving else 0.0) * (-1.0 if front else 1.0))
+		var foot := knee + Vector2(0, h * 0.5 - 2).rotated(-a + maxf(0.0, cos(ph)) * 0.7 * mv * (-1.0 if front else 1.0))
 		var lc := col.darkened(0.3 if i % 2 == 1 else 0.1)
 		_limb(ci, hip, knee, 6.0, lc)
 		_limb(ci, knee, foot, 4.5, lc)
@@ -426,6 +431,7 @@ static func mounted(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pos
 	var saddle := quadruped(ci, st.get("beast", "horse"), team, pose, seed)
 	var p := pose.duplicate()
 	p["moving"] = false
+	p["move"] = 0.0
 	_rider(ci, st, pal, team, p, seed, saddle)
 
 
@@ -492,7 +498,7 @@ static func car(ci: CanvasItem, pal: Array, team: Color, pose: Dictionary) -> vo
 	var hull := _c(Color("5d6150"), pose)
 	var roll: float = pose.get("walk", 0.0) * 1.6
 	var kick := maxf(0.0, swing(pose.get("atk", -1.0))) * 4.0
-	var bob := sin(pose.get("t", 0.0) * 9.0) * 0.6 if pose.get("moving", false) else 0.0
+	var bob := sin(pose.get("t", 0.0) * 9.0) * 0.6 * _mv(pose)
 	_shadow(ci, 40)
 	_push(ci, Transform2D(0.0, Vector2(0, bob)))
 	_poly(ci, [Vector2(-38, -12), Vector2(34, -12), Vector2(42, -24), Vector2(30, -38), Vector2(-30, -38), Vector2(-40, -26)], hull)
@@ -507,20 +513,20 @@ static func car(ci: CanvasItem, pal: Array, team: Color, pose: Dictionary) -> vo
 
 
 static func mech(ci: CanvasItem, team: Color, pose: Dictionary) -> void:
-	var moving: bool = pose.get("moving", false)
+	var mv := _mv(pose)
 	var walk: float = pose.get("walk", 0.0) * 0.8
 	var t: float = pose.get("t", 0.0)
 	var armour := _c(Color("596274"), pose)
 	var glow := team.lightened(0.5)
 	var kick := maxf(0.0, swing(pose.get("atk", -1.0))) * 5.0
-	var bob := absf(sin(walk)) * 3.0 if moving else sin(t * 1.3) * 0.8
+	var bob := lerpf(sin(t * 1.3) * 0.8, absf(sin(walk)) * 3.0, mv)
 	var hip := Vector2(0, -48 + bob)
 	_shadow(ci, 30)
 	for i in [1, 0]:
 		var ph: float = walk + PI * i
-		var a := sin(ph) * 0.5 if moving else (0.1 if i == 0 else -0.1)
+		var a := lerpf(0.1 if i == 0 else -0.1, sin(ph) * 0.5, mv)
 		var knee := hip + Vector2(10, 22).rotated(-a)
-		var ankle := knee + Vector2(-10, 22).rotated(-a + (maxf(0.0, cos(ph)) * 0.6 if moving else 0.0))
+		var ankle := knee + Vector2(-10, 22).rotated(-a + maxf(0.0, cos(ph)) * 0.6 * mv)
 		var c := armour.darkened(0.3 if i == 1 else 0.0)
 		_limb(ci, hip, knee, 9.0, c)
 		_limb(ci, knee, ankle, 7.0, c)

@@ -4,7 +4,6 @@ extends Control
 var _menu: VBoxContainer
 var _personality: OptionButton
 var _difficulty: OptionButton
-var _colourblind: CheckBox
 var _start_age: OptionButton
 var _match: MatchView
 var _p_ids: Array[StringName] = []
@@ -17,7 +16,11 @@ var _parade: MenuParade
 var _t := 0.0
 
 
+var _audio: AudioDirector
+
+
 func _ready() -> void:
+	GameSettings.load_settings()
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	theme = MatchHud.make_theme()
 	# Background: the split battlefield itself — Stone Age dawn meets Future night at a drifting seam.
@@ -86,9 +89,15 @@ func _ready() -> void:
 	for a in data.ages:
 		_start_age.add_item("Start in: %s Age" % a.display_name)
 	_menu.add_child(_start_age)
-	_colourblind = CheckBox.new()
-	_colourblind.text = "Colour-blind team palette"
-	_menu.add_child(_colourblind)
+	var settings := Button.new()
+	settings.text = "Settings"
+	settings.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	settings.pressed.connect(func():
+		_menu.get_parent().visible = false
+		add_child(GameSettings.make_panel(func(): _menu.get_parent().visible = true)))
+	_menu.add_child(settings)
+	if "--settings" in OS.get_cmdline_user_args():
+		settings.pressed.emit.call_deferred()
 	var start := Button.new()
 	start.text = "Start skirmish"
 	start.custom_minimum_size = Vector2(0, 54)
@@ -99,6 +108,7 @@ func _ready() -> void:
 	quit.text = "Quit"
 	quit.pressed.connect(func(): get_tree().quit())
 	_menu.add_child(quit)
+	_start_menu_music()
 	var args := OS.get_cmdline_user_args()
 	if "--autostart" in args or "--autoplay" in args:
 		_start.call_deferred()
@@ -149,10 +159,13 @@ func _process(delta: float) -> void:
 func _start() -> void:
 	_menu.get_parent().visible = false
 	_bg_root.visible = false
+	if _audio != null:
+		_audio.queue_free()
+		_audio = null
 	_match = MatchView.new()
 	_match.personality_id = _p_ids[_personality.selected]
 	_match.difficulty_id = _d_ids[_difficulty.selected]
-	_match.colourblind = _colourblind.button_pressed
+	_match.colourblind = GameSettings.get_value("colourblind")
 	_match.start_age = _start_age.selected + 1
 	_match.exit_to_menu.connect(_end_match.bind(false))
 	_match.rematch.connect(_end_match.bind(true))
@@ -167,6 +180,7 @@ func _end_match(again: bool) -> void:
 	else:
 		_menu.get_parent().visible = true
 		_bg_root.visible = true
+		_start_menu_music()
 
 
 ## Units of the two ages marching toward the seam behind the menu.
@@ -193,3 +207,10 @@ class MenuParade extends Node2D:
 			UnitArt.begin(self, Transform2D(0.0, Vector2(dir, 1) * 1.25, 0.0, pos))
 			UnitArt.draw_unit(self, def, MatchView.TEAM[side], {"walk": lane * 0.14, "moving": true, "atk": -1.0, "t": t + i, "flash": 0.0}, i)
 			draw_set_transform(Vector2.ZERO)
+
+
+func _start_menu_music() -> void:
+	_audio = AudioDirector.new()
+	add_child(_audio)
+	_audio.start(1)
+	_audio.target_intensity = 0.3

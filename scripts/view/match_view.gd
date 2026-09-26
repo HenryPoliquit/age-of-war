@@ -26,6 +26,10 @@ var camera: Camera2D
 var backdrops: Array[Backdrop] = []
 var world: WorldLayer
 var fx: FxLayer
+var lights: LightPool
+var audio: AudioDirector
+var _last_tide := 1
+var _ability_ready := false
 
 var speeds := [1.0, 2.0, 0.0]
 var speed_index := 0
@@ -71,6 +75,10 @@ func _ready() -> void:
 		left_ai = UtilityAI.make(sim.data, &"tactician", &"hard", MatchSim.LEFT, seed + 3)
 		left_ai.setup(sim)
 	sim.event_emitted.connect(_on_event)
+	colourblind = GameSettings.get_value("colourblind")
+	audio = AudioDirector.new()
+	add_child(audio)
+	audio.start(sim.sides[0].age)
 
 	camera = Camera2D.new()
 	add_child(camera)
@@ -83,9 +91,13 @@ func _ready() -> void:
 	world = WorldLayer.new()
 	world.view = self
 	add_child(world)
+	lights = LightPool.new()
+	add_child(lights)
 	fx = FxLayer.new()
 	fx.view = self
+	fx.lights = lights
 	add_child(fx)
+	apply_settings()
 	var post := CanvasLayer.new()
 	post.layer = 1
 	var vig := ColorRect.new()
@@ -100,6 +112,7 @@ func _ready() -> void:
 	hud.view = self
 	hud.layer = 5
 	add_child(hud)
+	apply_settings()
 	_cam_x = get_viewport_rect().size.x * 0.5 - 140.0
 	_follow_front = left_ai != null
 	for a in args:
@@ -107,6 +120,15 @@ func _ready() -> void:
 			_cam_x = float(a.get_slice("=", 1))
 			_follow_front = false
 	_place_camera(0.0)
+
+
+func apply_settings() -> void:
+	colourblind = GameSettings.get_value("colourblind")
+	fx.intensity = GameSettings.particle_scale()
+	fx.flash_scale = 0.5 if GameSettings.get_value("flash_reduction") else 1.0
+	lights.enabled = GameSettings.lights_enabled()
+	if hud != null:
+		hud.shake_scale = GameSettings.get_value("shake")
 
 
 func team_color(side: int) -> Color:
@@ -171,10 +193,15 @@ func _process(delta: float) -> void:
 		_prune_prev()
 	_pan(delta)
 	_place_camera(delta)
+	var cam_x := camera.get_screen_center_position().x
 	for b in backdrops:
-		b.cam_x = camera.get_screen_center_position().x
+		b.cam_x = cam_x
 		b.seam_x = sim.front_x
 		b.time = anim_time
+	_audio_state()
+	# Ambient tint follows whichever age fills most of the screen.
+	var w := smoothstep(-500.0, 500.0, cam_x - sim.front_x)
+	lights.update(anim_time, LightPool.AMBIENT[sim.sides[0].age - 1].lerp(LightPool.AMBIENT[sim.sides[1].age - 1], w))
 	if aiming:
 		aim_x = clampf(get_global_mouse_position().x, 0.0, sim.rules.lane_length)
 	if sim.is_over() and not _logged:
@@ -183,6 +210,29 @@ func _process(delta: float) -> void:
 		sim.match_log.meta = {"left": "player", "right": String(personality_id), "right_difficulty": String(difficulty_id), "winner": sim.winner, "duration": sim.time}
 		sim.match_log.save_json("user://logs/match_%s.json" % stamp)
 		hud.show_post_match()
+
+
+## Music intensity from lane pressure, plus tide / escalation / ability-ready cues (GDD §13.8).
+func _audio_state() -> void:
+	var fighting := 0
+	for s in sim.sides:
+		for u in s.units:
+			if u.state == &"attack":
+				fighting += 1
+	var pressure := clampf(fighting / 10.0, 0.0, 1.0)
+	if sim.time - sim.sides[0].last_base_hit_time < 5.0:
+		pressure = maxf(pressure, 0.8)
+	if sim.escalation > 0:
+		pressure = maxf(pressure, 0.7)
+	audio.target_intensity = pressure
+	var tide := sim.rules.tide_level_at(sim.time)
+	if tide != _last_tide:
+		_last_tide = tide
+		audio.play("tide")
+	var ready := sim.can_fire_ability(0)
+	if ready and not _ability_ready:
+		audio.play("ability_ready")
+	_ability_ready = ready
 
 
 func _prune_prev() -> void:
@@ -273,7 +323,10 @@ func _hotkey(k: Key) -> void:
 		KEY_F3:
 			set_speed(2)
 		KEY_ESCAPE:
-			aiming = false
+			if aiming:
+				aiming = false
+			else:
+				hud.open_settings()
 
 
 func toggle_stance() -> void:
@@ -293,17 +346,23 @@ func _on_event(ev: Dictionary) -> void:
 	match ev.type:
 		"evolve_start":
 			var side: int = ev.side
+			audio.play("evolve", Vector2.INF if side == 0 else Vector2(sim.to_world(side, 0.0), GROUND_Y), 0.0 if side == 0 else -4.0)
 			fx.evolution_wave(sim.to_world(side, 0.0) + (-90.0 if side == 0 else 90.0), team_color(side))
 			if side == 0 or left_ai == null:
 				_slowmo_until = anim_time + 0.5
 		"evolve":
 			var side: int = ev.side
 			backdrops[side].set_age(ev.age)
+			if side == 0:
+				audio.set_age(ev.age)
 			base_rebuilt[side] = anim_time
 			hud.banner("%s Age" % sim.data.age(ev.age).display_name, team_color(side), side)
 		"ability":
 			fx.ability_cast(ev.ability, ev.x, ev.side)
+			audio.play("ability_cast", Vector2(ev.x, GROUND_Y - 100))
 			hud.banner(sim.data.age(sim.sides[ev.side].age).ability.display_name + "!", team_color(ev.side), ev.side, true)
+		"match_end":
+			audio.target_intensity = 0.0
 		"turret_destroyed":
 			var gate := sim.to_world(ev.side, 0.0)
 			fx.impact("blast", Vector2(gate + (-80.0 if ev.side == 0 else 80.0), GROUND_Y - 140), true, true)
@@ -384,7 +443,8 @@ func _on_shot(f: Dictionary) -> void:
 	var col := team_color(f.side).lightened(0.5)
 	fx.later(L * 0.35, func():
 		if gun:
-			fx.muzzle(muzzle, 0.0 if dir > 0 else PI, big, col if kind == "bolt" else Color(1.0, 0.8, 0.4))
+			fx.muzzle(muzzle, 0.0 if dir > 0 else PI, big, col if kind == "bolt" else Color(1.0, 0.8, 0.4),
+				"zap" if kind == "bolt" else ("cannon" if big else "gun"))
 		fx.shoot(kind, muzzle, to, dtype, hit, heavy)
 		if kind == "bolt":
 			fx.projectiles[-1]["col"] = col)
@@ -410,7 +470,8 @@ func _on_turret_shot(f: Dictionary) -> void:
 	var splash := def.kind == "artillery"
 	var col := team_color(side).lightened(0.5)
 	if kind in ["bullet", "tracer", "ball", "bolt"] or (splash and def.age >= 4):
-		fx.muzzle(from + Vector2(dir * 18.0, 0), 0.0 if dir > 0 else PI, splash, col if kind == "bolt" else Color(1.0, 0.8, 0.4))
+		fx.muzzle(from + Vector2(dir * 18.0, 0), 0.0 if dir > 0 else PI, splash, col if kind == "bolt" else Color(1.0, 0.8, 0.4),
+			"zap" if kind == "bolt" else ("cannon" if splash else "gun"))
 	var enemy := 1 - side
 	var radius := def.splash
 	fx.shoot(kind, from, to, def.damage_type, func():
@@ -428,6 +489,7 @@ func _on_turret_shot(f: Dictionary) -> void:
 func _on_death(f: Dictionary) -> void:
 	var def: UnitDef = f.def
 	world.add_corpse(def, f.x, f.side, f.unit_id)
+	audio.play("death", Vector2(f.x, GROUND_Y), -4.0)
 	var rig: String = UnitArt.style_for(def).rig
 	if rig in ["car", "mech", "rail", "howitzer"]:
 		fx.impact("blast", Vector2(f.x, GROUND_Y - 24), true)
