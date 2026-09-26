@@ -141,3 +141,19 @@ func test_unit_tooltip_includes_upgrades() -> void:
 	var tip := HudModel.unit_tooltip(sim, 0, def, _race())
 	check(tip.contains("%d HP" % roundi(def.hp * 1.15)), tip)
 	check(tip.contains("Upgrades: ♥ 1"), tip)
+
+
+func test_matchup_table_rows_are_mine_columns_are_theirs() -> void:
+	var sim := new_sim()
+	var race := _race()
+	sim.sides[1].age = 2
+	var t := HudModel.matchup_table(sim, 0, race, race)
+	check_eq(t.rows.size(), sim.roster(0).size(), "one row per unit I can train")
+	check_eq(t.cols.size(), sim.roster(1).size() + 1, "enemy units plus Structures")
+	check_eq(t.cols[-1], "Structures")
+	var mine := sim.roster(0)[1]
+	var theirs := sim.roster(1)[2]
+	check(t.rows[1].name.begins_with(race.unit_name(mine)), t.rows[1].name)
+	check(t.cols[2].begins_with(race.unit_name(theirs)), t.cols[2])
+	check_near(t.rows[1].mults[2], sim.rules.matrix(mine.damage_type, theirs.armour), 1e-6)
+	check_near(t.rows[1].mults[-1], sim.rules.matrix(mine.damage_type, "structure"), 1e-6)

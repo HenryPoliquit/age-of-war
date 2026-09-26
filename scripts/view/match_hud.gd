@@ -37,6 +37,7 @@ func _ready() -> void:
 	add_child(_root)
 	_top = TopBar.new(self)
 	_root.add_child(_top)
+	_root.add_child(MatchupHelp.new(self))
 	_units = UnitBar.new(self)
 	_root.add_child(_units)
 	_lane = LanePanel.new(self)

@@ -57,3 +57,17 @@ func test_turret_menu_does_not_block_the_battlefield() -> void:
 	bar.open_menu(1)
 	check(bar.menu.visible or hud.view.sim.sides[0].turret_slots == 2, "opening another slot replaces the menu or unlocks it")
 	_free(hud, [bar])
+
+
+func test_matchup_button_shows_the_table_on_hover() -> void:
+	var hud := _hud()
+	var help := MatchupHelp.new(hud)
+	check_eq(help.focus_mode, Control.FOCUS_NONE)
+	check(help.tooltip_text != "", "a tooltip text is needed for the custom tooltip to appear")
+	var tip: Control = help._make_custom_tooltip("")
+	var t := HudModel.matchup_table(hud.sim, 0, hud.view.race_def(0), hud.view.race_def(1))
+	var grids := tip.find_children("*", "GridContainer", true, false)
+	check_eq(grids.size(), 1)
+	check_eq(grids[0].get_child_count(), (t.cols.size() + 1) * (t.rows.size() + 1), "header row and column plus one cell per matchup")
+	tip.free()
+	_free(hud, [help])

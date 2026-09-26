@@ -154,3 +154,23 @@ static func unit_tooltip(sim: MatchSim, side: int, u: UnitDef, race: RaceDef) ->
 	if not ups.is_empty():
 		text += "\nUpgrades: " + "  ".join(ups)
 	return text
+
+
+## Damage multipliers of this side's units (rows) against the enemy's current units and structures
+## (columns), from the damage × armour matrix (GDD §5.2). {cols: [String], rows: [{name, mults: [float]}]}.
+static func matchup_table(sim: MatchSim, side: int, race: RaceDef, enemy_race: RaceDef) -> Dictionary:
+	var enemy := sim.enemy_of(side)
+	var cols: Array[String] = []
+	var armours: Array[String] = []
+	for u in sim.roster(enemy):
+		cols.append("%s (%s)" % [enemy_race.unit_name(u), u.armour])
+		armours.append(u.armour)
+	cols.append("Structures")
+	armours.append("structure")
+	var rows: Array[Dictionary] = []
+	for u in sim.roster(side):
+		var mults: Array[float] = []
+		for a in armours:
+			mults.append(sim.rules.matrix(u.damage_type, a))
+		rows.append({"name": "%s (%s)" % [race.unit_name(u), u.damage_type], "mults": mults})
+	return {"cols": cols, "rows": rows}
