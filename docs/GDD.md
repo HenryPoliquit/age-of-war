@@ -2,11 +2,21 @@
 
 **Working title:** Timefront
 **Author:** Paul
-**Status:** Draft v2
-**Last updated:** 2026-09-25
+**Status:** Draft v3
+**Last updated:** 2026-09-26
 **Companion document:** `docs/PRD.md` — goals, success metrics, scope, engine choice, development workflow. This document is the spec: how the game works, with starting numbers.
 
 > **About the numbers.** Every value here is a *starting baseline* for the balance harness (§15), not a final answer. Values live in data files, not code, and are expected to move. What should not move without revisiting the PRD are the *systems* and the *acceptance targets*.
+
+### What changed in v3
+
+From the owner's first local playtest (spec: `docs/superpowers/specs/2026-09-26-simplify-systems-and-hud-design.md`). The game read as more complicated than Age of War without being more fun, so v3 cuts the systems players had to learn and keeps one decision per currency: **gold buys the army** (units, turrets, slots, upgrades), **XP buys progress** (evolving, the special skill).
+
+- **Removed:** veterancy (§4.5), doctrines (§9), momentum (§8.2), Hold/Advance stances and the rally line (§10), the Forge button (now the Income upgrade, §6.1).
+- **New — upgrades (§6.1):** gold buys Attack / Health / Defence for each unit slot, Attack / Health / Range for all turrets, and Income. Three levels each, kept for the whole match.
+- **Skills (§7)** cost XP, fire with one click and aim themselves by shape (area, strip, sweep). Shieldwall is replaced by Rockfall.
+- **Turrets (§6):** one free slot, three to unlock; every unit can attack turrets, Siege hardest.
+- **HUD (§13.9):** slim top bar; units bottom-left, turret slots bottom-right, lane map and training queue between them; upgrades in a drop-down.
 
 ### What changed in v2
 
@@ -26,21 +36,21 @@ Two bases, one lane, left vs. right. The player (left) and an AI opponent (right
 1. **Earn gold** from passive income, which rises for both sides as the match goes on (the tide), plus bounties for kills.
 2. **Spend gold** to queue units, which walk down the lane and fight automatically, and to build turrets on the base.
 3. **Earn experience (XP)** from kills and base damage.
-4. **Spend XP** to evolve to the next age *or* to buy veterancy for the current age (§4).
-5. **Push the front line** to build **momentum**, which fuels a targeted age ability (§7, §8).
+4. **Spend XP** to evolve to the next age *or* to fire the age's special skill (§4, §7).
+5. **Spend gold on upgrades** (§6.1) to make a unit slot or your turrets stronger for the rest of the match.
 
 A match is won by destroying the enemy base. Target: median 10–14 minutes, most matches ending in Age 5 or 6.
 
 ```
-  Tide ──► Gold ──► Units & Turrets ──► Combat ──► XP ──► Evolve  or  Veterancy
-              ▲                            │
-              └───────── Bounties ◄────────┴──► Front line ──► Momentum ──► Age Ability
+  Tide ──► Gold ──► Units, Turrets & Upgrades ──► Combat ──► XP ──► Evolve  or  Skill
+              ▲                                      │
+              └─────────────── Bounties ◄────────────┘
 ```
 
 ## 2. Match Structure & Win Conditions
 
 - **Win:** reduce the enemy base to 0 HP.
-- **Start:** both sides begin in Age 1 with 150 gold, 0 XP, 0 momentum, 2 turret slots (empty), base at 1,000 HP.
+- **Start:** both sides begin in Age 1 with 150 gold, 0 XP, 1 turret slot (empty), base at 1,000 HP.
 - **Escalation (anti-stalemate backstop):** from **15:00** — see §8.3. Matches cannot run indefinitely.
 - **Speed control:** 1× / 2× / pause in single player.
 
@@ -51,10 +61,10 @@ A match is won by destroying the enemy base. Target: median 10–14 minutes, mos
 | Source | Value |
 | --- | --- |
 | Passive income | 2 gold/s × current **tide multiplier** (§3.2) |
-| Forge upgrades | +20% passive income per level, 3 levels. Cost 100 / 250 / 500 gold × your age cost multiplier (1.7^(age − 1)) |
+| Income upgrade | +20% passive income per level, 3 levels. Cost 100 / 250 / 500 gold × your age cost multiplier (1.7^(age − 1)) (§6.1) |
 | Kill bounty | 50% of the killed unit's gold cost |
 
-The Forge is the economy-vs-army decision: gold into the Forge is gold not on the lane *now*. Because its cost scales with your age, it stays a decision at every stage rather than becoming an automatic late buy.
+The Income upgrade is the economy-vs-army decision: gold into Income is gold not on the lane *now*. Because its cost scales with your age, it stays a decision at every stage rather than becoming an automatic late buy.
 
 ### 3.2 The Tide
 
@@ -78,11 +88,11 @@ Passive income rises for **both sides equally** on a fixed schedule, shown on th
 | Killing a unit | 80% of that unit's gold cost |
 | Damaging the enemy base | 1 XP per 10 damage |
 
-XP is **spent**, not a threshold. It buys either evolution or veterancy (§4).
+XP is **spent**, not a threshold. It buys either evolution or the special skill (§4, §7).
 
-### 3.4 Momentum
+### 3.4 Momentum (removed in v3)
 
-A 0–100 meter per side, spent on the age ability (§7). Sources in §8.2.
+The special skill is paid in XP (§7). The front line is still drawn (§8.1) but grants nothing.
 
 ## 4. Ages, Evolution & Pacing
 
@@ -143,15 +153,11 @@ The sim's pacing target (PRD §6): median Age 6 arrival for a balanced AI betwee
 - **Units:** the new age's roster replaces the spawn menu. Units already on the lane stay in their old age and fight on.
 - **Turrets:** existing turrets stay but do **not** upgrade. New turret types unlock. Old turrets get outclassed and should be sold (50% refund) and replaced — a deliberate gold sink and decision.
 - **Transition:** 5 s. The spawn queue pauses; turrets keep firing; the base is vulnerable. Evolving under pressure is a gamble.
-- **Doctrine pick:** evolving into Age 2 and Age 4 presents a doctrine choice (§9).
+- **Upgrades carry over:** everything bought in §6.1 applies to the new age's units and turrets.
 
-### 4.5 Veterancy (the alternative to evolving)
+### 4.5 Veterancy (removed in v3)
 
-XP can instead buy **veterancy ranks** for the *current* age: each rank gives current-age lane units +10% HP and damage. **Veterancy never applies to turrets** — otherwise Turtle + veterancy + Bastion would stack into exactly the unbreakable defence this design exists to prevent. Three ranks per age, costing 15% / 20% / 25% of that age's next evolution cost. Ranks reset on evolving.
-
-This is the core strategic tension Age of War 2 lacked: **fast-age** (evolve ASAP, accept a weaker army during transitions) vs. **strong-age** (bank veterancy, dominate the current age, evolve later from strength). The sim checks both win 40–60% against each other.
-
-Why strong-age works: per gold, each age's units are about 12% more efficient than the previous age's (stats ×1.9 for cost ×1.7), while full veterancy is +30% — so a fully drilled army can beat a freshly evolved one at equal spend, until the evolved side drills too.
+Replaced by upgrades (§6.1), bought with gold. XP's alternative to evolving is now the special skill (§7): every skill fired pushes the next evolution back.
 
 ## 5. Units
 
@@ -254,7 +260,8 @@ Ties break by unit ID, so sim runs are reproducible (§15.3).
 
 ## 6. Turrets
 
-- **Slots:** 2 at start; slot 3 costs 150 gold, slot 4 costs 400 gold (both × your age cost multiplier).
+- **Slots:** 1 free; slots 2, 3 and 4 cost 150 / 400 / 700 gold × your age cost multiplier. Maximum 4.
+- **Every unit attacks turrets.** A unit with no enemy unit in range hits the nearest structure — turrets (lowest slot first), then the base — at its damage type's Structure multiplier (§5.2), so Siege stays the structure-breaker.
 - **Sell:** 50% refund, instant.
 - **No auto-upgrade on evolution** (§4.4). Turret stats scale by age like units.
 
@@ -264,47 +271,52 @@ Ties break by unit ID, so sim runs are reproducible (§15.3).
 | **Artillery** | Age 2 | Blast | Slow, splash, minimum range | Stone Catapult: 180 g, 45 dmg / 3.0 s, splash 60 px, range 150–420 |
 | **Support** | Age 3 | — | Aura near the base: slows enemies or grants allies armour | Tar Cauldron: 220 g, −30% enemy speed within 180 px |
 
-## 7. Age Abilities
+### 6.1 Upgrades
 
-Each age has one **signature ability**, costing **100 momentum**, with a 45 s minimum cooldown. Unlike Age of War's untargeted specials, every ability is **aimed**: the player drags a ground marker along the lane.
+Bought with **gold**, **3 levels** each, **kept for the whole match** (they carry across evolutions) and applied **immediately** to units and turrets already on the field. Unit upgrades belong to a unit **slot** (Vanguard, Ranged, Heavy, Siege), so the next era's unit in that slot inherits them.
 
-| Age | Ability | Effect |
-| --- | --- | --- |
-| Stone | **Stampede** | A herd charges across a targeted 300 px section, knocking back and damaging enemies |
-| Bronze | **Shieldwall** | Allies in a targeted zone gain +40% armour for 8 s |
-| Iron | **Volley** | Three volleys land in a targeted 250 px area over 3 s (Pierce) |
-| Medieval | **Bombardment** | Siege shot walks across a 400 px strip (Blast) |
-| Gunpowder | **Cannonade** | A heavier barrage along a targeted line; heavy Blast, telegraphed first |
-| Arcane | **Starfall** | A charged beam at one point after a 1.5 s telegraph; massive damage in a narrow column |
+| Row | ⚔ | ♥ | Third |
+| --- | --- | --- | --- |
+| Each unit slot (4 rows) | Attack +15% / level | Health +15% / level | 🛡 Defence −10% damage taken / level |
+| Turrets (all) | Attack +15% / level | Health +15% / level | ➶ Range +10% / level (Support auras too) |
+| 💰 Income | +20% passive income / level | — | — |
 
-Each race names and dresses the same ability: Stampede is boars, stags or rams; Volley is pila,
-arrows or throwing axes; Bombardment is a trebuchet barrage, a hail of ballista bolts or a rockslide;
-Cannonade is cannon balls or falling moonfire; Starfall is an arcane lance, starfall or a thunder rune
-in the race's magic colour. Human / elf / dwarf names: Stampede / Wild Hunt / Ram Charge,
-Shieldwall / Barkskin / Shield Oath, Pilum Volley / Arrow Rain / Axe Storm, Trebuchet Barrage / Hail
-of Thorns / Rockslide, Cannonade / Moonfire / Grand Cannonade, Arcane Lance / Starfall / Thunder Rune.
+**Costs:** level *n* of a unit row costs 0.6× / 1.0× / 1.5× the current price of that slot's unit; the turret row uses the average current-era turret cost; Income costs 100 / 250 / 500 × the age cost multiplier. Health upgrades keep the current HP percentage. The Siege row is unavailable until Siege exists (Age 2).
 
-Ability damage scales by age like units. The AI gets the same abilities under the same rules and must also aim them.
+## 7. Special Skills
 
-## 8. Front Line, Momentum & Escalation
+Each era has one **special skill**. Click ☄ Skill or press Space: it fires immediately and **aims itself** — no aiming. It costs **XP** (so every use delays the next evolution) and has a **20 s cooldown**. Skills hit units only, never turrets or bases.
 
-The central fix for Age of War 2's stalemates: something rewards pushing, the tide makes late armies strong enough to break defences, and a backstop forces an ending.
+| Shape | Where it lands |
+| --- | --- |
+| **Area** | Centred on the densest enemy group (most enemy unit value within its width) |
+| **Strip** | From the enemy's front unit back toward their base, for its width |
+| **Sweep** | Travels from your gate to the enemy gate, hitting every enemy unit it passes |
+
+| Era | Skill | Shape | XP (starting) |
+| --- | --- | --- | --- |
+| Stone | **Stampede** — a herd charges down the lane, knocking enemies back | Sweep | 60 |
+| Bronze | **Rockfall** — boulders crash onto the biggest enemy group | Area | 75 |
+| Iron | **Volley** — three volleys along the enemy line (Pierce) | Strip | 175 |
+| Medieval | **Bombardment** — a walking barrage from gate to gate (Blast) | Sweep | 275 |
+| Gunpowder | **Cannonade** — heavy Blast along the enemy line, telegraphed | Strip | 700 |
+| Arcane | **Starfall** — a massive strike on the densest group after a 1.5 s telegraph | Area | 1,000 |
+
+A marker shows where it will land during the telegraph; afterwards a short line reports the result ("Volley: 6 killed"). Each race names and dresses the same skill (human / elf / dwarf): Stampede / Wild Hunt / Ram Charge, Rockfall / Stone Rain / Boulder Toss, Pilum Volley / Arrow Rain / Axe Storm, Trebuchet Barrage / Hail of Thorns / Rockslide, Cannonade / Moonfire / Grand Cannonade, Arcane Lance / Starfall / Thunder Rune. The AI uses the same skills under the same rules.
+
+## 8. Front Line & Escalation
+
+The central fix for Age of War 2's stalemates: the tide makes late armies strong enough to break defences, every unit can break turrets, and a backstop forces an ending.
 
 ### 8.1 The Front Line
 
-The **front** is the midpoint between the two sides' most-advanced units — regardless of stance, so units held at a rally line past midfield count. If one side has no units on the lane, the front is that side's base gate. If **neither** side has units on the lane, the front holds its last position until either side fields a unit. It is always visible as the seam where the two ages' backdrops meet (§13.6).
+The **front** is the midpoint between the two sides' most-advanced units. If one side has no units on the lane, the front is that side's base gate. If **neither** side has units on the lane, the front holds its last position until either side fields a unit. It is always visible as the seam where the two ages' backdrops meet (§13.6).
 
 The lane is 2,400 px at 1080p (roughly 1.25 screens); the camera pans.
 
-### 8.2 Momentum
+### 8.2 Momentum (removed in v3)
 
-| Source | Gain |
-| --- | --- |
-| Front line on the enemy's half | +2 per second |
-| Killing an enemy unit | +1 Vanguard or Ranged, +2 Siege, +3 Heavy |
-| Your base taking damage | +1 per 2% of your base's max HP lost |
-
-Momentum caps at 100 and is spent entirely on the age ability. Values are flat per unit and per percentage, so ability frequency doesn't creep up in later ages. The pushing side earns it fastest; the losing side still gets a comeback ability eventually.
+Skills are paid in XP (§7).
 
 ### 8.3 Escalation
 
@@ -315,69 +327,58 @@ From **15:00**, one stack is added every 30 s (max 4):
 
 Full escalation (4 stacks) is reached at 16:30. Announced on screen and in the music. The tide stays at level 6. PRD target: fewer than 10% of simulated matches reach escalation — it's a guarantee, not the normal ending.
 
-## 9. Doctrines
+## 9. Doctrines (removed in v3)
 
-On evolving into Age 2 and Age 4, the player picks one of two doctrines, kept for the rest of the match. The AI's doctrines are shown as banners on its base so the player can counter-plan.
+Cut after the first playtest: invisible modifiers that confused players and were the least balanced system in the simulations. AI personalities (§11.2) provide match variety. Doctrines may return as Chronicle battle modifiers.
 
-| Pick | Option A | Option B |
-| --- | --- | --- |
-| Age 2 | **Horde** — units −20% cost, −15% HP | **Elite** — units +25% HP and damage, +30% cost |
-| Age 4 | **Bastion** — turrets +25% damage, a 5th turret slot | **Siegecraft** — Siege units +50% structure damage, −25% cost |
-
-Four combinations per match, against four AI personalities. A third pick at Age 6 (Blitz / Attrition) is a post-v1 candidate.
-
-## 10. Player Controls & Unit Stances
+## 10. Player Controls
 
 | Action | Mouse | Keyboard |
 | --- | --- | --- |
 | Queue unit | Click unit card | 1 / 2 / 3 / 4 |
-| Build / sell turret | Click slot | Q / W / E / R |
-| Evolve / buy veterancy | Click age panel | T / V |
-| Forge upgrade | Click Forge | F |
-| Aim ability | Drag on lane, release to fire | Space, then click |
-| Toggle stance | Click stance button | S |
+| Build / sell turret | Click slot (a list opens above it) | Q / W / E / R |
+| Evolve | Click ▲ Evolve | T |
+| Fire skill | Click ☄ Skill | Space |
+| Upgrades | ⬆ Upgrades opens the grid; click a cell | — |
 | Pan camera | Edge-pan or right-drag | A / D |
-| Speed | Buttons | F1 / F2 / F3 (1×, 2×, pause) |
+| Speed / pause | 1×/2× toggle, ⏸ | Esc opens settings (pauses) |
 
-**Stances:**
-
-- **Advance** (default): units march to the enemy base.
-- **Hold:** units stop at a rally line you place and wait for the group to build up. Releasing Hold sends them in together — the coordinated push that breaks a defended line.
+Units always advance; there are no stances.
 
 ## 11. AI Opponents
 
 ### 11.1 Rules
 
-The AI plays by the same rules as the player: same costs, same tide, same queue, same field cap, same abilities it must aim. On **Easy, Normal and Hard it receives no resource bonuses**; difficulty comes from reaction speed, decision quality and counter-play. Only **Brutal** (+10% income) and **Nightmare** (+25% income) add bonuses — the fix for Age of War 2's difficulty spikes.
+The AI plays by the same rules as the player: same costs, same tide, same queue, same field cap, same skills. On **Easy, Normal and Hard it receives no resource bonuses**; difficulty comes from reaction speed, decision quality and counter-play. Only **Brutal** (+10% income) and **Nightmare** (+25% income) add bonuses — the fix for Age of War 2's difficulty spikes.
 
-| Difficulty | Decision interval | Counter-play | Ability aim | Bonus |
+| Difficulty | Decision interval | Counter-play | Skill use | Bonus |
 | --- | --- | --- | --- | --- |
-| Easy | 3.0 s | Ignores composition | Random within zone | — |
-| Normal | 1.5 s | Reacts to your majority role | Largest cluster | — |
-| Hard | 0.75 s | Full matrix-aware counters | Highest-value cluster, timed with pushes | — |
+| Easy | 3.0 s | Ignores composition | Any 2+ units | — |
+| Normal | 1.5 s | Reacts to your majority role | Worthwhile group | — |
+| Hard | 0.75 s | Full matrix-aware counters | Highest-value moments; never delays a planned evolution | — |
 | Brutal | 0.5 s | As Hard | As Hard | +10% income |
-| Nightmare | 0.5 s | As Hard, plus doctrine counters | As Hard | +25% income |
+| Nightmare | 0.5 s | As Hard | As Hard | +25% income |
 
 ### 11.2 Personalities
 
 | Personality | Plan |
 | --- | --- |
-| **Rusher** | Early aggression, Horde, fast-age, uses Hold to mass pushes |
-| **Turtle** | Early turrets, Bastion, strong-age via veterancy, counter-attacks when you over-extend |
-| **Economist** | Early Forge levels, Elite, big late-game waves |
-| **Tactician** | Adapts to your composition and doctrines; the default balanced opponent |
+| **Rusher** | Early aggression, fast-age, few turrets, upgrades its Vanguards |
+| **Turtle** | Early turrets and turret upgrades, counter-attacks when you over-extend |
+| **Economist** | Early Income upgrades, big late-game waves |
+| **Tactician** | Adapts to your composition; upgrades what it fields most; the default balanced opponent |
 
 ### 11.3 Sim-Only Archetypes
 
 Used by the balance harness, never shipped as opponents:
 
-- **Fast-age Tactician:** always evolves the moment XP allows; never buys veterancy.
-- **Strong-age Tactician:** buys all three veterancy ranks before evolving.
+- **Fast-age Tactician:** always evolves the moment XP allows; fires the skill only when it can't delay an evolution.
+- **Skill-heavy Tactician:** fires the skill whenever it can hit anything.
 - **Spam bots:** queue only one role (one bot per role). Used for the dominant-unit check (PRD §6).
 
 ### 11.4 Implementation Approach
 
-**Utility AI:** at each decision tick, score the candidate actions (queue each unit, build/sell a turret, evolve, veterancy, Forge, ability, stance change) with personality-weighted scoring over the lane state (front position, compositions, gold, XP, momentum, base HP, tide level), and pick the best. Weights live in data files; the same AI drives both sides in the sim.
+**Utility AI:** at each decision tick, score the candidate actions (queue each unit, build/sell a turret, unlock a slot, evolve, fire the skill, buy an upgrade) with personality-weighted scoring over the lane state (front position, compositions, gold, XP, base HP, tide level), and pick the best. Weights live in data files; the same AI drives both sides in the sim.
 
 ## 12. Modes, Onboarding & Progression
 
@@ -395,12 +396,12 @@ The first five Chronicle battles each introduce exactly one layer, with a short 
 | 1 | Queueing units; the damage × armour matrix via tooltips |
 | 2 | Turrets, selling and replacing |
 | 3 | Evolving (the enemy evolves first, so the player sees why) |
-| 4 | The front line, momentum and the age ability |
-| 5 | Veterancy vs. evolving, and the first doctrine pick |
+| 4 | The special skill (XP) and the front line |
+| 5 | Upgrades: more units or stronger units |
 
 ### 12.3 Post-Match Screen
 
-Win/lose banner, then: graphs over time of gold, army value, front-line position and age for both sides; markers for evolutions, abilities and doctrine picks; the three biggest trades (gold destroyed per engagement); Rematch / Change settings / Main menu. The same data is written to the match log (§15.4).
+Win/lose banner, then: graphs over time of gold, army value, front-line position and age for both sides; markers for evolutions, skills and upgrades; the three biggest trades (gold destroyed per engagement); Rematch / Change settings / Main menu. The same data is written to the match log (§15.4).
 
 ### 12.4 Progression
 
@@ -476,7 +477,7 @@ Over the 5 s transition:
 3. Your half of the backdrop cross-fades into the new age with a painterly dissolve shader.
 4. The base rebuilds: old structure dissolves out, new one assembles in.
 5. The music crossfades to the new age's theme.
-6. A banner shows the new age name and, at Age 2 and 4, opens the doctrine choice (the transition timer pauses while the player chooses; the AI chooses instantly).
+6. A banner shows the new age name.
 
 ### 13.6 The Split Battlefield (signature visual)
 
@@ -494,10 +495,12 @@ Smooth follow-pan with easing; brief, subtle zoom punch on ability impacts and e
 
 ### 13.9 HUD
 
-- Bottom bar: four unit cards (portrait, cost, role icon, hotkey), queue display.
-- Top: both bases' HP bars, ages, doctrine banners, match timer, tide level (and escalation stacks once active).
-- Right: gold, XP, momentum meter with ability button, evolve/veterancy panel, Forge.
-- Tooltips show the damage × armour matrix row for the hovered unit.
+- **Top bar (slim):** left — XP, ▲ Evolve, ☄ Skill; centre — your era, elapsed time, enemy era; right — ⬆ Upgrades (drop-down grid), gold (+income/s), 1×/2× toggle, pause, settings.
+- **Bottom left:** four unit cards (portrait, name, price, hotkey).
+- **Bottom centre:** lane map (gates and a dot per unit); under it, the unit in training with its progress bar and the 5-slot queue.
+- **Bottom right:** four turret slots (built, empty, locked with unlock price); clicking one opens the build list or a Sell option directly above it.
+- **In the world:** a base HP bar above each base.
+- Tooltips show the damage × armour matrix row for the hovered unit, and exact effects and prices for upgrades.
 
 ## 14. Accessibility & Settings
 
@@ -507,14 +510,14 @@ Colour-blind team palette option; screen shake slider (0–100%); flash reductio
 
 ### 15.1 Data-Driven Content
 
-Every unit, turret, ability, age, doctrine, tide level and AI personality is a **Godot Resource file** (`.tres`) under `data/` — plain text, diffable, editable without touching code. A script exports all of them to one CSV for spreadsheet review, and a validation script (run by Haiku in the workflow — PRD §10.2) checks every file against the schema.
+Every unit, turret, skill, age, tide level and AI personality is a **Godot Resource file** (`.tres`) under `data/` — plain text, diffable, editable without touching code. A script exports all of them to one CSV for spreadsheet review, and a validation script (run by Haiku in the workflow — PRD §10.2) checks every file against the schema.
 
 ### 15.2 Balance Simulation Harness
 
 A headless Godot scene runs AI-vs-AI matches at maximum speed with no rendering:
 
-- Runs *N* matches per personality pairing and difficulty, with randomised doctrine choices, plus the sim-only archetypes (§11.3).
-- Reports: win rates by personality, doctrine and archetype; match-length distribution; Age 6 arrival times; share reaching escalation; spam-bot win rates; per-unit damage dealt and absorbed per gold.
+- Runs *N* matches per personality pairing and difficulty, plus the sim-only archetypes (§11.3).
+- Reports: win rates by personality and archetype; match-length distribution; Age 6 arrival times; share reaching escalation; spam-bot win rates; per-unit damage dealt and absorbed per gold.
 - Exits non-zero if any acceptance target fails.
 
 **Acceptance targets** (identical to PRD §6):
@@ -526,10 +529,9 @@ A headless Godot scene runs AI-vs-AI matches at maximum speed with no rendering:
 | Median Age 6 arrival, balanced AI | 10:00–12:00 |
 | Each personality's aggregate win rate across all opponents (equal difficulty) | 40–60% |
 | Any single personality pairing | 30–70% (designed counters allowed, hard counters not) |
-| Any doctrine's win rate | 40–60% |
-| Fast-age vs. strong-age Tactician | each wins 40–60% |
+| Fast-age vs. skill-heavy Tactician | each wins 40–60% |
 | Any spam bot vs. Tactician (Hard) | wins < 30% |
-| Turtle vs. Turtle, both Bastion (worst-case defence mirror) | < 25% reach escalation; no match exceeds 18:00 |
+| Turtle vs. Turtle (worst-case defence mirror) | < 25% reach escalation; no match exceeds 18:00 |
 
 This is the balance equivalent of a test suite: after any balance change, edit the `.tres` values, run the harness, read the report, iterate until green — with a human reviewing the diff and playing the result.
 
@@ -539,7 +541,7 @@ Seeded random number generation and deterministic tie-breaking (§5.6), so any f
 
 ### 15.4 Match Logs
 
-Every match — sim or real — writes a local JSON log: a timeline sampled every second (gold, XP, momentum, army value, front position, age, tide level) plus events (evolutions, doctrine picks, abilities, turret changes, base damage). The sim computes its report from these logs; the post-match screen draws from them; playtest logs are compared with sim logs (PRD §7).
+Every match — sim or real — writes a local JSON log: a timeline sampled every second (gold, XP, army value, front position, age, tide level) plus events (evolutions, skills, upgrades, turret changes, base damage). The sim computes its report from these logs; the post-match screen draws from them; playtest logs are compared with sim logs (PRD §7).
 
 ## 16. Performance Budgets
 
@@ -559,6 +561,6 @@ Profile against these budgets from M1 onwards with boxes, then again at the vert
 
 - Is the front-line seam readable enough alone, or does it need a subtle marker (a flag, dust line)?
 - Should escalation start by clock (15:00) or by condition (no base damage in the last 3 minutes)? Clock is simpler and predictable; condition is more targeted.
-- Veterancy: flat +10% per rank, or role-specific bonuses (Ranged +range, Heavy +armour) for more texture?
+- Upgrades: flat percentages per level, or role-specific bonuses (Ranged +range, Heavy +armour) for more texture?
 - Is a fifth unit role per age (e.g. a support/medic unit) worth its art cost after the vertical slice?
 - Should the tide schedule be visible as a countdown to the next level, or just as the current level?
