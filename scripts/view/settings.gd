@@ -68,13 +68,13 @@ static func lights_enabled() -> bool:
 
 
 ## A settings panel usable from the menu and in-match. `on_close` runs when it's dismissed.
-static func make_panel(on_close: Callable) -> PanelContainer:
+static func make_panel(on_close: Callable, extra: Control = null) -> PanelContainer:
 	var p := PanelContainer.new()
 	p.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	p.offset_left = -260
 	p.offset_right = 260
-	p.offset_top = -220
-	p.offset_bottom = 210
+	p.offset_top = -250
+	p.offset_bottom = 250
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	p.add_child(v)
@@ -112,6 +112,8 @@ static func make_panel(on_close: Callable) -> PanelContainer:
 		c.button_pressed = get_value(spec[1])
 		c.toggled.connect(func(on): set_value(spec[1], on))
 		v.add_child(c)
+	if extra != null:
+		v.add_child(extra)
 	var close := Button.new()
 	close.text = "Done"
 	close.alignment = HORIZONTAL_ALIGNMENT_CENTER

@@ -48,6 +48,8 @@ func _ready() -> void:
 	_root.add_child(_grid)
 	_top.upgrades_button.toggled.connect(func(on: bool): _grid.visible = on)
 	# Dev aid for screenshots: open the HUD's pop-ups without clicking.
+	if "--hud-demo-settings" in OS.get_cmdline_user_args():
+		get_tree().create_timer(2.0).timeout.connect(open_settings)
 	if "--hud-demo" in OS.get_cmdline_user_args():
 		get_tree().create_timer(2.0).timeout.connect(func():
 			_top.upgrades_button.button_pressed = true
@@ -146,8 +148,31 @@ func open_settings() -> void:
 	var panel := GameSettings.make_panel(func():
 		_settings_open = false
 		view.apply_settings()
-		view.set_speed(_speed_before))
+		view.set_speed(_speed_before), _match_actions())
 	_root.add_child(panel)
+
+
+## Restart / End game row for the in-match settings panel; each asks for confirmation first.
+func _match_actions() -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	for spec in [["↻ Restart match", "Restart this match? The current match is lost.", view.rematch],
+			["✕ End game", "End this match and return to the main menu?", view.exit_to_menu]]:
+		var b := Button.new()
+		b.text = spec[0]
+		b.alignment = HORIZONTAL_ALIGNMENT_CENTER
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.custom_minimum_size = Vector2(0, 40)
+		var ask := ConfirmationDialog.new()
+		ask.dialog_text = spec[1]
+		ask.ok_button_text = "Yes"
+		ask.cancel_button_text = "No"
+		var sig: Signal = spec[2]
+		ask.confirmed.connect(func(): sig.emit())
+		b.add_child(ask)
+		b.pressed.connect(func(): ask.popup_centered())
+		row.add_child(b)
+	return row
 
 
 func slot_pressed(i: int) -> void:
