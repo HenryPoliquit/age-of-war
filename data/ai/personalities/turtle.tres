@@ -17,3 +17,4 @@ age_plan = "balanced"
 turret_target = 4
 turret_after = 20.0
 turret_panic_hp = 0.95
+upgrade_bias = {"heavy": 1.0, "ranged": 1.0, "siege": 1.0, "turret": 3.0, "vanguard": 1.0}

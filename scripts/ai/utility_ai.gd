@@ -53,6 +53,7 @@ func _decide(sim: MatchSim) -> void:
 	_try_ability(sim, pressure)
 	_spend_xp(sim, pressure)
 	_spend_gold(sim, pressure)
+	_buy_upgrade(sim, pressure)
 
 
 ## Enemy units near our gate, or our base hit recently.
@@ -82,6 +83,43 @@ func _spend_xp(sim: MatchSim, pressure: bool) -> void:
 
 # ---------------------------------------------------------------------------
 # Gold
+
+## Leftover gold buys the best-value upgrade: rows the army actually uses, weighted by personality.
+## At most one per decision; never under pressure or with a thin army.
+func _buy_upgrade(sim: MatchSim, pressure: bool) -> void:
+	var s := sim.sides[side]
+	if pressure or s.army_value() < sim.income_rate(side) * personality.upgrade_after_army_seconds:
+		return
+	var share := {}
+	var total := 0.0
+	for u in s.units:
+		share[u.def.role] = share.get(u.def.role, 0.0) + u.cost_paid
+		total += u.cost_paid
+	var best_row := ""
+	var best_stat := ""
+	var best_score := 0.0
+	for row in MatchSim.UPGRADES:
+		if row == "income":
+			continue
+		var weight: float = personality.upgrade_bias.get(row, 0.0)
+		if row == "turret":
+			weight *= s.turret_count() / 2.0
+		else:
+			weight *= share.get(row, 0.0) / maxf(total, 1.0)
+		if weight <= 0.0:
+			continue
+		for stat in MatchSim.UPGRADES[row]:
+			var cost := sim.upgrade_cost(side, row, stat)
+			if cost > s.gold:
+				continue
+			var score := weight / cost
+			if score > best_score:
+				best_score = score
+				best_row = row
+				best_stat = stat
+	if best_row != "":
+		sim.buy_upgrade(side, best_row, best_stat)
+
 
 func _spend_gold(sim: MatchSim, pressure: bool) -> void:
 	var s := sim.sides[side]

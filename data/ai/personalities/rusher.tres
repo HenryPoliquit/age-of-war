@@ -18,3 +18,5 @@ income_target = 1
 income_after = 60.0
 turret_target = 2
 turret_after = 90.0
+upgrade_bias = {"heavy": 0.5, "ranged": 0.5, "siege": 0.5, "turret": 0.0, "vanguard": 2.0}
+upgrade_after_army_seconds = 30.0

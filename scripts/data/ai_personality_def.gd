@@ -35,3 +35,10 @@ extends Resource
 @export var turret_after: float = 60.0
 ## Build turrets sooner if own base HP fraction falls below this.
 @export var turret_panic_hp: float = 0.8
+
+@export_group("Upgrades")
+## Appetite per upgrade row (roles and "turret"); multiplied by that role's share of the army
+## (turrets: by turret count ÷ 2).
+@export var upgrade_bias: Dictionary = {"vanguard": 1.0, "ranged": 1.0, "heavy": 1.0, "siege": 1.0, "turret": 1.0}
+## Only buy unit/turret upgrades once the army on the lane is worth this many seconds of income.
+@export var upgrade_after_army_seconds: float = 15.0

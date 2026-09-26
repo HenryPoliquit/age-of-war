@@ -71,3 +71,11 @@ func test_fx_records_only_when_enabled() -> void:
 	sim.record_fx = true
 	run_for(sim, 2.0)
 	check(sim.fx.any(func(f): return f.type == "shot"), "shots recorded")
+
+
+func test_ai_buys_unit_or_turret_upgrades() -> void:
+	var gd := GameData.get_default()
+	var r := MatchRunner.run(gd, {"personality": &"tactician"}, {"personality": &"turtle"}, 11)
+	var bought: Array = r.log.events.filter(func(ev): return ev.type == "upgrade" and ev.row != "income")
+	check(not bought.is_empty(), "some unit or turret upgrade was bought")
+	check(bought.any(func(ev): return ev.row == "turret" and ev.side == 1), "Turtle upgrades its turrets")
