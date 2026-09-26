@@ -24,6 +24,8 @@ extends Resource
 @export_group("Evolution")
 ## "balanced" (Hard+ waits out pressure before evolving) | "fast" (evolve the moment XP allows)
 @export_enum("balanced", "fast") var age_plan: String = "balanced"
+## Sim archetype: fire the skill whenever it can hit anything (GDD §11.3).
+@export var skill_eager: bool = false
 
 @export_group("Economy & defence")
 ## Forge levels to target, and the earliest time to buy each.

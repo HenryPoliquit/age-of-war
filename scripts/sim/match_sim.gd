@@ -22,7 +22,7 @@ var front_x: float
 var escalation: int = 0
 var rng := RandomNumberGenerator.new()
 var match_log: MatchLog
-## Pending ability pulses: {side, def, center, next_t, pulse, age}
+## Pending skill pulses: {side, def, lo, hi, next_t, pulse, kills}
 var effects: Array[Dictionary] = []
 ## Short-lived records for the view (hits, shots, deaths). Cleared by the consumer.
 var fx: Array[Dictionary] = []
@@ -135,9 +135,13 @@ func can_evolve(side: int) -> bool:
 	return not is_over() and not s.is_evolving() and s.age < GameData.AGE_COUNT and s.xp >= evolve_cost(side)
 
 
+func ability_cost(side: int) -> float:
+	return float(data.age(sides[side].age).ability.xp_cost)
+
+
 func can_fire_ability(side: int) -> bool:
 	var s := sides[side]
-	return not is_over() and s.momentum >= rules.ability_cost and s.ability_cooldown <= 0.0
+	return not is_over() and s.ability_cooldown <= 0.0 and s.xp >= ability_cost(side)
 
 
 # ---------------------------------------------------------------------------
@@ -244,17 +248,73 @@ func first_free_slot(side: int) -> int:
 	return -1
 
 
-func fire_ability(side: int, world_x: float) -> bool:
+## Fires this side's current-era skill where its shape lands now (PLAN D20). Fails, costing nothing,
+## when there is nothing to hit (D21).
+func fire_ability(side: int) -> bool:
 	if not can_fire_ability(side):
+		return false
+	var zone := ability_zone(side)
+	if zone.is_empty():
 		return false
 	var s := sides[side]
 	var def := data.age(s.age).ability
-	s.momentum -= rules.ability_cost
+	s.xp -= def.xp_cost
 	s.ability_cooldown = rules.ability_cooldown
-	var center := clampf(world_x, 0.0, rules.lane_length)
-	effects.append({"side": side, "def": def, "center": center, "next_t": time + def.telegraph, "pulse": 0})
-	_emit({"type": "ability", "side": side, "ability": String(def.id), "x": center})
+	var center: float = (zone[0] + zone[1]) * 0.5
+	effects.append({"side": side, "def": def, "lo": zone[0], "hi": zone[1], "next_t": time + def.telegraph, "pulse": 0, "kills": 0})
+	_emit({"type": "ability", "side": side, "ability": String(def.id), "x": center, "lo": zone[0], "hi": zone[1]})
 	return true
+
+
+## [lo, hi] in world x where this side's skill would land now, or [] if no enemy unit is on the lane.
+func ability_zone(side: int) -> Array:
+	var def := data.age(sides[side].age).ability
+	var enemy := enemy_of(side)
+	var front := _front_unit(enemy)
+	if front == null:
+		return []
+	match def.shape:
+		"sweep":
+			return [0.0, rules.lane_length]
+		"strip":
+			# From the enemy's front unit back toward the enemy base.
+			var x := to_world(enemy, front.progress)
+			return [x, x + def.width] if enemy == RIGHT else [x - def.width, x]
+		_:
+			var c := _densest_window(enemy, def.width)
+			return [c - def.width * 0.5, c + def.width * 0.5]
+
+
+## Gold value of the enemy units inside this side's skill zone right now.
+func ability_zone_value(side: int) -> float:
+	var zone := ability_zone(side)
+	if zone.is_empty():
+		return 0.0
+	var enemy := enemy_of(side)
+	var v := 0.0
+	for u in sides[enemy].units:
+		var x := to_world(enemy, u.progress)
+		if u.alive() and x >= zone[0] and x <= zone[1]:
+			v += u.cost_paid
+	return v
+
+
+## Centre of the `width` window holding the most gold of `of_side`'s units. Candidate windows start or
+## end at a unit; the first best window in unit order wins ties (deterministic).
+func _densest_window(of_side: int, width: float) -> float:
+	var best := NAN
+	var best_v := -1.0
+	for u in sides[of_side].units:
+		var start := to_world(of_side, u.progress)
+		for c in [start + width * 0.5, start - width * 0.5]:
+			var v := 0.0
+			for w in sides[of_side].units:
+				if w.alive() and absf(to_world(of_side, w.progress) - c) <= width * 0.5:
+					v += w.cost_paid
+			if v > best_v:
+				best_v = v
+				best = c
+	return best
 
 
 # ---------------------------------------------------------------------------
@@ -280,7 +340,7 @@ func step() -> void:
 		_turrets_act(s, dt)
 	_resolve_effects()
 	_remove_dead()
-	_front_and_momentum(dt)
+	_update_front()
 	_check_end()
 	_log_accum += dt
 	if _log_accum >= 1.0 - 1e-6:
@@ -428,8 +488,6 @@ func _damage_unit(target: SimUnit, raw: float, dtype: String, by_side: int) -> f
 	if not target.alive():
 		return 0.0
 	var dmg := raw * rules.matrix(dtype, target.def.armour)
-	if target.armour_buff_until > time:
-		dmg /= 1.0 + target.armour_buff
 	dmg = minf(dmg, target.hp)
 	target.hp -= dmg
 	target.stat_damage_taken += dmg
@@ -450,7 +508,6 @@ func _on_kill(victim: SimUnit, by_side: int) -> void:
 	s.stat_gold_earned += bounty
 	s.xp += victim.cost_paid * rules.xp_per_kill_fraction
 	s.stat_xp_earned += victim.cost_paid * rules.xp_per_kill_fraction
-	s.momentum = minf(rules.momentum_cap, s.momentum + victim.def.momentum_on_kill)
 	if record_fx:
 		fx.append({"type": "death", "x": to_world(victim.side, victim.progress), "side": victim.side, "role": victim.def.role,
 			"def": victim.def, "unit_id": victim.id})
@@ -487,7 +544,6 @@ func damage_base(s: SimSide, raw: float, by_side: int) -> void:
 	var attacker := sides[by_side]
 	attacker.xp += dmg * rules.xp_per_base_damage
 	attacker.stat_xp_earned += dmg * rules.xp_per_base_damage
-	s.momentum = minf(rules.momentum_cap, s.momentum + dmg / s.base_max_hp * 100.0 * rules.momentum_per_base_pct)
 	match_log.count_base_damage(by_side, dmg)
 	if record_fx:
 		fx.append({"type": "hit", "x": to_world(s.index, 0.0), "dtype": "siege", "side": s.index, "structure": true})
@@ -540,6 +596,20 @@ func _turrets_act(s: SimSide, dt: float) -> void:
 						t.stat_damage_dealt += _damage_unit(v, raw, t.def.damage_type, s.index)
 
 
+func _update_front() -> void:
+	var lf := _front_unit(LEFT)
+	var rf := _front_unit(RIGHT)
+	var lane := rules.lane_length
+	if lf == null and rf == null:
+		return
+	if lf == null:
+		front_x = 0.0
+	elif rf == null:
+		front_x = lane
+	else:
+		front_x = (lf.progress + lane - rf.progress) * 0.5
+
+
 func _resolve_effects() -> void:
 	var keep: Array[Dictionary] = []
 	for e in effects:
@@ -550,20 +620,22 @@ func _resolve_effects() -> void:
 			e.next_t += def.pulse_interval
 		if e.pulse < def.pulses:
 			keep.append(e)
+		else:
+			_emit({"type": "ability_end", "side": e.side, "ability": String(def.id), "kills": e.kills})
 	effects = keep
 
 
 func _ability_pulse(e: Dictionary) -> void:
 	var def: AbilityDef = e.def
-	var lo: float = e.center - def.width * 0.5
-	var hi: float = e.center + def.width * 0.5
-	if def.sweep and def.pulses > 1:
-		var slice := def.width / def.pulses
-		# Sweeps travel away from the caster, toward the enemy base.
+	var lo: float = e.lo
+	var hi: float = e.hi
+	if def.shape == "sweep" and def.pulses > 1:
+		# Sweeps travel away from the caster, one slice per pulse.
+		var slice := (hi - lo) / def.pulses
 		var i: int = e.pulse if e.side == LEFT else def.pulses - 1 - e.pulse
-		lo = e.center - def.width * 0.5 + slice * i
+		lo = e.lo + slice * i
 		hi = lo + slice
-	var target_side: int = e.side if def.affects == "ally" else enemy_of(e.side)
+	var target_side := enemy_of(e.side)
 	if record_fx:
 		fx.append({"type": "ability_pulse", "lo": lo, "hi": hi, "side": e.side, "ability": String(def.id)})
 	for u in sides[target_side].units:
@@ -572,13 +644,11 @@ func _ability_pulse(e: Dictionary) -> void:
 		var x := to_world(u.side, u.progress)
 		if x < lo or x > hi:
 			continue
-		if def.affects == "ally":
-			u.armour_buff = def.armour_buff
-			u.armour_buff_until = time + def.buff_duration
-		else:
-			_damage_unit(u, def.damage, def.damage_type, e.side)
-			if def.knockback > 0.0 and u.alive():
-				u.progress = maxf(0.0, u.progress - def.knockback)
+		_damage_unit(u, def.damage, def.damage_type, e.side)
+		if not u.alive():
+			e.kills += 1
+		elif def.knockback > 0.0:
+			u.progress = maxf(0.0, u.progress - def.knockback)
 	match_log.count_ability_damage(e.side)
 
 
@@ -589,26 +659,6 @@ func _remove_dead() -> void:
 			if u.alive():
 				alive.append(u)
 		s.units = alive
-
-
-func _front_and_momentum(dt: float) -> void:
-	var lf := _front_unit(LEFT)
-	var rf := _front_unit(RIGHT)
-	var lane := rules.lane_length
-	if lf != null or rf != null:
-		var lx := lf.progress if lf != null else 0.0
-		var rx := lane - rf.progress if rf != null else lane
-		if lf == null:
-			front_x = 0.0
-		elif rf == null:
-			front_x = lane
-		else:
-			front_x = (lx + rx) * 0.5
-	var half := lane * 0.5
-	if front_x > half + 1e-6:
-		sides[LEFT].momentum = minf(rules.momentum_cap, sides[LEFT].momentum + rules.momentum_push_rate * dt)
-	elif front_x < half - 1e-6:
-		sides[RIGHT].momentum = minf(rules.momentum_cap, sides[RIGHT].momentum + rules.momentum_push_rate * dt)
 
 
 func _check_end() -> void:

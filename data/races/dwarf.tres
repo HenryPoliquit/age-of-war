@@ -51,7 +51,7 @@ turret_names = {
 }
 ability_names = {
 "stampede": "Ram Charge",
-"shieldwall": "Shield Oath",
+"rockfall": "Boulder Toss",
 "volley": "Axe Storm",
 "bombardment": "Rockslide",
 "cannonade": "Grand Cannonade",

@@ -17,13 +17,6 @@ func test_front_line_rules() -> void:
 	check_near(sim.front_x, 0.0, 0.01)
 
 
-func test_push_momentum() -> void:
-	var sim := new_sim()
-	place(sim, 0, "vanguard", 1500.0)
-	run_for(sim, 5.0)
-	check_near(sim.sides[0].momentum, 10.0, 0.05)
-
-
 func test_escalation_stacks() -> void:
 	var r := GameData.get_default().rules
 	check_eq(r.escalation_stacks_at(899.0), 0)
@@ -31,19 +24,6 @@ func test_escalation_stacks() -> void:
 	check_eq(r.escalation_stacks_at(930.0), 2)
 	check_eq(r.escalation_stacks_at(990.0), 4)
 	check_eq(r.escalation_stacks_at(2000.0), 4)
-
-
-func test_ability_spends_momentum_and_cools_down() -> void:
-	var sim := new_sim()
-	var e := place(sim, 1, "vanguard", 1000.0)
-	check(not sim.fire_ability(0, 1400.0), "needs momentum")
-	sim.sides[0].momentum = 100.0
-	check(sim.fire_ability(0, 1400.0))
-	check_near(sim.sides[0].momentum, 0.0, 0.01)
-	run_pinned(sim, 1.0, [e])
-	check(e.hp < e.max_hp or not e.alive(), "stampede hit")
-	sim.sides[0].momentum = 100.0
-	check(not sim.fire_ability(0, 1400.0), "cooldown")
 
 
 func test_base_destroyed_ends_match() -> void:

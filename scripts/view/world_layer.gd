@@ -124,23 +124,12 @@ func _draw_side_units(side: int, n: Node2D) -> void:
 	n.draw_set_transform(Vector2.ZERO)
 
 
-## HP bars and the ability aim marker, drawn over the outlined units.
+## HP bars, drawn over the outlined units (skill telegraphs are in FxLayer's glow pass).
 func _draw_overlay() -> void:
 	var sim := view.sim
 	for s in sim.sides:
 		for u in s.units:
 			_draw_bars(_overlay, u)
-	if view.aiming:
-		var ov := _overlay
-		var def := sim.data.age(sim.sides[0].age).ability
-		var x := view.aim_x
-		var c := view.team_color(0).lightened(0.5)
-		ov.draw_rect(Rect2(x - def.width * 0.5, GROUND_Y - 6, def.width, 16), Color(c, 0.35))
-		for k in int(def.width / 16):
-			ov.draw_line(Vector2(x - def.width * 0.5 + k * 16, GROUND_Y - 130), Vector2(x - def.width * 0.5 + k * 16 + 8, GROUND_Y - 130), c, 2.0)
-		ov.draw_line(Vector2(x - def.width * 0.5, GROUND_Y - 130), Vector2(x - def.width * 0.5, GROUND_Y + 10), c, 2.0)
-		ov.draw_line(Vector2(x + def.width * 0.5, GROUND_Y - 130), Vector2(x + def.width * 0.5, GROUND_Y + 10), c, 2.0)
-		ov.draw_string(_font, Vector2(x - 60, GROUND_Y - 140), view.race_def(0).ability_name(def), HORIZONTAL_ALIGNMENT_CENTER, 120, 18, c)
 
 
 func _draw_base(s: SimSide, t: float) -> void:
@@ -206,9 +195,6 @@ func _draw_unit(ci: CanvasItem, u: SimUnit, rt: float, t: float) -> void:
 	UnitArt.begin(ci, Transform2D(0.0, Vector2(dir * sc, sc), 0.0, pos))
 	UnitArt.draw_unit(ci, u.def, view.team_color(u.side), _pose(u, rt, t), u.id, view.race_of(u.side))
 	ci.draw_set_transform(Vector2.ZERO)
-	if u.armour_buff_until > view.sim.time:
-		var h := UnitArt.height_for(u.def, view.race_of(u.side)) * UNIT_SCALE
-		ci.draw_arc(pos + Vector2(0, -h * 0.5), h * 0.6, 0, TAU, 24, Color(view.team_color(u.side).lightened(0.6), 0.55), 2.0)
 
 
 func _draw_bars(ci: CanvasItem, u: SimUnit) -> void:

@@ -36,8 +36,6 @@ var _ability_ready := false
 
 var speeds := [1.0, 2.0, 0.0]
 var speed_index := 0
-var aiming := false
-var aim_x := 0.0
 
 ## Presentation clock: advances with game speed, freezes on hitstop and pause.
 var anim_time := 0.0
@@ -163,11 +161,6 @@ func set_speed(i: int) -> void:
 	speed_index = i
 
 
-func begin_aim() -> void:
-	if sim.can_fire_ability(0):
-		aiming = true
-
-
 func render_time() -> float:
 	return sim.time - sim.rules.tick_dt * (1.0 - alpha)
 
@@ -236,8 +229,6 @@ func _process(delta: float) -> void:
 	var amb_r: Color = look_r.ambient * dn.tint(look_r.dn)
 	lights.night_boost = 1.0 + 0.8 * (1.0 - dn.daylight)
 	lights.update(anim_time, amb_l.lerp(amb_r, w))
-	if aiming:
-		aim_x = clampf(get_global_mouse_position().x, 0.0, sim.rules.lane_length)
 	if sim.is_over() and not _logged:
 		_logged = true
 		var stamp := Time.get_datetime_string_from_system().replace(":", "-")
@@ -313,12 +304,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_RIGHT:
 			_drag_pan = event.pressed
-			if event.pressed and aiming:
-				aiming = false
-		elif event.button_index == MOUSE_BUTTON_LEFT and aiming and not event.pressed:
-			# Drag the marker on the lane, release to fire (GDD §10).
-			sim.fire_ability(0, aim_x)
-			aiming = false
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
 			_cam_x -= 120.0
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
@@ -343,7 +328,7 @@ func _hotkey(k: Key) -> void:
 		KEY_F:
 			hud.feedback(sim.buy_forge(0))
 		KEY_SPACE:
-			begin_aim()
+			hud.feedback(sim.fire_ability(0))
 		KEY_F1:
 			set_speed(0)
 		KEY_F2:
@@ -351,10 +336,7 @@ func _hotkey(k: Key) -> void:
 		KEY_F3:
 			set_speed(2)
 		KEY_ESCAPE:
-			if aiming:
-				aiming = false
-			else:
-				hud.open_settings()
+			hud.open_settings()
 
 
 # ---------------------------------------------------------------------------
@@ -380,6 +362,11 @@ func _on_event(ev: Dictionary) -> void:
 			fx.ability_cast(ev.ability, ev.x, ev.side, race_of(ev.side))
 			audio.play("ability_cast", Vector2(ev.x, GROUND_Y - 100))
 			hud.banner(race_def(ev.side).ability_name(sim.data.age(sim.sides[ev.side].age).ability) + "!", team_color(ev.side), ev.side, true)
+		"ability_end":
+			if ev.side == 0 and ev.kills > 0:
+				for a in sim.data.ages:
+					if String(a.ability.id) == ev.ability:
+						hud.banner("%s: %d killed" % [race_def(0).ability_name(a.ability), ev.kills], team_color(0), 0, true)
 		"match_end":
 			audio.target_intensity = 0.0
 		"turret_destroyed":
@@ -398,11 +385,10 @@ func _consume_fx() -> void:
 				_on_death(f)
 			"ability_pulse":
 				fx.ability_pulse(f.ability, f.lo, f.hi, f.side, team_color(f.side), race_of(f.side))
-				if f.ability != "shieldwall":
-					for u in sim.sides[1 - f.side].units:
-						var x := sim.to_world(u.side, u.progress)
-						if x >= f.lo and x <= f.hi:
-							flash_at[u.id] = anim_time + 0.1
+				for u in sim.sides[1 - f.side].units:
+					var x := sim.to_world(u.side, u.progress)
+					if x >= f.lo and x <= f.hi:
+						flash_at[u.id] = anim_time + 0.1
 	sim.fx.clear()
 
 

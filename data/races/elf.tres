@@ -51,7 +51,7 @@ turret_names = {
 }
 ability_names = {
 "stampede": "Wild Hunt",
-"shieldwall": "Barkskin",
+"rockfall": "Stone Rain",
 "volley": "Arrow Rain",
 "bombardment": "Hail of Thorns",
 "cannonade": "Moonfire",

@@ -40,12 +40,9 @@ extends Resource
 ## Turrets and the base share the gate; units must be this close to hit them.
 @export var structure_offset: float = 0.0
 
-@export_group("Momentum & abilities")
-@export var momentum_cap: float = 100.0
-@export var momentum_push_rate: float = 2.0
-@export var momentum_per_base_pct: float = 0.5
-@export var ability_cost: float = 100.0
-@export var ability_cooldown: float = 45.0
+@export_group("Skills")
+## Seconds before the same side can fire its skill again.
+@export var ability_cooldown: float = 20.0
 
 @export_group("Escalation")
 @export var escalation_start: float = 900.0

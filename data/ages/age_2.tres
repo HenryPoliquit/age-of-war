@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="AgeDef" format=3]
 
-[ext_resource type="Resource" path="res://data/abilities/shieldwall.tres" id="1_c7n40"]
+[ext_resource type="Resource" path="res://data/abilities/rockfall.tres" id="1_c7n40"]
 [ext_resource type="Script" path="res://scripts/data/age_def.gd" id="5_r0x17"]
 [ext_resource type="Script" path="res://scripts/data/turret_def.gd" id="6_2mdu0"]
 [ext_resource type="Resource" path="res://data/turrets/bronze_sentry.tres" id="7_ouha8"]

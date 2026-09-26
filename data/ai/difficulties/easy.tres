@@ -8,4 +8,4 @@ id = &"easy"
 display_name = "Easy"
 decision_interval = 3.0
 counter_level = 0
-aim_level = 0
+skill_min_value = 30.0

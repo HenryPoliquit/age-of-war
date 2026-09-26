@@ -4,14 +4,14 @@
 
 [resource]
 script = ExtResource("1_ab")
-id = &"volley"
-display_name = "Volley"
-age = 3
-shape = "strip"
-xp_cost = 175
-width = 350.0
-telegraph = 0.5
+id = &"rockfall"
+display_name = "Rockfall"
+age = 2
+shape = "area"
+xp_cost = 75
+width = 260.0
+telegraph = 0.8
 pulses = 3
-pulse_interval = 1.0
-damage = 123.0
-damage_type = "pierce"
+pulse_interval = 0.35
+damage = 90.0
+damage_type = "blast"

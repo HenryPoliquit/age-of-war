@@ -8,5 +8,5 @@ id = &"nightmare"
 display_name = "Nightmare"
 decision_interval = 0.5
 counter_level = 3
-aim_level = 2
 income_bonus = 0.25
+skill_min_value = 100.0

@@ -17,8 +17,6 @@ extends Resource
 ## Ranged Siege cannot hit anything closer than this (GDD §5.6). 0 = no minimum.
 @export var min_range: float = 0.0
 @export var speed: float = 0.0
-## Momentum granted to the killer (GDD §8.2).
-@export var momentum_on_kill: int = 0
 
 
 func is_ranged_siege() -> bool:

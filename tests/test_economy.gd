@@ -25,7 +25,7 @@ func test_forge_raises_income_and_scales_with_age() -> void:
 	check_near(sim.forge_cost(0), 250.0 * 1.7 * 1.7, 1.0)
 
 
-func test_kill_pays_bounty_xp_momentum() -> void:
+func test_kill_pays_bounty_and_xp() -> void:
 	var sim := new_sim(false)
 	var victim := place(sim, 1, "heavy", 100.0)
 	var gold := sim.sides[0].gold
@@ -33,7 +33,6 @@ func test_kill_pays_bounty_xp_momentum() -> void:
 	sim._damage_unit(victim, 100.0, "blast", 0)
 	check_near(sim.sides[0].gold - gold, victim.cost_paid * 0.5, 0.01, "bounty")
 	check_near(sim.sides[0].xp, victim.cost_paid * 0.8, 0.01, "xp")
-	check_near(sim.sides[0].momentum, 3.0, 0.01, "heavy kill momentum")
 
 
 func test_queue_charges_and_refunds() -> void:

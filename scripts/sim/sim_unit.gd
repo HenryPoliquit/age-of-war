@@ -13,8 +13,6 @@ var max_hp: float
 var base_damage: float
 var cost_paid: float
 var cooldown: float = 0.0
-var armour_buff: float = 0.0
-var armour_buff_until: float = -1.0
 var slow: float = 0.0
 ## Presentation hooks — the sim never reads these.
 var state: StringName = &"walk"

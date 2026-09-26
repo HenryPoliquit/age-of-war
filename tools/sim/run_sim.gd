@@ -35,7 +35,7 @@ func _init() -> void:
 		for j in range(i + 1, PERSONALITIES.size()):
 			_series("rr", PERSONALITIES[i], PERSONALITIES[j], matches)
 	_series("mirror", "tactician", "tactician", matches * 3)
-	_series("fast_strong", "fast_age", "strong_age", matches * 2)
+	_series("fast_skill", "fast_age", "skill_heavy", matches * 2)
 	for bot in SPAM:
 		_series("spam", bot, "tactician", matches)
 	_series("turtle_mirror", "turtle", "turtle", matches)
@@ -48,13 +48,13 @@ func _init() -> void:
 		by[r.suite].append(r)
 	var round_robin: Array = by.rr
 	var mirror: Array = by.mirror
-	var fast_strong: Array = by.fast_strong
+	var fast_skill: Array = by.fast_skill
 	var spam: Array = by.spam
 	var turtle: Array = by.turtle_mirror
 
 	var checks := []
 	var metrics := {}
-	var main_pool := round_robin + mirror + fast_strong
+	var main_pool := round_robin + mirror + fast_skill
 
 	var esc := _share(main_pool, func(r): return r.escalated)
 	metrics["escalation"] = esc
@@ -113,11 +113,11 @@ func _init() -> void:
 	checks.append(_check("Balance", "Any single personality pairing (first-named side's win rate)", "30–70%", "; ".join(pair_txt), pair_ok))
 
 	var fast_rate := 0.0
-	for r in fast_strong:
+	for r in fast_skill:
 		fast_rate += _score(r, r.pair_a)
-	fast_rate /= fast_strong.size()
-	metrics["fast_vs_strong"] = fast_rate
-	checks.append(_check("Decisions", "Fast-age vs. strong-age Tactician (fast-age win rate)", "40–60%", _pct(fast_rate), fast_rate >= 0.4 and fast_rate <= 0.6))
+	fast_rate /= fast_skill.size()
+	metrics["fast_vs_skill"] = fast_rate
+	checks.append(_check("Decisions", "Fast-age vs. skill-heavy Tactician (fast-age win rate)", "40–60%", _pct(fast_rate), fast_rate >= 0.4 and fast_rate <= 0.6))
 
 	var spam_ok := true
 	var spam_txt := []
@@ -237,7 +237,7 @@ func _markdown(checks: Array, ok: bool, pool: Array, mirror: Array, elapsed: flo
 	for c in checks:
 		lines.append("| %s | %s | %s | %s | %s |" % [c.area, c.metric, c.target, c.value, "✅" if c.pass else "❌"])
 	lines.append("")
-	lines.append("## Match length distribution (round robin + mirror + fast/strong)")
+	lines.append("## Match length distribution (round robin + mirror + fast/skill)")
 	lines.append("")
 	var buckets := {}
 	for r in pool:

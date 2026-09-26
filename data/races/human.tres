@@ -51,7 +51,7 @@ turret_names = {
 }
 ability_names = {
 "stampede": "Stampede",
-"shieldwall": "Shieldwall",
+"rockfall": "Rockfall",
 "volley": "Pilum Volley",
 "bombardment": "Trebuchet Barrage",
 "cannonade": "Cannonade",

@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="AiPersonalityDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ai_personality_def.gd" id="1_p"]
+
+[resource]
+script = ExtResource("1_p")
+id = &"skill_heavy"
+display_name = "Skill-heavy Tactician"
+sim_only = true
+skill_eager = true

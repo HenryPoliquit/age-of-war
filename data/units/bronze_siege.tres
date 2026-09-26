@@ -18,4 +18,3 @@ attack_interval = 2.5
 range = 30.0
 min_range = 0.0
 speed = 40.0
-momentum_on_kill = 2

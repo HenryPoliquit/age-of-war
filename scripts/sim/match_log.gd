@@ -5,7 +5,7 @@ extends RefCounted
 
 var seed: int = 0
 var meta: Dictionary = {}
-## Each sample: {t, front, tide, esc, sides: [{gold, xp, momentum, army, age, base_hp, base_max}, ...]}
+## Each sample: {t, front, tide, esc, sides: [{gold, xp, army, age, base_hp, base_max}, ...]}
 var timeline: Array[Dictionary] = []
 var events: Array[Dictionary] = []
 ## unit id -> {spawned, gold, dealt, absorbed}, per side.
@@ -25,7 +25,6 @@ func sample(sim: MatchSim) -> void:
 			"xp": snappedf(s.xp, 0.1),
 			"xp_earned": snappedf(s.stat_xp_earned, 0.1),
 			"gold_earned": snappedf(s.stat_gold_earned, 0.1),
-			"momentum": snappedf(s.momentum, 0.1),
 			"army": snappedf(s.army_value(), 0.1),
 			"units": s.units.size(),
 			"age": s.age,

@@ -25,6 +25,10 @@ func _init() -> void:
 		_check(a.base_max_hp > 0, tag + " base HP")
 		_check(a.index == 1 or a.evolve_cost > 0, tag + " evolve cost")
 		_check(a.ability != null and a.ability.age == a.index, tag + " ability")
+		if a.ability != null:
+			var ab := a.ability
+			_check(ab.shape in ["area", "strip", "sweep"] and ab.xp_cost > 0 and ab.pulses >= 1 and ab.damage > 0, tag + " skill shape/cost/pulses/damage")
+			_check(ab.shape == "sweep" or ab.width > 0, tag + " skill width")
 		var roles := {}
 		for u in a.units:
 			var ut := "unit %s" % u.id
@@ -35,7 +39,6 @@ func _init() -> void:
 			roles[u.role] = true
 			for f in ["cost", "train_time", "hp", "damage", "attack_interval", "range", "speed"]:
 				_check(float(u.get(f)) > 0.0, "%s %s > 0" % [ut, f])
-			_check(u.momentum_on_kill > 0, ut + " momentum_on_kill")
 			_check(u.min_range < u.range, ut + " min_range < range")
 			_check(r.damage_matrix.has(u.damage_type), ut + " damage type in matrix")
 		_check(roles.has("vanguard") and roles.has("ranged") and roles.has("heavy"), tag + " core roles")

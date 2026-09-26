@@ -11,7 +11,7 @@ import argparse, json, os, subprocess, sys, tempfile, time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 GODOT = os.environ.get("GODOT", os.path.join(ROOT, "tools", "godot"))
-PERSONALITIES = ["tactician", "rusher", "turtle", "economist", "fast_age", "strong_age",
+PERSONALITIES = ["tactician", "rusher", "turtle", "economist", "fast_age", "skill_heavy",
                  "spam_vanguard", "spam_ranged", "spam_heavy", "spam_siege"]
 
 # name, kind, target, start value, step multipliers (for scale) or candidate values (for set)
@@ -42,7 +42,7 @@ def loss(m):
     l += band(min(m["median_age6"], 1200), 600, 720, 60) + band(m["age6_reached"], 0.5, 1.0, 0.1)
     l += sum(band(v, 0.4, 0.6, 0.05) for v in m["personality"].values())
     l += 0.5 * sum(band(v, 0.3, 0.7, 0.05) for v in m["pairs"].values())
-    l += band(m["fast_vs_strong"], 0.4, 0.6, 0.05)
+    l += band(m["fast_vs_skill"], 0.4, 0.6, 0.05)
     l += sum(band(v, 0.0, 0.29, 0.05) for v in m["spam"].values())
     l += band(m["turtle_escalation"], 0, 0.25, 0.05) + band(m["turtle_longest"], 0, 1080, 60)
     return l

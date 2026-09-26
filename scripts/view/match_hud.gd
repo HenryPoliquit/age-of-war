@@ -26,7 +26,6 @@ var _cards: Array[UnitCard] = []
 var _queue: QueueStrip
 var _gold: Label
 var _xp: Label
-var _momentum: Meter
 var _ability: Button
 var _evolve: Button
 var _evolve_meter: Meter
@@ -216,11 +215,7 @@ func _build_commands() -> void:
 	_xp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var row1 := HBoxContainer.new()
 	v.add_child(row1)
-	_momentum = Meter.new()
-	_momentum.col = Color("ff7a5a")
-	_momentum.custom_minimum_size = Vector2(180, 38)
-	row1.add_child(_momentum)
-	_ability = _btn(row1, "", func(): view.begin_aim())
+	_ability = _btn(row1, "", func(): feedback(sim.fire_ability(0)))
 	_ability.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_ability.custom_minimum_size = Vector2(0, 38)
 	var row2 := HBoxContainer.new()
@@ -362,10 +357,8 @@ func _process(delta: float) -> void:
 	_gold.modulate = Color(1, 0.45, 0.45) if _flash > 0.0 else Color.WHITE
 	_flash = maxf(0.0, _flash - delta)
 	_xp.text = "%d XP" % me.xp
-	_momentum.value = me.momentum / sim.rules.momentum_cap
-	_momentum.text = "Momentum %d" % me.momentum
 	var ab := sim.data.age(me.age).ability
-	_ability.text = "⚡ %s  [Space]%s" % [view.race_def(0).ability_name(ab), "" if me.ability_cooldown <= 0 else "   %ds" % ceili(me.ability_cooldown)]
+	_ability.text = "⚡ %s  %d XP  [Space]%s" % [view.race_def(0).ability_name(ab), ab.xp_cost, "" if me.ability_cooldown <= 0 else "   %ds" % ceili(me.ability_cooldown)]
 	_ability.disabled = not sim.can_fire_ability(0)
 	if me.age >= GameData.AGE_COUNT:
 		_evolve.text = "Final age"

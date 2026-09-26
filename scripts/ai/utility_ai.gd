@@ -50,7 +50,7 @@ func _decide(sim: MatchSim) -> void:
 		_hp_loss_rate = lerpf(_hp_loss_rate, lost, 0.5)
 	_hp_seen = s.base_hp
 	var pressure := _under_pressure(sim)
-	_try_ability(sim)
+	_try_ability(sim, pressure)
 	_spend_xp(sim, pressure)
 	_spend_gold(sim, pressure)
 
@@ -289,62 +289,26 @@ func _apply_counters(sim: MatchSim, weights: Dictionary) -> void:
 
 
 # ---------------------------------------------------------------------------
-# Abilities
+# Skills
 
-func _try_ability(sim: MatchSim) -> void:
+func _try_ability(sim: MatchSim, pressure: bool) -> void:
 	if not sim.can_fire_ability(side):
 		return
-	var s := sim.sides[side]
-	var def := sim.data.age(s.age).ability
-	if def.affects == "ally":
-		# Shieldwall: cover our most engaged group, only when a fight is on.
-		var enemy_front := sim._front_unit(sim.enemy_of(side))
-		if enemy_front == null or s.units.is_empty():
+	var value := sim.ability_zone_value(side)
+	if value <= 0.0:
+		return
+	if not personality.skill_eager and not pressure:
+		if value < difficulty.skill_min_value * sim.rules.age_cost_mult(sim.sides[side].age):
 			return
-		var x := _best_window(sim, side, def.width, false)
-		if not is_nan(x):
-			sim.fire_ability(side, x)
-		return
-	var enemy_side := sim.enemy_of(side)
-	if sim.sides[enemy_side].units.is_empty():
-		return
-	var x := NAN
-	match difficulty.aim_level:
-		0:
-			var u := sim.sides[enemy_side].units[rng.randi_range(0, sim.sides[enemy_side].units.size() - 1)]
-			x = sim.to_world(enemy_side, u.progress) + rng.randf_range(-def.width * 0.5, def.width * 0.5)
-		1:
-			x = _best_window(sim, enemy_side, def.width, false)
-		_:
-			x = _best_window(sim, enemy_side, def.width, true)
-			# Timed: hold the ability for a worthwhile target unless under pressure.
-			var value := _window_value(sim, enemy_side, x, def.width, true)
-			if value < sim.income_rate(side) * 20.0 and not _under_pressure(sim):
-				return
-	if not is_nan(x):
-		sim.fire_ability(side, x)
+		if _evolve_soon(sim):
+			return
+	sim.fire_ability(side)
 
 
-## Centre of the window of `width` holding the most units (or the most gold of units) of `of_side`.
-func _best_window(sim: MatchSim, of_side: int, width: float, by_value: bool) -> float:
-	var best := NAN
-	var best_v := 0.0
-	for u in sim.sides[of_side].units:
-		var start := sim.to_world(of_side, u.progress)
-		# Try windows that start at this unit, extending in both directions.
-		for centre in [start + width * 0.5, start - width * 0.5]:
-			var v := _window_value(sim, of_side, centre, width, by_value)
-			if v > best_v:
-				best_v = v
-				best = centre
-	return best
-
-
-func _window_value(sim: MatchSim, of_side: int, centre: float, width: float, by_value: bool) -> float:
-	if is_nan(centre):
-		return 0.0
-	var v := 0.0
-	for u in sim.sides[of_side].units:
-		if absf(sim.to_world(of_side, u.progress) - centre) <= width * 0.5:
-			v += u.cost_paid if by_value else 1.0
-	return v
+## True if an evolution is due within ~10 s at the current XP rate (spending XP on a skill would delay it).
+func _evolve_soon(sim: MatchSim) -> bool:
+	var s := sim.sides[side]
+	if s.age >= GameData.AGE_COUNT or s.is_evolving():
+		return false
+	var rate := s.stat_xp_earned / maxf(sim.time, 1.0)
+	return (sim.evolve_cost(side) - s.xp) / maxf(rate, 0.01) <= 10.0

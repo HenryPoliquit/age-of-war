@@ -39,7 +39,7 @@ func test_allies_do_not_overlap() -> void:
 	check(back.progress <= front.progress - sim.rules.unit_spacing + 0.01, "spacing held")
 
 
-func test_base_damage_gives_xp_and_defender_momentum() -> void:
+func test_base_damage_gives_xp() -> void:
 	var sim := new_sim(false)
 	place(sim, 0, "vanguard", sim.rules.lane_length - 10.0)
 	run_for(sim, 1.0)
@@ -47,7 +47,6 @@ func test_base_damage_gives_xp_and_defender_momentum() -> void:
 	check(r.base_hp < r.base_max_hp, "base hit")
 	var dmg := r.base_max_hp - r.base_hp
 	check_near(sim.sides[0].xp, dmg * 0.1, 0.01, "1 XP per 10 damage")
-	check_near(r.momentum, dmg / r.base_max_hp * 100.0 * 0.5, 0.01, "1 momentum per 2% lost")
 
 
 func test_only_siege_damages_turrets() -> void:

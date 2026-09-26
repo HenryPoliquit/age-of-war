@@ -13,7 +13,7 @@ var lights: LightPool
 var particles: Array[Dictionary] = []
 var projectiles: Array[Dictionary] = []
 var decals: Array[Dictionary] = []
-var actors: Array[Dictionary] = []    # stampede beasts, lasting domes, beams
+var actors: Array[Dictionary] = []    # stampede beasts, beams
 var scheduled: Array[Dictionary] = [] # {at, fn: Callable}
 var glow: Node2D
 var rng := RandomNumberGenerator.new()
@@ -167,9 +167,13 @@ func ability_pulse(ability: String, lo: float, hi: float, side: int, team: Color
 			for k in 10:
 				burst("smoke", Vector2(rng.randf_range(lo, hi), GROUND_Y), 2, Color(0.7, 0.58, 0.42, 0.55), Vector2(20, 80), Vector2(0.6, 1.1), Vector2(10, 22), -20.0)
 			view.add_shake(8.0)
-		"shieldwall":
-			actors.append({"kind": "dome", "lo": lo, "hi": hi, "born": now(), "life": 8.0, "col": team})
-			ring(Vector2((lo + hi) * 0.5, GROUND_Y - 30), (hi - lo) * 0.6, Color(team.lightened(0.5), 0.6), 0.5, 6.0)
+		"rockfall":
+			for i in 7:
+				var x := rng.randf_range(lo, hi)
+				var to := Vector2(x, GROUND_Y - rng.randf_range(2, 16))
+				var from := to + Vector2(rng.randf_range(-40, 40), -rng.randf_range(560, 680))
+				later(rng.randf_range(0.0, 0.25), func(): shoot("stone", from, to, "blast", func(): impact("blast", to, true)))
+			view.add_shake(6.0)
 		"volley":
 			var kind: String = VOLLEY_SHOT.get(race, "arrow")
 			for i in 22:
@@ -337,17 +341,6 @@ func _draw_actor(a: Dictionary, t: float) -> void:
 			UnitArt.begin(self, Transform2D(0.0, Vector2(dir * 0.9, 0.9), 0.0, Vector2(a.x, a.y)))
 			UnitArt.quadruped(self, a.get("beast", "boar"), Color("5b4130"), {"moving": true, "walk": t * 26.0 + a.y, "t": t}, 0)
 			draw_set_transform(Vector2.ZERO)
-		"dome":
-			var c: Color = a.col.lightened(0.5)
-			var fade := minf(1.0, (1.0 - u) * 6.0)
-			var cx: float = (a.lo + a.hi) * 0.5
-			var rx: float = (a.hi - a.lo) * 0.5
-			var pts := PackedVector2Array()
-			for i in 25:
-				var ang := PI + PI * i / 24.0
-				pts.append(Vector2(cx + cos(ang) * rx, GROUND_Y + sin(ang) * 110.0))
-			draw_colored_polygon(pts, Color(c, 0.08 * fade))
-			draw_polyline(pts, Color(c, 0.55 * fade), 2.0)
 		"beam":
 			pass
 
@@ -403,12 +396,14 @@ func _draw_glow() -> void:
 	# Telegraphs for pending abilities (GDD §13.4: ground decal before every ability).
 	for e in view.sim.effects:
 		var def: AbilityDef = e.def
-		if e.pulse > 0 and not def.sweep:
+		if e.pulse > 0 and def.shape != "sweep":
 			continue
 		var c := view.team_color(e.side).lightened(0.4)
 		var pulse := 0.5 + 0.5 * sin(t * 18.0)
-		var lo: float = e.center - def.width * 0.5
-		glow.draw_rect(Rect2(lo, GROUND_Y - 4, def.width, 14), Color(c, 0.25 + 0.2 * pulse))
+		var lo: float = e.lo
+		var hi: float = e.hi
+		var mid := (lo + hi) * 0.5
+		glow.draw_rect(Rect2(lo, GROUND_Y - 4, hi - lo, 14), Color(c, 0.25 + 0.2 * pulse))
 		if def.id == &"starfall":
-			glow.draw_arc(Vector2(e.center, GROUND_Y), 40.0 + 20.0 * pulse, 0, TAU, 40, Color(c, 0.8), 2.0)
-			glow.draw_line(Vector2(e.center, -400), Vector2(e.center, GROUND_Y), Color(c, 0.35 * pulse), 2.0)
+			glow.draw_arc(Vector2(mid, GROUND_Y), 40.0 + 20.0 * pulse, 0, TAU, 40, Color(c, 0.8), 2.0)
+			glow.draw_line(Vector2(mid, -400), Vector2(mid, GROUND_Y), Color(c, 0.35 * pulse), 2.0)
