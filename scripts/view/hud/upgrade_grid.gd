@@ -43,6 +43,7 @@ func _init(p_hud: MatchHud) -> void:
 				continue
 			var stat: String = stats[c]
 			var b := Button.new()
+			b.focus_mode = Control.FOCUS_NONE
 			b.custom_minimum_size = Vector2(150, 32)
 			b.alignment = HORIZONTAL_ALIGNMENT_CENTER
 			b.add_theme_font_size_override("font_size", 14)

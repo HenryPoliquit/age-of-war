@@ -4,8 +4,10 @@ extends PanelContainer
 ## era's turrets to build or a Sell option; clicking the next locked slot unlocks it.
 
 var hud: MatchHud
+## The build/sell menu. A plain panel, not a popup Window: a Window would take every click and key
+## (no camera drag, no hotkeys) until closed. It closes on any click outside it.
+var menu: PanelContainer
 var _slots: Array[Button] = []
-var _popup: PopupPanel
 var _options: VBoxContainer
 
 
@@ -24,6 +26,7 @@ func _init(p_hud: MatchHud) -> void:
 	add_child(row)
 	for i in 4:
 		var b := Button.new()
+		b.focus_mode = Control.FOCUS_NONE
 		b.custom_minimum_size = Vector2(104, 96)
 		b.alignment = HORIZONTAL_ALIGNMENT_CENTER
 		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -31,11 +34,13 @@ func _init(p_hud: MatchHud) -> void:
 		b.pressed.connect(func(): open_menu(i))
 		row.add_child(b)
 		_slots.append(b)
-	_popup = PopupPanel.new()
+	menu = PanelContainer.new()
+	menu.top_level = true
+	menu.visible = false
 	_options = VBoxContainer.new()
 	_options.add_theme_constant_override("separation", 4)
-	_popup.add_child(_options)
-	add_child(_popup)
+	menu.add_child(_options)
+	add_child(menu)
 
 
 func open_menu(i: int) -> void:
@@ -43,9 +48,11 @@ func open_menu(i: int) -> void:
 	var st := HudModel.slot_state(sim, 0, i, hud.view.race_def(0))
 	match st.kind:
 		"unlock":
+			menu.visible = false
 			hud.feedback(sim.unlock_slot(0))
 			return
 		"locked":
+			menu.visible = false
 			hud.feedback(false)
 			return
 	for c in _options.get_children():
@@ -60,20 +67,30 @@ func open_menu(i: int) -> void:
 			_add_option(o.text, o.enabled, func(): hud.feedback(sim.build_turret(0, i, def)))
 	# Open like a drop-down, directly above the clicked slot, kept on screen.
 	var r := _slots[i].get_global_rect()
-	_popup.reset_size()
-	var sz := Vector2(_popup.get_contents_minimum_size())
+	var sz := menu.get_combined_minimum_size()
 	var pos := Vector2(r.position.x + r.size.x * 0.5 - sz.x * 0.5, r.position.y - sz.y - 6.0)
-	pos.x = clampf(pos.x, 4.0, get_viewport_rect().size.x - sz.x - 4.0)
-	_popup.popup(Rect2i(Vector2i(pos), Vector2i(sz)))
+	if is_inside_tree():
+		pos.x = clampf(pos.x, 4.0, get_viewport_rect().size.x - sz.x - 4.0)
+	menu.size = sz
+	menu.global_position = pos
+	menu.visible = true
+
+
+## Any mouse press outside the menu closes it; the press is not consumed, so it still pans the camera,
+## hits a slot (which reopens the menu there) and so on.
+func _input(e: InputEvent) -> void:
+	if menu.visible and e is InputEventMouseButton and e.pressed and not menu.get_global_rect().has_point(e.position):
+		menu.visible = false
 
 
 func _add_option(text: String, enabled: bool, cb: Callable) -> void:
 	var b := Button.new()
+	b.focus_mode = Control.FOCUS_NONE
 	b.text = text
 	b.disabled = not enabled
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	b.pressed.connect(func():
-		_popup.hide()
+		menu.visible = false
 		cb.call())
 	_options.add_child(b)
 

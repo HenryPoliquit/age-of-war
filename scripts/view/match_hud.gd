@@ -93,6 +93,7 @@ func _label(parent: Control, text := "", size := 16, col := UiStyle.TEXT, title 
 
 func _btn(parent: Control, text: String, cb: Callable) -> Button:
 	var b := Button.new()
+	b.focus_mode = Control.FOCUS_NONE
 	b.text = text
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	b.pressed.connect(cb)

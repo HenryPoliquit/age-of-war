@@ -71,6 +71,7 @@ func _init(p_hud: MatchHud) -> void:
 	right.add_theme_constant_override("separation", 10)
 	row.add_child(right)
 	upgrades_button = Button.new()
+	upgrades_button.focus_mode = Control.FOCUS_NONE
 	upgrades_button.text = "⬆ Upgrades"
 	upgrades_button.toggle_mode = true
 	upgrades_button.tooltip_text = "Show or hide the upgrade grid"
@@ -89,6 +90,7 @@ func _init(p_hud: MatchHud) -> void:
 
 func _small(parent: Control, text: String, tip: String, cb: Callable) -> Button:
 	var b := Button.new()
+	b.focus_mode = Control.FOCUS_NONE
 	b.text = text
 	b.tooltip_text = tip
 	b.alignment = HORIZONTAL_ALIGNMENT_CENTER

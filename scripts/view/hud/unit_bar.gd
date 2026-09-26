@@ -22,6 +22,7 @@ func _init(p_hud: MatchHud) -> void:
 	add_child(row)
 	for i in 4:
 		var c := UnitCard.new()
+		c.focus_mode = Control.FOCUS_NONE
 		c.hud = hud
 		c.index = i
 		c.custom_minimum_size = CARD
