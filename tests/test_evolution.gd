@@ -38,13 +38,20 @@ func test_turrets_do_not_upgrade() -> void:
 
 func test_turret_slots_and_sell() -> void:
 	var sim := new_sim()
+	check_eq(sim.sides[0].turret_slots, 1, "one free slot")
 	check_near(sim.slot_cost(0), 150.0, 0.01)
 	check(sim.unlock_slot(0))
 	check_near(sim.slot_cost(0), 400.0, 0.01)
 	check(sim.unlock_slot(0))
+	check_near(sim.slot_cost(0), 700.0, 0.01)
+	check(sim.unlock_slot(0))
 	check(not sim.unlock_slot(0), "4 slots max")
+	check(sim.slot_cost(0) == INF)
 	var def := sim.data.turret_for_kind(1, "sentry")
+	check(not sim.build_turret(0, 4, def), "no fifth slot")
 	sim.build_turret(0, 0, def)
 	var g := sim.sides[0].gold
 	check(sim.sell_turret(0, 0))
 	check_near(sim.sides[0].gold - g, def.cost * 0.5, 0.01)
+	sim.sides[1].age = 3
+	check_near(sim.slot_cost(1), roundf(150.0 * sim.rules.age_cost_mult(3)), 0.01, "scales with age")

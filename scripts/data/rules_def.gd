@@ -13,7 +13,7 @@ extends Resource
 
 @export_group("Start")
 @export var start_gold: float = 150.0
-@export var start_turret_slots: int = 2
+@export var start_turret_slots: int = 1
 
 @export_group("Economy")
 @export var base_income: float = 2.0
@@ -34,8 +34,9 @@ extends Resource
 @export var evolve_time: float = 5.0
 
 @export_group("Turrets")
-## Cost to unlock slot N (index = slot number − 1). Multiplied by the age cost multiplier.
-@export var turret_slot_costs: PackedInt32Array = PackedInt32Array([0, 0, 150, 400, 700])
+## Cost to unlock slot N (index N − 1; slot 1 is free). The array length is the slot maximum.
+## Multiplied by the age cost multiplier.
+@export var turret_slot_costs: PackedInt32Array = PackedInt32Array([0, 150, 400, 700])
 @export var sell_refund: float = 0.5
 ## Turrets and the base share the gate; units must be this close to hit them.
 @export var structure_offset: float = 0.0

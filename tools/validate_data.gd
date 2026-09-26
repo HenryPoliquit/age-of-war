@@ -13,7 +13,8 @@ func _init() -> void:
 	for i in range(1, r.tide_start_times.size()):
 		_check(r.tide_start_times[i] > r.tide_start_times[i - 1], "tide times increase")
 		_check(r.tide_multipliers[i] > r.tide_multipliers[i - 1], "tide multipliers increase")
-	_check(r.turret_slot_costs.size() >= 5, "turret slot costs for 5 slots")
+	_check(r.turret_slot_costs.size() == 4 and r.turret_slot_costs[0] == 0, "4 turret slots, the first free")
+	_check(r.start_turret_slots == 1, "one slot at start")
 	for dt in ["slash", "pierce", "blast", "siege"]:
 		for arm in ["light", "heavy", "structure"]:
 			_check(r.damage_matrix.has(dt) and r.damage_matrix[dt].has(arm), "matrix %s/%s" % [dt, arm])

@@ -7,8 +7,8 @@ var gold: float = 0.0
 var xp: float = 0.0
 var age: int = 1
 var forge_level: int = 0
-var turret_slots: int = 2
-var turrets: Array = [null, null, null, null, null]
+var turret_slots: int = 1
+var turrets: Array = [null, null, null, null]
 var base_hp: float = 1000.0
 var base_max_hp: float = 1000.0
 var queue: Array[UnitDef] = []
@@ -33,10 +33,6 @@ var stat_xp_earned: float = 0.0
 
 func is_evolving() -> bool:
 	return evolve_left > 0.0
-
-
-func max_turret_slots() -> int:
-	return 4
 
 
 func turret_count() -> int:

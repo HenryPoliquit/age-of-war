@@ -113,9 +113,14 @@ func forge_cost(side: int) -> float:
 
 func slot_cost(side: int) -> float:
 	var s := sides[side]
-	if s.turret_slots >= s.max_turret_slots():
+	if s.turret_slots >= max_turret_slots():
 		return INF
 	return roundf(rules.turret_slot_costs[s.turret_slots] * rules.age_cost_mult(s.age))
+
+
+
+func max_turret_slots() -> int:
+	return rules.turret_slot_costs.size()
 
 
 func income_rate(side: int) -> float:

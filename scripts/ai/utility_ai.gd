@@ -148,7 +148,7 @@ func _structural_want(sim: MatchSim, pressure: bool) -> Dictionary:
 	if turret_time and s.turret_count() < personality.turret_target:
 		var slot := sim.first_free_slot(side)
 		if slot == -1:
-			if s.turret_slots < s.max_turret_slots():
+			if s.turret_slots < sim.max_turret_slots():
 				return {"kind": "slot", "cost": sim.slot_cost(side)}
 		else:
 			var def := _best_turret(sim)

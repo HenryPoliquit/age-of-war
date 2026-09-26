@@ -247,7 +247,7 @@ func _build_commands() -> void:
 	var row4 := HBoxContainer.new()
 	row4.add_theme_constant_override("separation", 6)
 	v.add_child(row4)
-	for i in 5:
+	for i in 4:
 		var b := Button.new()
 		b.custom_minimum_size = Vector2(98, 40)
 		b.clip_text = true
@@ -376,10 +376,9 @@ func _process(delta: float) -> void:
 	_forge.disabled = me.gold < sim.forge_cost(0)
 	for i in 3:
 		_speed_buttons[i].button_pressed = view.speed_index == i
-	for i in 5:
+	for i in 4:
 		var b := _slots[i]
-		b.visible = i < me.max_turret_slots()
-		var key := "QWER"[i] if i < 4 else "–"
+		var key := "QWER"[i]
 		if i < me.turret_slots:
 			var t: SimTurret = me.turrets[i]
 			if t == null:
