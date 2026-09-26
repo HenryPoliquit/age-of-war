@@ -18,12 +18,10 @@ var _root: Control
 var _theme: Theme
 var _top: TopBar
 var _grid: UpgradeGrid
+var _turrets: TurretBar
 var _minimap: Minimap
 var _cards: Array[UnitCard] = []
 var _queue: QueueStrip
-var _slots: Array[Button] = []
-var _slot_menu: PopupMenu
-var _slot_menu_index := -1
 var _banner: Label
 var _banner_sub: Label
 var _banner_t := -10.0
@@ -42,17 +40,17 @@ func _ready() -> void:
 	_root.add_child(_top)
 	_build_minimap()
 	_build_cards()
-	_build_commands()
+	_turrets = TurretBar.new(self)
+	_root.add_child(_turrets)
 	_build_banner()
 	_grid = UpgradeGrid.new(self)
 	_root.add_child(_grid)
 	_top.upgrades_button.toggled.connect(func(on: bool): _grid.visible = on)
 	# Dev aid for screenshots: open the HUD's pop-ups without clicking.
 	if "--hud-demo" in OS.get_cmdline_user_args():
-		get_tree().create_timer(2.0).timeout.connect(func(): _top.upgrades_button.button_pressed = true)
-	_slot_menu = PopupMenu.new()
-	_slot_menu.id_pressed.connect(_on_slot_menu)
-	_root.add_child(_slot_menu)
+		get_tree().create_timer(2.0).timeout.connect(func():
+			_top.upgrades_button.button_pressed = true
+			_turrets.open_menu(0))
 
 
 # ---------------------------------------------------------------------------
@@ -136,32 +134,6 @@ func _build_cards() -> void:
 	v.add_child(_queue)
 
 
-func _build_commands() -> void:
-	var p := _panel(_root)
-	p.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	p.offset_left = -560
-	p.offset_right = -12
-	p.offset_top = -150
-	p.offset_bottom = -12
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 6)
-	p.add_child(v)
-	var tl := _label(v, "Turrets — click an empty slot to build, a turret to sell (Q W E R)", 13, Color(1, 1, 1, 0.6))
-	tl.autowrap_mode = TextServer.AUTOWRAP_WORD
-	var row4 := HBoxContainer.new()
-	row4.add_theme_constant_override("separation", 6)
-	v.add_child(row4)
-	for i in 4:
-		var b := Button.new()
-		b.custom_minimum_size = Vector2(98, 40)
-		b.clip_text = true
-		b.alignment = HORIZONTAL_ALIGNMENT_CENTER
-		b.add_theme_font_size_override("font_size", 13)
-		b.pressed.connect(func(): slot_pressed(i))
-		row4.add_child(b)
-		_slots.append(b)
-
-
 func _build_banner() -> void:
 	var v := VBoxContainer.new()
 	v.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
@@ -215,27 +187,7 @@ func open_settings() -> void:
 
 
 func slot_pressed(i: int) -> void:
-	var s := sim.sides[0]
-	if i >= s.turret_slots:
-		if i == s.turret_slots:
-			feedback(sim.unlock_slot(0))
-		return
-	if s.turrets[i] != null:
-		feedback(sim.sell_turret(0, i))
-		return
-	_slot_menu.clear()
-	var roster := sim.turret_roster(0)
-	for j in roster.size():
-		var t := roster[j]
-		_slot_menu.add_item("%s (%s) — %d g" % [view.race_def(0).turret_name(t), t.kind.capitalize(), t.cost], j)
-		_slot_menu.set_item_disabled(j, s.gold < t.cost)
-	_slot_menu_index = i
-	_slot_menu.position = Vector2i(get_viewport().get_mouse_position()) - Vector2i(0, 40 + roster.size() * 28)
-	_slot_menu.popup()
-
-
-func _on_slot_menu(id: int) -> void:
-	feedback(sim.build_turret(0, _slot_menu_index, sim.turret_roster(0)[id]))
+	_turrets.open_menu(i)
 
 
 # ---------------------------------------------------------------------------
@@ -247,29 +199,13 @@ func _process(delta: float) -> void:
 	var me := sim.sides[0]
 	_top.refresh()
 	_grid.refresh()
+	_turrets.refresh()
 	_flash = maxf(0.0, _flash - delta)
 	for c in _cards:
 		c.queue_redraw()
 		c.refresh()
 	_queue.queue_redraw()
 	_minimap.queue_redraw()
-	for i in 4:
-		var b := _slots[i]
-		var key := "QWER"[i]
-		if i < me.turret_slots:
-			var t: SimTurret = me.turrets[i]
-			if t == null:
-				b.text = "%s  + Build" % key
-				b.tooltip_text = "Empty slot — build a turret"
-			else:
-				b.text = "%s  %s" % [key, view.race_def(0).turret_name(t.def)]
-				b.tooltip_text = "%s (Age %d) — click to sell for %d g%s" % [view.race_def(0).turret_name(t.def), t.def.age, roundi(t.def.cost * sim.rules.sell_refund), "\nOutclassed: replace it" if t.def.age < me.age else ""]
-			b.modulate = Color(1, 0.75, 0.6) if t != null and t.def.age < me.age else Color.WHITE
-		elif i == me.turret_slots:
-			b.text = "🔒 %dg" % sim.slot_cost(0)
-			b.tooltip_text = "Unlock turret slot"
-		else:
-			b.text = "🔒"
 	var bt := view.anim_time - _banner_t
 	var bv: Control = _banner.get_parent()
 	bv.modulate.a = clampf(minf(bt / 0.15, (2.6 - bt) / 0.6), 0.0, 1.0)
