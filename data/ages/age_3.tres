@@ -1,7 +1,6 @@
 [gd_resource type="Resource" script_class="AgeDef" format=3]
 
 [ext_resource type="Resource" path="res://data/abilities/volley.tres" id="1_vikgj"]
-[ext_resource type="Script" path="res://scripts/data/doctrine_def.gd" id="2_saq5i"]
 [ext_resource type="Script" path="res://scripts/data/age_def.gd" id="3_5cf3f"]
 [ext_resource type="Script" path="res://scripts/data/turret_def.gd" id="4_vcips"]
 [ext_resource type="Resource" path="res://data/turrets/iron_sentry.tres" id="5_ktpy0"]

@@ -6,7 +6,6 @@ const AGE_COUNT := 6
 
 var rules: RulesDef
 var ages: Array[AgeDef] = []
-var doctrines: Dictionary = {}      # StringName -> DoctrineDef
 var personalities: Dictionary = {}  # StringName -> AiPersonalityDef
 var difficulties: Dictionary = {}   # StringName -> AiDifficultyDef
 var races: Dictionary = {}          # StringName -> RaceDef
@@ -25,8 +24,6 @@ static func load_from(root: String) -> GameData:
 	gd.rules = load(root + "/rules.tres")
 	for i in range(1, AGE_COUNT + 1):
 		gd.ages.append(load("%s/ages/age_%d.tres" % [root, i]))
-	for r in _load_dir(root + "/doctrines"):
-		gd.doctrines[r.id] = r
 	for r in _load_dir(root + "/ai/personalities"):
 		gd.personalities[r.id] = r
 	for r in _load_dir(root + "/ai/difficulties"):

@@ -51,8 +51,6 @@ func _init() -> void:
 				_check(t.aura_radius > 0 and t.aura_slow > 0, tt + " aura")
 			else:
 				_check(t.damage > 0 and t.attack_interval > 0 and t.range > t.min_range, tt + " attack stats")
-		for d in a.doctrine_options:
-			_check(d.pick_age == a.index, "doctrine %s pick_age" % d.id)
 	# Races are cosmetic (GDD §5.7): every slot needs a name in every race.
 	_check(gd.races.has(&"human"), "human race exists (fallback)")
 	for rid in gd.races:
@@ -67,8 +65,6 @@ func _init() -> void:
 	for id in gd.personalities:
 		var p: AiPersonalityDef = gd.personalities[id]
 		_check(p.age_plan in ["balanced", "fast", "strong"], "personality %s age_plan" % id)
-		for pref in p.doctrine_prefs:
-			_check(gd.doctrines.has(pref), "personality %s doctrine pref %s exists" % [id, pref])
 	for id in gd.difficulties:
 		var d: AiDifficultyDef = gd.difficulties[id]
 		_check(d.decision_interval > 0, "difficulty %s interval" % id)

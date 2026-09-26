@@ -3,9 +3,9 @@ extends RefCounted
 ## Runs batches of headless AI-vs-AI matches, optionally across worker processes, and returns
 ## JSON-safe results. Shared by the balance harness and the experiment tool.
 ##
-## Job: {suite, left, right, left_diff, right_diff, seed, random_doctrines, left_docs, right_docs, pair_a}
+## Job: {suite, left, right, left_diff, right_diff, seed, pair_a, start_age}
 ## Temporary data overrides (applied in every worker, never saved):
-##   --set=rules.forge_income_bonus=0.1          --set=doctrines/horde.unit_cost_mult=0.75
+##   --set=rules.forge_income_bonus=0.1          --set=rules.bounty_fraction=0.4
 ##   --scale=units:role=heavy.hp=0.9             --scale=turrets:kind=sentry.damage=0.8
 ##   --scale=ages:index=*.base_max_hp=1.5
 
@@ -48,13 +48,10 @@ static func apply_overrides(args: PackedStringArray, data: GameData) -> Array[St
 
 
 static func run_job(data: GameData, job: Dictionary) -> Dictionary:
-	var left := {"personality": StringName(job.left), "difficulty": StringName(job.get("left_diff", "hard")), "doctrines": job.get("left_docs", [])}
-	var right := {"personality": StringName(job.right), "difficulty": StringName(job.get("right_diff", "hard")), "doctrines": job.get("right_docs", [])}
-	var r := MatchRunner.run(data, left, right, int(job.seed), job.get("random_doctrines", false), int(job.get("start_age", 1)))
+	var left := {"personality": StringName(job.left), "difficulty": StringName(job.get("left_diff", "hard"))}
+	var right := {"personality": StringName(job.right), "difficulty": StringName(job.get("right_diff", "hard"))}
+	var r := MatchRunner.run(data, left, right, int(job.seed), int(job.get("start_age", 1)))
 	var log: MatchLog = r.log
-	var docs := []
-	for side_docs in r.doctrines:
-		docs.append(side_docs.map(func(d): return String(d)))
 	var units := {}
 	for side_stats in log.unit_stats:
 		for id in side_stats:
@@ -74,7 +71,6 @@ static func run_job(data: GameData, job: Dictionary) -> Dictionary:
 		"escalated": r.escalated,
 		"age_times": [Array(r.age_times[0]), Array(r.age_times[1])],
 		"final_ages": r.final_ages,
-		"doctrines": docs,
 		"units": units,
 		"deaths": Array(log.deaths),
 		"base_damage": Array(log.base_damage),

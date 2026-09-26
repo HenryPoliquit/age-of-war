@@ -160,14 +160,6 @@ func _draw_base(s: SimSide, t: float) -> void:
 	var xf := Transform2D(0.0, Vector2(dir, 1), 0.0, Vector2(gate, GROUND_Y + 4))
 	UnitArt.begin(self, xf)
 	BaseArt.draw_base(self, s.age, team, s.base_hp / s.base_max_hp, t, build, self, s.race)
-	# Doctrine banners hang on the base (GDD §9: shown so the player can counter-plan).
-	for i in s.doctrines.size():
-		var p := Vector2(-170 + i * 40, -60)
-		draw_rect(Rect2(p, Vector2(28, 40)), team.darkened(0.25))
-		draw_colored_polygon(PackedVector2Array([p + Vector2(0, 40), p + Vector2(28, 40), p + Vector2(14, 50)]), team.darkened(0.25))
-		draw_set_transform_matrix(xf * Transform2D(0.0, Vector2(dir, 1), 0.0, p + Vector2(14, 26)))
-		draw_string(_font, Vector2(-12 if dir > 0 else -12, 0), String(s.doctrines[i].display_name).left(2), HORIZONTAL_ALIGNMENT_CENTER, 24, 14, Color.WHITE)
-		draw_set_transform_matrix(xf)
 	# Turrets stand on their own towers on the ground in front of the gate (drawn behind the units).
 	# Back-row towers first so the front row overlaps them.
 	for row in [1, 0]:

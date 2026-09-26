@@ -9,7 +9,7 @@ var age: int
 var progress: float = 0.0
 var hp: float
 var max_hp: float
-## Damage before veterancy (doctrine multipliers baked in at spawn).
+## Damage per hit before veterancy.
 var base_damage: float
 var cost_paid: float
 var vet_rank: int = 0

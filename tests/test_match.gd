@@ -60,8 +60,8 @@ func test_base_destroyed_ends_match() -> void:
 
 func test_determinism() -> void:
 	var gd := GameData.get_default()
-	var a := MatchRunner.run(gd, {"personality": &"tactician"}, {"personality": &"rusher"}, 42, true)
-	var b := MatchRunner.run(gd, {"personality": &"tactician"}, {"personality": &"rusher"}, 42, true)
+	var a := MatchRunner.run(gd, {"personality": &"tactician"}, {"personality": &"rusher"}, 42)
+	var b := MatchRunner.run(gd, {"personality": &"tactician"}, {"personality": &"rusher"}, 42)
 	check_eq(a.winner, b.winner)
 	check_eq(a.duration, b.duration)
 	check_eq(JSON.stringify(a.log.to_dict()), JSON.stringify(b.log.to_dict()), "identical logs")

@@ -1,35 +1,28 @@
 extends SceneTree
 ## Quick what-if matchups for balance work. Prints win rate, lengths, escalation and age pacing.
 ##   tools/godot --headless --path . -s tools/sim/experiment.gd -- --a=tactician --b=spam_heavy --n=40
-## Options: --a=/--b= personality ids, --docs-a=horde,bastion / --docs-b=… (force doctrines),
-##          --diff-a=/--diff-b= difficulty, --random-docs, --start-age=N, --n=matches, --seed=S, --workers=K,
+## Options: --a=/--b= personality ids, --diff-a=/--diff-b= difficulty, --start-age=N, --n=matches, --seed=S, --workers=K,
 ##          plus SimJobs data overrides (--set=…, --scale=…).
 
 
 func _init() -> void:
 	var a := "tactician"
 	var b := "tactician"
-	var docs_a := []
-	var docs_b := []
 	var diff_a := "hard"
 	var diff_b := "hard"
 	var n := 40
 	var seed := 7
 	var workers := 4
-	var random_docs := false
 	var start_age := 1
 	for arg in OS.get_cmdline_user_args():
 		var v := arg.get_slice("=", 1)
 		if arg.begins_with("--a="): a = v
 		elif arg.begins_with("--b="): b = v
-		elif arg.begins_with("--docs-a="): docs_a = v.split(",")
-		elif arg.begins_with("--docs-b="): docs_b = v.split(",")
 		elif arg.begins_with("--diff-a="): diff_a = v
 		elif arg.begins_with("--diff-b="): diff_b = v
 		elif arg.begins_with("--n="): n = int(v)
 		elif arg.begins_with("--seed="): seed = int(v)
 		elif arg.begins_with("--workers="): workers = int(v)
-		elif arg == "--random-docs": random_docs = true
 		elif arg.begins_with("--start-age="): start_age = int(v)
 	var overrides := SimJobs.apply_overrides(OS.get_cmdline_user_args(), GameData.get_default())
 	var jobs := []
@@ -37,8 +30,7 @@ func _init() -> void:
 		var a_left := k % 2 == 0
 		jobs.append({"suite": "x", "left": a if a_left else b, "right": b if a_left else a,
 			"left_diff": diff_a if a_left else diff_b, "right_diff": diff_b if a_left else diff_a,
-			"left_docs": docs_a if a_left else docs_b, "right_docs": docs_b if a_left else docs_a,
-			"seed": seed * 1009 + k, "random_doctrines": random_docs, "pair_a": 0 if a_left else 1, "start_age": start_age})
+			"seed": seed * 1009 + k, "pair_a": 0 if a_left else 1, "start_age": start_age})
 	var t0 := Time.get_ticks_msec()
 	var results := SimJobs.run_all(jobs, workers, SimJobs.passthrough_args())
 	var wins := 0.0

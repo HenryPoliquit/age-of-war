@@ -14,13 +14,11 @@ var turrets: Array = [null, null, null, null, null]
 var base_hp: float = 1000.0
 var base_max_hp: float = 1000.0
 var queue: Array[UnitDef] = []
-## Gold paid for each queued unit, parallel to `queue` (doctrines change prices).
+## Gold paid for each queued unit, parallel to `queue`.
 var queue_paid: Array[float] = []
 var train_progress: float = 0.0
 ## Seconds left in the evolution transition; 0 when not evolving.
 var evolve_left: float = 0.0
-var awaiting_doctrine: bool = false
-var doctrines: Array[DoctrineDef] = []
 var stance: StringName = &"advance"
 ## Hold stance rally line, as progress from own gate.
 var rally_progress: float = 800.0
@@ -39,21 +37,11 @@ var stat_xp_earned: float = 0.0
 
 
 func is_evolving() -> bool:
-	return evolve_left > 0.0 or awaiting_doctrine
-
-
-func has_doctrine(id: StringName) -> bool:
-	for d in doctrines:
-		if d.id == id:
-			return true
-	return false
+	return evolve_left > 0.0
 
 
 func max_turret_slots() -> int:
-	var n := 4
-	for d in doctrines:
-		n += d.extra_turret_slots
-	return n
+	return 4
 
 
 func turret_count() -> int:

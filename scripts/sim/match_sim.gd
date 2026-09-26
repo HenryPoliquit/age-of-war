@@ -86,14 +86,8 @@ func is_over() -> bool:
 # ---------------------------------------------------------------------------
 # Prices and availability (shared by the HUD and the AI)
 
-func unit_price(side: int, def: UnitDef) -> float:
-	var s := sides[side]
-	var c := float(def.cost)
-	for d in s.doctrines:
-		c *= d.unit_cost_mult
-		if def.role == "siege":
-			c *= d.siege_cost_mult
-	return roundf(c)
+func unit_price(_side: int, def: UnitDef) -> float:
+	return float(def.cost)
 
 
 func roster(side: int) -> Array[UnitDef]:
@@ -280,18 +274,6 @@ func first_free_slot(side: int) -> int:
 	return -1
 
 
-func choose_doctrine(side: int, doctrine: DoctrineDef) -> bool:
-	var s := sides[side]
-	if not s.awaiting_doctrine or doctrine == null:
-		return false
-	if not doctrine in data.age(s.age + 1).doctrine_options:
-		return false
-	s.doctrines.append(doctrine)
-	s.awaiting_doctrine = false
-	_emit({"type": "doctrine", "side": side, "doctrine": String(doctrine.id)})
-	return true
-
-
 func set_stance(side: int, stance: StringName, rally_world_x: float = NAN) -> void:
 	var s := sides[side]
 	if stance != s.stance:
@@ -352,13 +334,7 @@ func _economy(s: SimSide, dt: float) -> void:
 
 
 func _evolution(s: SimSide, dt: float) -> void:
-	if s.evolve_left <= 0.0 or s.awaiting_doctrine:
-		return
-	# The doctrine choice opens as the transition starts; its timer pauses until chosen (GDD §13.5).
-	if s.evolve_left >= rules.evolve_time - 1e-6 and not data.age(s.age + 1).doctrine_options.is_empty() \
-			and _doctrine_pending(s):
-		s.awaiting_doctrine = true
-		_emit({"type": "doctrine_offer", "side": s.index, "age": s.age + 1})
+	if s.evolve_left <= 0.0:
 		return
 	s.evolve_left -= dt
 	if s.evolve_left <= 1e-6:
@@ -370,14 +346,6 @@ func _evolution(s: SimSide, dt: float) -> void:
 		s.base_hp = s.base_max_hp * pct
 		s.age_times[s.age - 1] = time
 		_emit({"type": "evolve", "side": s.index, "age": s.age})
-
-
-func _doctrine_pending(s: SimSide) -> bool:
-	var options := data.age(s.age + 1).doctrine_options
-	for d in s.doctrines:
-		if d in options:
-			return false
-	return true
 
 
 func _training(s: SimSide, dt: float) -> void:
@@ -404,16 +372,11 @@ func _spawn(s: SimSide, def: UnitDef, paid: float) -> SimUnit:
 	u.def = def
 	u.age = def.age
 	u.cost_paid = paid
-	var hp_mult := 1.0
-	var dmg_mult := 1.0
-	for d in s.doctrines:
-		hp_mult *= d.unit_hp_mult
-		dmg_mult *= d.unit_damage_mult
 	u.vet_rank = s.vet_ranks if def.age == s.age else 0
 	var vet := 1.0 + rules.veterancy_bonus * u.vet_rank
-	u.max_hp = def.hp * hp_mult * vet
+	u.max_hp = def.hp * vet
 	u.hp = u.max_hp
-	u.base_damage = def.damage * dmg_mult
+	u.base_damage = def.damage
 	s.units.append(u)
 	match_log.count_spawn(s.index, def, paid)
 	return u
@@ -538,12 +501,9 @@ func _on_kill(victim: SimUnit, by_side: int) -> void:
 
 
 func _hit_structures(u: SimUnit, enemy: SimSide) -> void:
-	var own := sides[u.side]
 	var raw := u.base_damage * u.damage_mult(rules.veterancy_bonus) * rules.matrix(u.def.damage_type, "structure")
 	raw *= 1.0 + rules.escalation_structure_bonus * escalation
 	if u.def.role == "siege":
-		for d in own.doctrines:
-			raw *= d.siege_structure_mult
 		# Only Siege reaches turrets; it knocks them out before the base (PLAN D3).
 		for t in enemy.turrets:
 			if t != null and t.alive():
@@ -587,8 +547,6 @@ func _turrets_act(s: SimSide, dt: float) -> void:
 		if t.cooldown > 0.0:
 			continue
 		var mult := 1.0 - rules.escalation_turret_penalty * escalation
-		for d in s.doctrines:
-			mult *= d.turret_damage_mult
 		var raw: float = t.def.damage * mult
 		if t.def.kind == "sentry":
 			# Enemy unit closest to our base = the most advanced enemy.

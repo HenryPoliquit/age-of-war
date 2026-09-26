@@ -8,10 +8,6 @@ var personality: AiPersonalityDef
 var difficulty: AiDifficultyDef
 var side: int
 var rng := RandomNumberGenerator.new()
-## Harness override: when true, doctrine picks are random instead of personality preferences.
-var random_doctrines := false
-## Harness override: doctrine ids to pick whenever offered (wins over everything else).
-var forced_doctrines: Array = []
 
 var _timer := 0.0
 var _released_hold := false
@@ -41,10 +37,6 @@ func setup(sim: MatchSim) -> void:
 
 
 func update(sim: MatchSim, dt: float) -> void:
-	var s := sim.sides[side]
-	# The AI "chooses instantly" (GDD §13.5), independent of its decision interval.
-	if s.awaiting_doctrine:
-		sim.choose_doctrine(side, _pick_doctrine(sim))
 	_timer -= dt
 	if _timer > 0.0:
 		return
@@ -65,27 +57,6 @@ func _decide(sim: MatchSim) -> void:
 	_spend_xp(sim, pressure)
 	_manage_stance(sim, pressure)
 	_spend_gold(sim, pressure)
-
-
-func _pick_doctrine(sim: MatchSim) -> DoctrineDef:
-	var s := sim.sides[side]
-	var options := sim.data.age(s.age + 1).doctrine_options
-	for d in options:
-		if String(d.id) in forced_doctrines.map(func(x): return String(x)):
-			return d
-	if not random_doctrines:
-		for pref in personality.doctrine_prefs:
-			for d in options:
-				if d.id == pref:
-					return d
-		# Nightmare counters the opponent's doctrines (GDD §11.1).
-		if difficulty.counter_level >= 3:
-			var enemy := sim.sides[sim.enemy_of(side)]
-			if enemy.has_doctrine(&"bastion") or enemy.turret_count() >= 3:
-				for d in options:
-					if d.id == &"siegecraft":
-						return d
-	return options[rng.randi_range(0, options.size() - 1)]
 
 
 ## Enemy units near our gate, or our base hit recently.

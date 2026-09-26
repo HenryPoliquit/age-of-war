@@ -34,7 +34,7 @@ func _init() -> void:
 	for i in PERSONALITIES.size():
 		for j in range(i + 1, PERSONALITIES.size()):
 			_series("rr", PERSONALITIES[i], PERSONALITIES[j], matches)
-	_series("mirror", "tactician", "tactician", matches * 3, true)
+	_series("mirror", "tactician", "tactician", matches * 3)
 	_series("fast_strong", "fast_age", "strong_age", matches * 2)
 	for bot in SPAM:
 		_series("spam", bot, "tactician", matches)
@@ -112,34 +112,6 @@ func _init() -> void:
 		metrics["pairs"][k] = pair_rates[k][0] / pair_rates[k][1]
 	checks.append(_check("Balance", "Any single personality pairing (first-named side's win rate)", "30–70%", "; ".join(pair_txt), pair_ok))
 
-	# Only count a doctrine against the opponent's different pick from the same offer. Otherwise an
-	# Age 4 doctrine is credited whenever the opponent never reached Age 4, i.e. was already losing.
-	var docs_def := GameData.get_default().doctrines
-	var doc := {}
-	for r in mirror:
-		for s in 2:
-			for d in r.doctrines[s]:
-				var age: int = docs_def[StringName(d)].pick_age
-				if not r.doctrines[1 - s].any(func(o): return o != d and docs_def[StringName(o)].pick_age == age):
-					continue
-				if not doc.has(d):
-					doc[d] = [0.0, 0]
-				doc[d][0] += _score(r, s)
-				doc[d][1] += 1
-	var doc_ok := true
-	var doc_txt := []
-	for d in ["horde", "elite", "bastion", "siegecraft"]:
-		if not doc.has(d) or doc[d][1] == 0:
-			doc_txt.append("%s n/a" % d)
-			continue
-		var rate: float = doc[d][0] / doc[d][1]
-		if not metrics.has("doctrines"):
-			metrics["doctrines"] = {}
-		metrics["doctrines"][d] = rate
-		doc_ok = doc_ok and rate >= 0.4 and rate <= 0.6
-		doc_txt.append("%s %s (n=%d)" % [d, _pct(rate), doc[d][1]])
-	checks.append(_check("Balance", "Win rate of each doctrine (Tactician mirror, random picks)", "40–60%", ", ".join(doc_txt), doc_ok))
-
 	var fast_rate := 0.0
 	for r in fast_strong:
 		fast_rate += _score(r, r.pair_a)
@@ -169,7 +141,7 @@ func _init() -> void:
 		t_max = maxf(t_max, r.duration)
 	metrics["turtle_escalation"] = t_esc
 	metrics["turtle_longest"] = t_max
-	checks.append(_check("Worst-case defence", "Turtle vs. Turtle, both Bastion", "< 25% reach escalation; none > 18:00", "%s escalate; longest %s" % [_pct(t_esc), _mmss(t_max)], t_esc < 0.25 and t_max <= 1080.0))
+	checks.append(_check("Worst-case defence", "Turtle vs. Turtle", "< 25% reach escalation; none > 18:00", "%s escalate; longest %s" % [_pct(t_esc), _mmss(t_max)], t_esc < 0.25 and t_max <= 1080.0))
 
 	var all_ok := true
 	for c in checks:
@@ -198,13 +170,13 @@ func _init() -> void:
 	quit(0 if all_ok else 1)
 
 
-func _series(suite: String, a: String, b: String, n: int, random_doctrines := false) -> void:
+func _series(suite: String, a: String, b: String, n: int) -> void:
 	for k in n:
 		_seed_counter += 1
 		# Alternate sides so any left/right asymmetry cancels out.
 		var a_left := k % 2 == 0
 		_jobs.append({"suite": suite, "left": a if a_left else b, "right": b if a_left else a,
-			"seed": base_seed * 100003 + _seed_counter, "random_doctrines": random_doctrines, "pair_a": 0 if a_left else 1})
+			"seed": base_seed * 100003 + _seed_counter, "pair_a": 0 if a_left else 1})
 
 
 ## 1 for a win, 0.5 for a draw, 0 for a loss.

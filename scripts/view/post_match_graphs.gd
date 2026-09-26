@@ -1,7 +1,7 @@
 class_name PostMatchGraphs
 extends Control
 ## Post-match graphs (GDD §12.3) drawn straight from the match log: gold earned, army value,
-## front-line position and age over time, with markers for evolutions, abilities and doctrines.
+## front-line position and age over time, with markers for evolutions and abilities.
 
 var match_log: MatchLog
 var colors: Array = [Color.CORNFLOWER_BLUE, Color.ORANGE]
@@ -49,7 +49,7 @@ func _draw() -> void:
 				draw_polyline(pts, Color.WHITE, 2.0)
 			draw_string(font, rect.position + Vector2(6, 16), "Front line (top = pushing into the right base)", HORIZONTAL_ALIGNMENT_LEFT, -1, 14)
 	for e in match_log.events:
-		var mark := {"evolve": "E", "ability": "A", "doctrine": "D"}.get(e.type, "") as String
+		var mark := {"evolve": "E", "ability": "A"}.get(e.type, "") as String
 		if mark == "":
 			continue
 		var x := size.x * float(e.t) / t_end

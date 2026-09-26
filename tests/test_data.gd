@@ -33,13 +33,6 @@ func test_base_hp_scales_1_7() -> void:
 		check_near(gd.age(i).base_max_hp / gd.age(i - 1).base_max_hp, 1.7, 0.01)
 
 
-func test_doctrine_offers_at_2_and_4() -> void:
-	var gd := GameData.get_default()
-	for i in range(1, 7):
-		var n := gd.age(i).doctrine_options.size()
-		check_eq(n, 2 if i in [2, 4] else 0, "age %d" % i)
-
-
 func test_evolution_costs_increase() -> void:
 	var gd := GameData.get_default()
 	for i in range(3, 7):

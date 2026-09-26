@@ -17,4 +17,3 @@ age_plan = "strong"
 turret_target = 4
 turret_after = 20.0
 turret_panic_hp = 0.95
-doctrine_prefs = Array[StringName]([&"elite", &"bastion"])

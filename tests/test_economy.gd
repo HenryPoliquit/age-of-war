@@ -52,12 +52,3 @@ func test_queue_limit_and_training() -> void:
 	check(not sim.queue_role(0, "vanguard"), "sixth slot must fail")
 	run_for(sim, 1.05)
 	check_eq(sim.sides[0].units.size(), 1, "one trained after 1 s")
-
-
-func test_doctrine_costs() -> void:
-	var sim := new_sim()
-	var def := sim.data.unit_for_role(2, "vanguard")
-	var horde: DoctrineDef = sim.data.doctrines[&"horde"]
-	sim.sides[0].doctrines.append(horde)
-	check(horde.unit_cost_mult < 1.0, "Horde is a discount")
-	check_near(sim.unit_price(0, def), roundf(def.cost * horde.unit_cost_mult), 0.01)

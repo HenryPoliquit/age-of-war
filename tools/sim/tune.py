@@ -25,10 +25,6 @@ PARAMS = [
     ("ranged_dmg", "scale", ["units:role=ranged.damage"], 1.0, [0.88, 1.14]),
     ("vanguard_hp", "scale", ["units:role=vanguard.hp"], 1.0, [0.88, 1.14]),
     ("siege_dmg", "scale", ["units:role=siege.damage"], 1.0, [0.85, 1.2]),
-    ("elite_cost", "set", ["doctrines/elite.unit_cost_mult"], 1.2, "rel:0.96,1.04"),
-    ("horde_cost", "set", ["doctrines/horde.unit_cost_mult"], 0.73, "rel:0.96,1.04"),
-    ("bastion", "set", ["doctrines/bastion.turret_damage_mult"], 1.25, "rel:0.9,1.1"),
-    ("siegecraft", "set", ["doctrines/siegecraft.siege_structure_mult"], 1.5, "rel:0.88,1.12"),
     ("vet_bonus", "set", ["rules.veterancy_bonus"], 0.1, "rel:0.8,1.25"),
     ("forge_bonus", "set", ["rules.forge_income_bonus"], 0.2, "rel:0.8,1.25"),
     ("push_ratio", "set_all", ["push_ratio"], 1.3, "rel:0.75,1.35"),
@@ -49,7 +45,6 @@ def loss(m):
     l += band(min(m["median_age6"], 1200), 600, 720, 60) + band(m["age6_reached"], 0.5, 1.0, 0.1)
     l += sum(band(v, 0.4, 0.6, 0.05) for v in m["personality"].values())
     l += 0.5 * sum(band(v, 0.3, 0.7, 0.05) for v in m["pairs"].values())
-    l += sum(band(v, 0.4, 0.6, 0.05) for v in m.get("doctrines", {}).values())
     l += band(m["fast_vs_strong"], 0.4, 0.6, 0.05)
     l += sum(band(v, 0.0, 0.29, 0.05) for v in m["spam"].values())
     l += band(m["turtle_escalation"], 0, 0.25, 0.05) + band(m["turtle_longest"], 0, 1080, 60)

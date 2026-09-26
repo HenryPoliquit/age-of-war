@@ -15,4 +15,3 @@ role_mix = {
 reserve_seconds = 6.0
 forge_target = 3
 forge_after = 10.0
-doctrine_prefs = Array[StringName]([&"elite", &"siegecraft"])

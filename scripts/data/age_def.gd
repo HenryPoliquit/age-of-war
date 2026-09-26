@@ -12,8 +12,6 @@ extends Resource
 @export var units: Array[UnitDef] = []
 @export var turrets: Array[TurretDef] = []
 @export var ability: AbilityDef
-## Doctrine choice offered when evolving into this age (empty = none).
-@export var doctrine_options: Array[DoctrineDef] = []
 @export_group("Graybox palette")
 @export var sky_color: Color = Color(0.5, 0.6, 0.8)
 @export var ground_color: Color = Color(0.4, 0.35, 0.25)

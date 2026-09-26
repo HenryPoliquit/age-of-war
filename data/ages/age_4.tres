@@ -1,9 +1,6 @@
 [gd_resource type="Resource" script_class="AgeDef" format=3]
 
 [ext_resource type="Resource" path="res://data/abilities/bombardment.tres" id="1_5pcju"]
-[ext_resource type="Script" path="res://scripts/data/doctrine_def.gd" id="2_ndixu"]
-[ext_resource type="Resource" path="res://data/doctrines/bastion.tres" id="3_s3bym"]
-[ext_resource type="Resource" path="res://data/doctrines/siegecraft.tres" id="4_jq1af"]
 [ext_resource type="Script" path="res://scripts/data/age_def.gd" id="5_yffcg"]
 [ext_resource type="Script" path="res://scripts/data/turret_def.gd" id="6_kmxrt"]
 [ext_resource type="Resource" path="res://data/turrets/medieval_sentry.tres" id="7_sobqm"]
@@ -25,6 +22,5 @@ base_max_hp = 4913.0
 units = Array[ExtResource("10_sdbf1")]([ExtResource("11_kbfaq"), ExtResource("12_0u4ai"), ExtResource("13_cae2v"), ExtResource("14_62ta7")])
 turrets = Array[ExtResource("6_kmxrt")]([ExtResource("7_sobqm"), ExtResource("8_a7h46"), ExtResource("9_0wcn5")])
 ability = ExtResource("1_5pcju")
-doctrine_options = Array[ExtResource("2_ndixu")]([ExtResource("3_s3bym"), ExtResource("4_jq1af")])
 sky_color = Color(0.35686275, 0.39607844, 0.4509804, 1)
 ground_color = Color(0.34509805, 0.32156864, 0.2901961, 1)

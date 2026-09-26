@@ -43,7 +43,3 @@ extends Resource
 ## Staged pushes: gather just outside enemy turret range and attack the gate together once the
 ## gathered group outweighs the defence by this ratio (0 = never stage; walk straight in).
 @export var push_ratio: float = 1.3
-
-@export_group("Doctrines")
-## Preferred doctrine ids; empty = random (the harness randomises).
-@export var doctrine_prefs: Array[StringName] = []

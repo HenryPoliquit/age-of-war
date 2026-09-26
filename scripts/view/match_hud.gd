@@ -1,8 +1,8 @@
 class_name MatchHud
 extends CanvasLayer
 ## Match HUD (GDD §13.9): top status bar with both bases, lane minimap, unit cards with portraits,
-## command panel (economy, ability, evolve/veterancy, Forge, turrets, stance, speed), doctrine
-## choice, event banners and the post-match screen. Reads MatchSim; acts only through its commands.
+## command panel (economy, ability, evolve/veterancy, Forge, turrets, stance, speed),
+## event banners and the post-match screen. Reads MatchSim; acts only through its commands.
 
 const ACCENT := UiStyle.ACCENT
 const PANEL_BG := Color(0.06, 0.07, 0.1, 0.84)
@@ -19,7 +19,6 @@ var _root: Control
 var _theme: Theme
 var _hp: Array[ProgressBar] = []
 var _age_labels: Array[Label] = []
-var _doc_labels: Array[Label] = []
 var _clock: Label
 var _tide: TidePips
 var _minimap: Minimap
@@ -38,8 +37,6 @@ var _stance: Button
 var _speed_buttons: Array[Button] = []
 var _slot_menu: PopupMenu
 var _slot_menu_index := -1
-var _doctrine_panel: PanelContainer
-var _doctrine_box: HBoxContainer
 var _banner: Label
 var _banner_sub: Label
 var _banner_t := -10.0
@@ -57,7 +54,6 @@ func _ready() -> void:
 	_build_top()
 	_build_cards()
 	_build_commands()
-	_build_doctrine()
 	_build_banner()
 	_slot_menu = PopupMenu.new()
 	_slot_menu.id_pressed.connect(_on_slot_menu)
@@ -127,7 +123,6 @@ func _build_top() -> void:
 		var name := _label(row, "You" if i == 0 else "Enemy", 15, view.team_color(i).lightened(0.35))
 		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_age_labels.append(_label(row, "", 16, ACCENT, true))
-		_doc_labels.append(_label(row, "", 13, Color(1, 1, 1, 0.7)))
 		var bar_hp := ProgressBar.new()
 		bar_hp.custom_minimum_size = Vector2(0, 16)
 		bar_hp.show_percentage = false
@@ -274,27 +269,6 @@ func _build_commands() -> void:
 		_slots.append(b)
 
 
-func _build_doctrine() -> void:
-	_doctrine_panel = _panel(_root)
-	_doctrine_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	_doctrine_panel.offset_left = -400
-	_doctrine_panel.offset_right = 400
-	_doctrine_panel.offset_top = -150
-	_doctrine_panel.offset_bottom = 110
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 12)
-	_doctrine_panel.add_child(v)
-	var l := _label(v, "Choose a doctrine", 28, ACCENT, true)
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var s := _label(v, "Kept for the rest of the match. Your evolution waits while you decide.", 14, Color(1, 1, 1, 0.7))
-	s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_doctrine_box = HBoxContainer.new()
-	_doctrine_box.add_theme_constant_override("separation", 16)
-	_doctrine_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.add_child(_doctrine_box)
-	_doctrine_panel.visible = false
-
-
 func _build_banner() -> void:
 	var v := VBoxContainer.new()
 	v.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
@@ -383,10 +357,6 @@ func _process(delta: float) -> void:
 		_hp[i].max_value = s.base_max_hp
 		_hp[i].value = s.base_hp
 		_age_labels[i].text = "%s Age  " % sim.data.age(s.age).display_name if i == 0 else "  %s Age" % sim.data.age(s.age).display_name
-		var names := []
-		for d in s.doctrines:
-			names.append(d.display_name)
-		_doc_labels[i].text = " · ".join(names)
 	_clock.text = "%d:%02d" % [int(sim.time) / 60, int(sim.time) % 60]
 	for c in _cards:
 		c.queue_redraw()
@@ -411,7 +381,7 @@ func _process(delta: float) -> void:
 		var cost := sim.evolve_cost(0)
 		_evolve.text = "▲ Evolve → %s   %d XP  [T]" % [sim.data.age(me.age + 1).display_name, cost]
 		if me.is_evolving():
-			_evolve.text = "Evolving…" if me.awaiting_doctrine else "Evolving… %.1fs" % me.evolve_left
+			_evolve.text = "Evolving… %.1fs" % me.evolve_left
 		_evolve.disabled = not sim.can_evolve(0)
 		_evolve_meter.value = clampf(me.xp / cost, 0.0, 1.0)
 	_vet.text = "★ Veteran %s  %s" % ["●".repeat(me.vet_ranks) + "○".repeat(3 - me.vet_ranks), "" if me.vet_ranks >= 3 else "%d" % sim.veterancy_cost(0)]
@@ -441,33 +411,11 @@ func _process(delta: float) -> void:
 			b.tooltip_text = "Unlock turret slot"
 		else:
 			b.text = "🔒"
-	_update_doctrine()
 	var bt := view.anim_time - _banner_t
 	var bv: Control = _banner.get_parent()
 	bv.modulate.a = clampf(minf(bt / 0.15, (2.6 - bt) / 0.6), 0.0, 1.0)
 	bv.scale = Vector2.ONE * (1.0 + 0.25 * maxf(0.0, 1.0 - bt / 0.25))
 	bv.pivot_offset = bv.size * 0.5
-
-
-func _update_doctrine() -> void:
-	var me := sim.sides[0]
-	if not me.awaiting_doctrine:
-		_doctrine_panel.visible = false
-		return
-	if _doctrine_panel.visible:
-		return
-	for c in _doctrine_box.get_children():
-		c.queue_free()
-	for d in sim.data.age(me.age + 1).doctrine_options:
-		var b := Button.new()
-		b.custom_minimum_size = Vector2(360, 130)
-		b.text = "%s\n%s" % [d.display_name.to_upper(), d.description]
-		b.alignment = HORIZONTAL_ALIGNMENT_CENTER
-		b.autowrap_mode = TextServer.AUTOWRAP_WORD
-		b.add_theme_font_size_override("font_size", 18)
-		b.pressed.connect(func(): sim.choose_doctrine(0, d))
-		_doctrine_box.add_child(b)
-	_doctrine_panel.visible = true
 
 
 func matrix_tooltip(u: UnitDef) -> String:
