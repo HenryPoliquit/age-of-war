@@ -5,8 +5,8 @@ extends Resource
 @export var id: StringName
 @export var display_name: String
 @export var decision_interval: float = 1.5
-## 0 = ignores composition, 1 = reacts to majority role, 2 = matrix-aware, 3 = + doctrine counters.
+## 0 = ignores composition, 1 = reacts to majority role, 2+ = counters every enemy role.
 @export var counter_level: int = 1
-## 0 = random within zone, 1 = largest cluster, 2 = highest-value cluster timed with pushes.
-@export var aim_level: int = 1
+## Enemy value (Age 1 gold, scaled by the era cost multiplier) a skill must hit before the AI fires it.
+@export var skill_min_value: float = 60.0
 @export var income_bonus: float = 0.0

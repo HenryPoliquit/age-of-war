@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="AbilityDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ability_def.gd" id="1_ab"]
+
+[resource]
+script = ExtResource("1_ab")
+id = &"bombardment"
+display_name = "Bombardment"
+age = 4
+shape = "sweep"
+xp_cost = 275
+telegraph = 0.6
+pulses = 8
+pulse_interval = 0.3
+damage = 200.0
+damage_type = "blast"
+knockback = 12.0

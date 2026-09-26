@@ -13,8 +13,8 @@ func _init() -> void:
 	for i in range(1, r.tide_start_times.size()):
 		_check(r.tide_start_times[i] > r.tide_start_times[i - 1], "tide times increase")
 		_check(r.tide_multipliers[i] > r.tide_multipliers[i - 1], "tide multipliers increase")
-	_check(r.veterancy_fractions.size() == 3, "three veterancy ranks")
-	_check(r.turret_slot_costs.size() >= 5, "turret slot costs for 5 slots")
+	_check(r.turret_slot_costs.size() == 4 and r.turret_slot_costs[0] == 0, "4 turret slots, the first free")
+	_check(r.start_turret_slots == 1, "one slot at start")
 	for dt in ["slash", "pierce", "blast", "siege"]:
 		for arm in ["light", "heavy", "structure"]:
 			_check(r.damage_matrix.has(dt) and r.damage_matrix[dt].has(arm), "matrix %s/%s" % [dt, arm])
@@ -25,8 +25,11 @@ func _init() -> void:
 		_check(a.display_name != "", tag + " name")
 		_check(a.base_max_hp > 0, tag + " base HP")
 		_check(a.index == 1 or a.evolve_cost > 0, tag + " evolve cost")
-		_check(a.veterancy_base_xp > 0, tag + " veterancy base")
 		_check(a.ability != null and a.ability.age == a.index, tag + " ability")
+		if a.ability != null:
+			var ab := a.ability
+			_check(ab.shape in ["area", "strip", "sweep"] and ab.xp_cost > 0 and ab.pulses >= 1 and ab.damage > 0, tag + " skill shape/cost/pulses/damage")
+			_check(ab.shape == "sweep" or ab.width > 0, tag + " skill width")
 		var roles := {}
 		for u in a.units:
 			var ut := "unit %s" % u.id
@@ -37,7 +40,6 @@ func _init() -> void:
 			roles[u.role] = true
 			for f in ["cost", "train_time", "hp", "damage", "attack_interval", "range", "speed"]:
 				_check(float(u.get(f)) > 0.0, "%s %s > 0" % [ut, f])
-			_check(u.momentum_on_kill > 0, ut + " momentum_on_kill")
 			_check(u.min_range < u.range, ut + " min_range < range")
 			_check(r.damage_matrix.has(u.damage_type), ut + " damage type in matrix")
 		_check(roles.has("vanguard") and roles.has("ranged") and roles.has("heavy"), tag + " core roles")
@@ -51,19 +53,26 @@ func _init() -> void:
 				_check(t.aura_radius > 0 and t.aura_slow > 0, tt + " aura")
 			else:
 				_check(t.damage > 0 and t.attack_interval > 0 and t.range > t.min_range, tt + " attack stats")
-		for d in a.doctrine_options:
-			_check(d.pick_age == a.index, "doctrine %s pick_age" % d.id)
+	# Races are cosmetic (GDD §5.7): every slot needs a name in every race.
+	_check(gd.races.has(&"human"), "human race exists (fallback)")
+	for rid in gd.races:
+		var rd: RaceDef = gd.races[rid]
+		_check(rd.id == rid and rd.display_name != "", "race %s id/name" % rid)
+		for a in gd.ages:
+			for u in a.units:
+				_check(rd.unit_names.has(String(u.id)), "race %s names unit %s" % [rid, u.id])
+			for t in a.turrets:
+				_check(rd.turret_names.has(String(t.id)), "race %s names turret %s" % [rid, t.id])
+			_check(rd.ability_names.has(String(a.ability.id)), "race %s names ability %s" % [rid, a.ability.id])
 	for id in gd.personalities:
 		var p: AiPersonalityDef = gd.personalities[id]
-		_check(p.age_plan in ["balanced", "fast", "strong"], "personality %s age_plan" % id)
-		for pref in p.doctrine_prefs:
-			_check(gd.doctrines.has(pref), "personality %s doctrine pref %s exists" % [id, pref])
+		_check(p.age_plan in ["balanced", "fast"], "personality %s age_plan" % id)
 	for id in gd.difficulties:
 		var d: AiDifficultyDef = gd.difficulties[id]
 		_check(d.decision_interval > 0, "difficulty %s interval" % id)
 		_check(d.income_bonus == 0.0 or id in [&"brutal", &"nightmare"], "difficulty %s: only Brutal/Nightmare get bonuses (GDD §11.1)" % id)
 	if problems.is_empty():
-		print("data OK: %d ages, %d ids, %d personalities, %d difficulties" % [gd.ages.size(), ids.size(), gd.personalities.size(), gd.difficulties.size()])
+		print("data OK: %d ages, %d ids, %d races, %d personalities, %d difficulties" % [gd.ages.size(), ids.size(), gd.races.size(), gd.personalities.size(), gd.difficulties.size()])
 	else:
 		for p in problems:
 			print("INVALID: ", p)

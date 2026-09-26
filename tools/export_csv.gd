@@ -18,8 +18,8 @@ func _init() -> void:
 		for t in age.turrets:
 			f.store_csv_line(PackedStringArray(["turret", age.index, t.id, t.display_name, t.kind, "structure", t.damage_type, t.cost, t.hp, t.damage, t.attack_interval, t.range, t.min_range, "", "", "splash=%s aura=%s slow=%s" % [t.splash, t.aura_radius, t.aura_slow]]))
 		var ab := age.ability
-		f.store_csv_line(PackedStringArray(["ability", age.index, ab.id, ab.display_name, ab.affects, "", ab.damage_type, "", "", ab.damage, ab.pulse_interval, ab.width, "", "", "", "pulses=%d telegraph=%s knockback=%s armour=%s dur=%s" % [ab.pulses, ab.telegraph, ab.knockback, ab.armour_buff, ab.buff_duration]]))
-		f.store_csv_line(PackedStringArray(["age", age.index, age.display_name.to_lower(), age.display_name, "", "", "", age.evolve_cost, age.base_max_hp, "", "", "", "", "", "", "vet_base=%d" % age.veterancy_base_xp]))
+		f.store_csv_line(PackedStringArray(["ability", age.index, ab.id, ab.display_name, ab.shape, "", ab.damage_type, ab.xp_cost, "", ab.damage, ab.pulse_interval, ab.width, "", "", "", "pulses=%d telegraph=%s knockback=%s" % [ab.pulses, ab.telegraph, ab.knockback]]))
+		f.store_csv_line(PackedStringArray(["age", age.index, age.display_name.to_lower(), age.display_name, "", "", "", age.evolve_cost, age.base_max_hp, "", "", "", "", "", "", ""]))
 	f.close()
 	print("wrote ", out)
 	quit()

@@ -8,11 +8,10 @@ var personality: AiPersonalityDef
 var difficulty: AiDifficultyDef
 var side: int
 var rng := RandomNumberGenerator.new()
-## Harness override: when true, doctrine picks are random instead of personality preferences.
-var random_doctrines := false
 
 var _timer := 0.0
-var _released_hold := false
+var _hp_seen := -1.0
+var _hp_loss_rate := 0.0  # own base HP lost per second, smoothed over decisions
 
 
 func _init(p_personality: AiPersonalityDef, p_difficulty: AiDifficultyDef, p_side: int, p_seed: int = 1) -> void:
@@ -35,10 +34,6 @@ func setup(sim: MatchSim) -> void:
 
 
 func update(sim: MatchSim, dt: float) -> void:
-	var s := sim.sides[side]
-	# The AI "chooses instantly" (GDD §13.5), independent of its decision interval.
-	if s.awaiting_doctrine:
-		sim.choose_doctrine(side, _pick_doctrine(sim))
 	_timer -= dt
 	if _timer > 0.0:
 		return
@@ -50,29 +45,15 @@ func update(sim: MatchSim, dt: float) -> void:
 
 func _decide(sim: MatchSim) -> void:
 	var s := sim.sides[side]
+	if _hp_seen >= 0.0:
+		var lost := maxf(0.0, _hp_seen - s.base_hp) / difficulty.decision_interval
+		_hp_loss_rate = lerpf(_hp_loss_rate, lost, 0.5)
+	_hp_seen = s.base_hp
 	var pressure := _under_pressure(sim)
-	_try_ability(sim)
+	_try_ability(sim, pressure)
 	_spend_xp(sim, pressure)
-	_manage_stance(sim, pressure)
 	_spend_gold(sim, pressure)
-
-
-func _pick_doctrine(sim: MatchSim) -> DoctrineDef:
-	var s := sim.sides[side]
-	var options := sim.data.age(s.age + 1).doctrine_options
-	if not random_doctrines:
-		for pref in personality.doctrine_prefs:
-			for d in options:
-				if d.id == pref:
-					return d
-		# Nightmare counters the opponent's doctrines (GDD §11.1).
-		if difficulty.counter_level >= 3:
-			var enemy := sim.sides[sim.enemy_of(side)]
-			if enemy.has_doctrine(&"bastion") or enemy.turret_count() >= 3:
-				for d in options:
-					if d.id == &"siegecraft":
-						return d
-	return options[rng.randi_range(0, options.size() - 1)]
+	_buy_upgrade(sim, pressure)
 
 
 ## Enemy units near our gate, or our base hit recently.
@@ -89,19 +70,6 @@ func _under_pressure(sim: MatchSim) -> bool:
 
 func _spend_xp(sim: MatchSim, pressure: bool) -> void:
 	var s := sim.sides[side]
-	var ranks_wanted := 0
-	match personality.age_plan:
-		"fast":
-			ranks_wanted = 0
-		"strong":
-			ranks_wanted = sim.rules.veterancy_fractions.size()
-		_:
-			ranks_wanted = personality.balanced_vet_ranks
-	if s.age >= GameData.AGE_COUNT:
-		ranks_wanted = sim.rules.veterancy_fractions.size()
-	if s.vet_ranks < ranks_wanted:
-		sim.buy_veterancy(side)
-		return
 	if not sim.can_evolve(side):
 		return
 	# Evolving under pressure is a gamble (5 s with a paused queue). Smarter AIs wait it out,
@@ -113,50 +81,115 @@ func _spend_xp(sim: MatchSim, pressure: bool) -> void:
 	sim.evolve(side)
 
 
-func _manage_stance(sim: MatchSim, pressure: bool) -> void:
-	if not personality.uses_hold:
-		return
-	var s := sim.sides[side]
-	var threshold := sim.income_rate(side) * personality.hold_release_seconds
-	var army := s.army_value()
-	if pressure:
-		sim.set_stance(side, &"advance")
-		_released_hold = true
-		return
-	if s.stance == &"hold":
-		if army >= threshold:
-			sim.set_stance(side, &"advance")
-			_released_hold = true
-	elif army < threshold * 0.3:
-		sim.set_stance(side, &"hold", sim.to_world(side, sim.rules.lane_length * 0.35))
-
-
 # ---------------------------------------------------------------------------
 # Gold
+
+## Leftover gold buys the best-value upgrade that pays for itself. At most one per decision.
+func _buy_upgrade(sim: MatchSim, pressure: bool) -> void:
+	if not _upgrades_allowed(sim, pressure):
+		return
+	var best := _best_upgrade(sim, 0.0, sim.sides[side].gold)
+	if not best.is_empty():
+		sim.buy_upgrade(side, best.row, best.stat)
+
+
+## Never under pressure or with a thin army.
+func _upgrades_allowed(sim: MatchSim, pressure: bool) -> bool:
+	return not pressure and sim.sides[side].army_value() >= sim.income_rate(side) * personality.upgrade_after_army_seconds
+
+
+## Best upgrade costing at most `budget` that pays for itself: its bonus on the gold already fielded in
+## that row (× personality bias) must cover its price. Rows with bias below `min_bias` are skipped.
+## Returns {row, stat, cost} or {}.
+func _best_upgrade(sim: MatchSim, min_bias: float, budget: float) -> Dictionary:
+	var s := sim.sides[side]
+	var fielded := {}
+	for u in s.units:
+		fielded[u.def.role] = fielded.get(u.def.role, 0.0) + u.cost_paid
+	for t in s.turrets:
+		if t != null:
+			fielded["turret"] = fielded.get("turret", 0.0) + t.def.cost
+	var best_row := ""
+	var best_stat := ""
+	var best_score := 0.0
+	for row in MatchSim.UPGRADES:
+		if row == "income":
+			continue
+		var bias: float = personality.upgrade_bias.get(row, 0.0)
+		var value: float = fielded.get(row, 0.0) * bias
+		if value <= 0.0 or bias < min_bias:
+			continue
+		for stat in MatchSim.UPGRADES[row]:
+			var cost := sim.upgrade_cost(side, row, stat)
+			var benefit := value * _upgrade_bonus(sim, stat)
+			if cost > budget or benefit < cost:
+				continue
+			var score := benefit / cost
+			if score > best_score:
+				best_score = score
+				best_row = row
+				best_stat = stat
+	if best_row == "":
+		return {}
+	return {"row": best_row, "stat": best_stat, "cost": sim.upgrade_cost(side, best_row, best_stat)}
+
+
+func _upgrade_bonus(sim: MatchSim, stat: String) -> float:
+	match stat:
+		"attack":
+			return sim.rules.upgrade_attack_bonus
+		"health":
+			return sim.rules.upgrade_health_bonus
+		"defence":
+			return sim.rules.upgrade_defence_bonus
+		_:
+			return sim.rules.upgrade_range_bonus
+
 
 func _spend_gold(sim: MatchSim, pressure: bool) -> void:
 	var s := sim.sides[side]
 	var income := sim.income_rate(side)
 	var want := _structural_want(sim, pressure)
 	var reserve := 0.0
+	# Under pressure a turret beats trickling single units into an army camped at the gate:
+	# it takes hits for the base and shoots every attacker, while each lone unit just feeds the
+	# attacker XP. Only worth it if the turret is affordable well before the base falls.
+	var defend: bool = pressure and want.get("kind", "") in ["turret", "replace"] \
+			and (want.cost - s.gold) / maxf(income, 0.01) < 0.5 * s.base_hp / maxf(_hp_loss_rate, 0.01)
 	if not want.is_empty():
 		if s.gold >= want.cost:
 			_do_want(sim, want)
 		# Only save for purchases that take a reasonable time to afford.
-		elif want.cost - s.gold <= income * 30.0:
+		elif defend or want.cost - s.gold <= income * 30.0:
 			reserve = want.cost
 	# Keep a minimum army on the lane even while saving.
 	var floor_value := income * 12.0
 	var guard := 0
 	while guard < sim.rules.queue_slots:
 		guard += 1
-		var def := _pick_unit(sim)
-		if def == null:
+		var ranked := _ranked_units(sim)
+		if ranked.is_empty():
 			break
+		var def: UnitDef = ranked[0]
 		var price := sim.unit_price(side, def)
 		var army := s.army_value() + s.queued_value()
+		if s.gold < price:
+			# Don't hoard for an expensive pick while the lane is thin: take the best affordable one.
+			var wait := (price - s.gold) / maxf(income, 0.01)
+			# Siege costs several units' worth but is what breaks a base: worth a longer save.
+			var max_wait := 30.0 if def.role == "siege" else 8.0
+			if not (army < floor_value or pressure or wait > max_wait):
+				break
+			def = null
+			for d in ranked.slice(1):
+				if s.gold >= sim.unit_price(side, d):
+					def = d
+					break
+			if def == null:
+				break
+			price = sim.unit_price(side, def)
 		var saving := reserve > 0.0 and s.gold - price < reserve
-		if saving and not pressure and army >= floor_value:
+		if saving and (defend or (not pressure and army >= floor_value)):
 			break
 		if s.queue.size() >= 2 and not pressure and s.units.size() + s.queue.size() >= sim.rules.field_cap:
 			break
@@ -175,24 +208,41 @@ func _structural_want(sim: MatchSim, pressure: bool) -> Dictionary:
 			var best := _best_turret(sim)
 			if best != null:
 				return {"kind": "replace", "slot": t.slot, "def": best, "cost": best.cost - roundf(t.def.cost * sim.rules.sell_refund)}
+	# Wanting a slot that is far out of reach still blocks the Income want (as before), but not a
+	# favoured upgrade: that slot would never be saved for.
+	var slot_blocked := false
 	if turret_time and s.turret_count() < personality.turret_target:
 		var slot := sim.first_free_slot(side)
 		if slot == -1:
-			if s.turret_slots < s.max_turret_slots():
-				return {"kind": "slot", "cost": sim.slot_cost(side)}
+			if s.turret_slots < sim.max_turret_slots():
+				var slot_cost := sim.slot_cost(side)
+				if slot_cost - s.gold <= sim.income_rate(side) * 30.0:
+					return {"kind": "slot", "cost": slot_cost}
+				slot_blocked = true
 		else:
 			var def := _best_turret(sim)
 			if def != null:
 				return {"kind": "turret", "slot": slot, "def": def, "cost": float(def.cost)}
-	if s.forge_level < personality.forge_target and sim.time >= personality.forge_after + s.forge_level * 90.0 and not pressure:
-		return {"kind": "forge", "cost": sim.forge_cost(side)}
+	# Upgrades in rows the personality strongly favours (bias 3+, i.e. Turtle's turrets) are saved
+	# for like a structure; otherwise unit spending never leaves enough gold (GDD §11.2).
+	if _upgrades_allowed(sim, pressure):
+		var up := _best_upgrade(sim, 3.0, INF)
+		if not up.is_empty():
+			return {"kind": "upgrade", "row": up.row, "stat": up.stat, "cost": up.cost}
+	if slot_blocked:
+		return {}
+	var inc := s.upgrade_level("income", "income")
+	if inc < personality.income_target and sim.time >= personality.income_after + inc * 90.0 and not pressure:
+		return {"kind": "income", "cost": sim.upgrade_cost(side, "income", "income")}
 	return {}
 
 
 func _do_want(sim: MatchSim, want: Dictionary) -> void:
 	match want.kind:
-		"forge":
-			sim.buy_forge(side)
+		"income":
+			sim.buy_upgrade(side, "income", "income")
+		"upgrade":
+			sim.buy_upgrade(side, want.row, want.stat)
 		"slot":
 			sim.unlock_slot(side)
 		"turret":
@@ -221,12 +271,15 @@ func _best_turret(sim: MatchSim) -> TurretDef:
 	return null
 
 
-func _pick_unit(sim: MatchSim) -> UnitDef:
+## This side's unit options, best first.
+func _ranked_units(sim: MatchSim) -> Array[UnitDef]:
 	var s := sim.sides[side]
+	var out: Array[UnitDef] = []
 	if personality.spam_role != "":
 		var d := sim.data.unit_for_role(s.age, personality.spam_role)
 		# Siege spam has nothing to queue in Age 1; it falls back to Vanguards until Age 2.
-		return d if d != null else sim.data.unit_for_role(s.age, "vanguard")
+		out.append(d if d != null else sim.data.unit_for_role(s.age, "vanguard"))
+		return out
 	var enemy := sim.sides[sim.enemy_of(side)]
 	var weights := {}
 	for role in MatchSim.ROLES:
@@ -259,7 +312,8 @@ func _pick_unit(sim: MatchSim) -> UnitDef:
 	for r in weights:
 		total += weights[r]
 	if total <= 0.0:
-		return sim.data.unit_for_role(s.age, "vanguard")
+		out.append(sim.data.unit_for_role(s.age, "vanguard"))
+		return out
 	var have := {}
 	var have_total := 1.0
 	for u in s.units:
@@ -268,18 +322,18 @@ func _pick_unit(sim: MatchSim) -> UnitDef:
 	for q in s.queue:
 		have[q.role] = have.get(q.role, 0.0) + q.cost
 		have_total += q.cost
-	var best_role := ""
-	var best_score := -INF
+	var scored := []
 	for r in weights:
 		var target: float = weights[r] / total
 		var share: float = have.get(r, 0.0) / have_total
 		var score := target - share
 		# Seeded noise: Easy is erratic; everyone else varies slightly so sim runs aren't identical.
 		score += rng.randf_range(-0.15, 0.15) if difficulty.counter_level == 0 else rng.randf_range(-0.03, 0.03)
-		if score > best_score:
-			best_score = score
-			best_role = r
-	return sim.data.unit_for_role(s.age, best_role)
+		scored.append([score, r])
+	scored.sort_custom(func(a, b): return a[0] > b[0])
+	for pair in scored:
+		out.append(sim.data.unit_for_role(s.age, pair[1]))
+	return out
 
 
 func _apply_counters(sim: MatchSim, weights: Dictionary) -> void:
@@ -291,96 +345,50 @@ func _apply_counters(sim: MatchSim, weights: Dictionary) -> void:
 		total += u.cost_paid
 	if total <= 0.0:
 		return
+	var table := personality.counter_table
 	if difficulty.counter_level == 1:
+		# Normal: react to the enemy's majority role.
 		var majority := ""
 		var mv := 0.0
 		for r in by_role:
 			if by_role[r] > mv:
 				mv = by_role[r]
 				majority = r
-		var counter := {"vanguard": "ranged", "ranged": "heavy", "heavy": "heavy", "siege": "vanguard"}
-		var c: String = counter.get(majority, "")
+		var c: String = table.get(majority, "")
 		if weights.has(c):
 			weights[c] *= 1.8
 		return
-	# Matrix-aware: value each of our roles by damage it deals into the enemy's armour mix and
-	# damage it absorbs from the enemy's damage mix, per gold.
-	var armour_share := {"light": 0.0, "heavy": 0.0}
-	var dtype_share := {}
-	for u in enemy.units:
-		armour_share[u.def.armour] += u.cost_paid / total
-		dtype_share[u.def.damage_type] = dtype_share.get(u.def.damage_type, 0.0) + u.cost_paid / total
-	var rules := sim.rules
-	for role in weights.keys():
-		var d := sim.data.unit_for_role(sim.sides[side].age, role)
-		var offence := 0.0
-		for a in armour_share:
-			offence += armour_share[a] * rules.matrix(d.damage_type, a)
-		var defence := 0.0
-		for dt in dtype_share:
-			defence += dtype_share[dt] * rules.matrix(dt, d.armour)
-		# Cubed so a 15–30% matrix edge actually changes the build.
-		var edge := pow(offence / maxf(0.3, defence), 3.0)
-		weights[role] *= clampf(edge, 0.25, 3.0)
+	# Hard+: shift the mix toward the counter of every enemy role, in proportion to its share.
+	var wsum := 0.0
+	for r in weights:
+		wsum += weights[r]
+	for r in by_role:
+		var c: String = table.get(r, "")
+		if weights.has(c):
+			weights[c] += by_role[r] / total * personality.counter_strength * wsum
 
 
 # ---------------------------------------------------------------------------
-# Abilities
+# Skills
 
-func _try_ability(sim: MatchSim) -> void:
+func _try_ability(sim: MatchSim, pressure: bool) -> void:
 	if not sim.can_fire_ability(side):
 		return
-	var s := sim.sides[side]
-	var def := sim.data.age(s.age).ability
-	if def.affects == "ally":
-		# Shieldwall: cover our most engaged group, only when a fight is on.
-		var enemy_front := sim._front_unit(sim.enemy_of(side))
-		if enemy_front == null or s.units.is_empty():
+	var value := sim.ability_zone_value(side)
+	if value <= 0.0:
+		return
+	if not personality.skill_eager and not pressure:
+		if value < difficulty.skill_min_value * sim.rules.age_cost_mult(sim.sides[side].age):
 			return
-		var x := _best_window(sim, side, def.width, false)
-		if not is_nan(x):
-			sim.fire_ability(side, x)
-		return
-	var enemy_side := sim.enemy_of(side)
-	if sim.sides[enemy_side].units.is_empty():
-		return
-	var x := NAN
-	match difficulty.aim_level:
-		0:
-			var u := sim.sides[enemy_side].units[rng.randi_range(0, sim.sides[enemy_side].units.size() - 1)]
-			x = sim.to_world(enemy_side, u.progress) + rng.randf_range(-def.width * 0.5, def.width * 0.5)
-		1:
-			x = _best_window(sim, enemy_side, def.width, false)
-		_:
-			x = _best_window(sim, enemy_side, def.width, true)
-			# Timed: hold the ability for a worthwhile target unless under pressure.
-			var value := _window_value(sim, enemy_side, x, def.width, true)
-			if value < sim.income_rate(side) * 20.0 and not _under_pressure(sim):
-				return
-	if not is_nan(x):
-		sim.fire_ability(side, x)
+		if _evolve_soon(sim):
+			return
+	sim.fire_ability(side)
 
 
-## Centre of the window of `width` holding the most units (or the most gold of units) of `of_side`.
-func _best_window(sim: MatchSim, of_side: int, width: float, by_value: bool) -> float:
-	var best := NAN
-	var best_v := 0.0
-	for u in sim.sides[of_side].units:
-		var start := sim.to_world(of_side, u.progress)
-		# Try windows that start at this unit, extending in both directions.
-		for centre in [start + width * 0.5, start - width * 0.5]:
-			var v := _window_value(sim, of_side, centre, width, by_value)
-			if v > best_v:
-				best_v = v
-				best = centre
-	return best
-
-
-func _window_value(sim: MatchSim, of_side: int, centre: float, width: float, by_value: bool) -> float:
-	if is_nan(centre):
-		return 0.0
-	var v := 0.0
-	for u in sim.sides[of_side].units:
-		if absf(sim.to_world(of_side, u.progress) - centre) <= width * 0.5:
-			v += u.cost_paid if by_value else 1.0
-	return v
+## True if an evolution is due within ~10 s at the current XP rate (spending XP on a skill would delay it).
+func _evolve_soon(sim: MatchSim) -> bool:
+	var s := sim.sides[side]
+	if s.age >= GameData.AGE_COUNT or s.is_evolving():
+		return false
+	var rate := s.stat_xp_earned / maxf(sim.time, 1.0)
+	return (sim.evolve_cost(side) - s.xp) / maxf(rate, 0.01) <= 10.0

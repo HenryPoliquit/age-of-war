@@ -1,0 +1,53 @@
+class_name DayNight
+extends RefCounted
+## Purely visual day/night cycle driven by match time. Nothing in the sim reads it.
+## Each look keeps its signature lighting (GDD §4.1): the cycle modulates around it by the look's
+## strength (Scenery.LOOKS "dn"), strongest in daylit ages and gentle in stormy or nocturnal ones.
+
+const PERIOD := 240.0
+## Start mid-morning so a match opens in daylight.
+const START_PHASE := 0.12
+## Night keeps a cool cast but stays readable: the lane stays at least ~70% as bright as by day.
+const NIGHT := Color(0.72, 0.76, 0.92)
+const DUSK := Color(1.0, 0.72, 0.52)
+
+## phase 0..1: 0–0.5 the sun is up (rises at 0, sets at 0.5), 0.5–1 the moon is up.
+var phase := START_PHASE
+## 1 at noon, 0 at deep night.
+var daylight := 1.0
+## Near 1 around sunrise and sunset.
+var twilight := 0.0
+
+
+static func at(time: float, enabled := true) -> DayNight:
+	var d := DayNight.new()
+	if not enabled:
+		d.phase = 0.25
+		return d
+	d.phase = fposmod(time / PERIOD + START_PHASE, 1.0)
+	var s := sin(TAU * d.phase)
+	d.daylight = smoothstep(-0.3, 0.35, s)
+	d.twilight = exp(-pow(s / 0.28, 2.0))
+	return d
+
+
+## Multiplier for the canvas ambient, for a look whose cycle strength is `k`.
+func tint(k: float) -> Color:
+	var c := NIGHT.lerp(Color.WHITE, daylight)
+	c = c.lerp(DUSK, twilight * 0.45)
+	return Color.WHITE.lerp(c, k)
+
+
+## Where the sun (day) or moon (night) sits, as (x fraction across the view, height in px).
+func body_pos() -> Vector2:
+	var u := fposmod(phase, 0.5) / 0.5
+	return Vector2(0.08 + 0.84 * u, 640.0 - sin(PI * u) * 520.0)
+
+
+func is_night() -> bool:
+	return phase >= 0.5
+
+
+## How visible stars are, 0..1.
+func stars() -> float:
+	return clampf(1.0 - daylight * 1.6, 0.0, 1.0)

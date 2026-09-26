@@ -6,6 +6,10 @@
 **Last updated:** 2026-09-25
 **Companion document:** `docs/GDD.md` — the Game Design Document. This PRD says *why* and *what counts as success*; the GDD says *how the game works*, with the numbers. In the spec-driven chain (PRD → spec → plan → tasks → implement), the GDD plays the role of the spec/SRD.
 
+### What changed in v3
+
+- **Simplified after the first playtest** (GDD v3 notes): veterancy, doctrines, momentum and stances removed; gold-bought upgrades and XP skills added; G3, G4 and the §6 targets updated.
+
 ### What changed in v2
 
 - **Economy fixed.** v1's flat income could not carry a match past Age 3–4 in the target time, and armies *shrank* each age. Income now rises on a shared match-wide "tide", and evolution costs were re-derived from a pacing model (GDD §4). Target: a balanced player reaches Age 6 around minute 11.
@@ -17,7 +21,7 @@
 
 ## 1. Summary
 
-Timefront is a 2D side-view lane battler in the "evolve through the ages" genre popularised by the Flash game Age of War and its sequel. Two bases sit at opposite ends of a single lane. Players spend gold to send units down the lane, build turrets to defend, and spend experience to advance their civilisation through six ages — Stone Age to Future — with every unit, turret, the base and the battlefield itself transforming at each evolution.
+Timefront is a 2D side-view lane battler in the "evolve through the ages" genre popularised by the Flash game Age of War and its sequel. Two bases sit at opposite ends of a single lane. Players spend gold to send units down the lane, build turrets to defend, and spend experience to advance their civilisation through six ages — Stone Age to an Arcane age of steam and sorcery — as Humans, Elves or Dwarves, with every unit, turret, the base and the battlefield itself transforming at each evolution.
 
 The goal is not to remake Age of War. It is to take the genre's proven core loop and fix what holds it back: **stalemates, blunt balance, shallow decisions, and dated presentation.** Timefront keeps the one-lane readability and "one more match" pacing, and adds a front line that rewards pushing, readable counters, a real evolve-now-or-strengthen-now tradeoff, doctrines for replayability, and hand-painted skeletal animation with modern VFX.
 
@@ -57,10 +61,10 @@ The age-evolution lane battler has a strong, simple hook and an audience that re
 
 ### Goals
 
-- **G1 — No stalemates.** Every match resolves. The front line rewards pushing, income rises through the match so late armies can break defences, and a late escalation phase guarantees an ending. *(Fixes: stalemates.)*
+- **G1 — No stalemates.** Every match resolves. Income rises through the match so late armies can break defences, every unit can attack turrets so turret walls fall, and a late escalation phase guarantees an ending. *(Fixes: stalemates.)*
 - **G2 — Legible counters.** A small damage-type × armour-type matrix, shown in unit tooltips, so the player knows *why* a unit won or lost. No hard counters that delete a unit type outright. *(Fixes: blunt balance.)*
-- **G3 — Real decisions.** Experience buys *either* evolution *or* veterancy for the current age; a targeted, momentum-fuelled age ability matters; turrets get outclassed and must be replaced. *(Fixes: shallow decisions.)*
-- **G4 — Replayability without grind.** Doctrines chosen at evolutions, AI opponents with distinct personalities, and a campaign of handcrafted battle modifiers. *(Fixes: low replayability.)*
+- **G3 — Real decisions.** Gold buys *either* more units *or* stronger ones (per-unit and turret upgrades); XP buys *either* the next age *or* the era's special skill; turrets get outclassed and must be replaced. *(Fixes: shallow decisions.)*
+- **G4 — Replayability without grind.** AI opponents with distinct personalities, three races, and a campaign of handcrafted battle modifiers. *(Fixes: low replayability.)*
 - **G5 — Fair, smooth difficulty.** AI plays by the same economic rules on Hard and below; difficulty comes from decision quality first and resource bonuses only at the top two levels. *(Fixes: difficulty spikes.)*
 - **G6 — Modern presentation.** Hand-painted 2D art, skeletal animation with blended transitions, 2D lighting, layered particle VFX, hit feedback, and an age-evolution moment that feels like an event — to the quality bar in §11. *(Fixes: dated presentation.)*
 - **G7 — Data-driven and verifiable.** Every unit, turret, ability and age lives in editable data files, and a headless AI-vs-AI simulation proves the balance targets in §6 instead of guessing.
@@ -92,10 +96,9 @@ The age-evolution lane battler has a strong, simple hook and an audience that re
 | Pacing | Median time a balanced AI reaches Age 6 | 10:00–12:00 |
 | Balance | Each personality's aggregate win rate across all opponents, equal difficulty | 40–60% |
 | Balance | Any single personality pairing | 30–70% (designed counters allowed, hard counters not) |
-| Balance | Win rate of any doctrine (across all matchups) | 40–60% |
-| Decisions | Fast-age AI vs. strong-age AI (GDD §11.3) | each wins 40–60% |
+| Decisions | Fast-age AI vs. skill-heavy AI (GDD §11.3) | each wins 40–60% |
 | Dominant units | Any single-role spam build vs. Tactician (Hard) | wins < 30% |
-| Worst-case defence | Turtle vs. Turtle, both taking Bastion | < 25% reach escalation; no match exceeds 18:00 |
+| Worst-case defence | Turtle vs. Turtle | < 25% reach escalation; no match exceeds 18:00 |
 
 The "Dominant units" row directly tests Age of War 2's "one unit type dominates" problem, the "Decisions" row tests that evolving ASAP is not always right, and the "Worst-case defence" row tests the exact turret-deadlock that produced Age of War 2's 40-minute stalemates — an aggregate stalemate rate could otherwise hide it.
 
@@ -133,7 +136,7 @@ The blind head-to-head is the M2 go/no-go gate, so it needs a fixed method:
 ### Vertical slice (the go/no-go gate)
 
 - Ages 1–2 fully finished: art, animation, VFX, audio — to the §11 quality bar.
-- All core systems working across all six ages in graybox (placeholder art): economy tide, front line, momentum, evolution, veterancy, turrets, first doctrine pick, escalation.
+- All core systems working across all six ages in graybox (placeholder art): economy tide, front line, evolution, special skills, upgrades, turrets, escalation.
 - One AI personality (Tactician) at three difficulties; Skirmish mode; post-match stats screen; the slice ruleset used for the §7 blind test.
 - Balance harness running headless and green on the §6 sim targets.
 
@@ -141,9 +144,10 @@ The blind head-to-head is the M2 go/no-go gate, so it needs a fixed method:
 
 ### Full game (v1.0)
 
-- Six ages (Stone, Bronze, Medieval, Gunpowder, Industrial, Future), four unit roles each (three in Age 1), turrets, one signature ability per age.
-- Two doctrine picks per match, four AI personalities, five difficulties.
-- **First-time experience:** Chronicle battles 1–5 each introduce one system (queueing & counters → turrets → evolving → front line & abilities → veterancy & doctrines), so no player meets everything at once.
+- Six ages (Stone, Bronze, Iron, Medieval, Gunpowder, Arcane), four unit roles each (three in Age 1), turrets, one signature ability per age.
+- Three playable races (Humans, Elves, Dwarves) with the same stats and different names, looks, bases and battlefields (GDD §5.7).
+- Four AI personalities, five difficulties.
+- **First-time experience:** Chronicle battles 1–5 each introduce one system (queueing & counters → turrets → evolving → skills & the front line → upgrades), so no player meets everything at once.
 - Skirmish, and a Campaign ("Chronicle") of ~18 handcrafted battles with modifiers.
 - Post-match stats: graphs of gold, army value, front-line position and age over time, plus key moments (evolutions, abilities, biggest trades).
 - Settings, campaign save, accessibility options, key rebinding, speed control.
@@ -153,7 +157,7 @@ The blind head-to-head is the M2 go/no-go gate, so it needs a fixed method:
 1. Campaign to 12 battles (keep the five teaching battles).
 2. Fourth AI personality (Economist).
 3. Support turret type.
-4. Age 6 doctrine-flavoured cosmetics, ability variants and other per-age extras beyond the core roster.
+4. Per-age extras beyond the core roster (skill variants, cosmetics).
 
 Never cut: the §11 quality bar on shipped ages, the balance harness, the teaching battles.
 
@@ -206,7 +210,7 @@ Development runs in Claude Code cloud sessions, with the owner's local machine u
 - **Environment setup (first M0 task):** confirm the cloud environment can download the pinned Godot 4.7 headless binary and export templates, and script that setup so every session starts identically. Pin the Godot version in the repo and in `CLAUDE.md`.
 - **Art files:** exported PNG body parts live in the repo; layered source files (`.kra`, `.psd`) stay out of it or go in Git LFS, since large binaries bloat clones and each cloud session clones fresh.
 - **`CLAUDE.md` in the repo** holds only what an agent can't infer: the commands to run tests, the sim and exports; "stats live in `data/*.tres`, never hardcoded"; "after any balance change, run the sim and include its report in the PR"; the Godot version.
-- **Suggested layout:** `docs/` (PRD, GDD, PLAN, tasks), `data/` (units, turrets, ages, doctrines, AI), `scenes/`, `scripts/`, `shaders/`, `art/`, `audio/`, `tests/`, `tools/sim/`.
+- **Suggested layout:** `docs/` (PRD, GDD, PLAN, tasks), `data/` (units, turrets, ages, skills, AI), `scenes/`, `scripts/`, `shaders/`, `art/`, `audio/`, `tests/`, `tools/sim/`.
 
 ## 11. Art Direction & Presentation Quality Bar
 
@@ -242,7 +246,7 @@ Genre mechanics — a single lane, spawning units, evolving through historical a
 | M0 | **Setup, paper & graybox** | Cloud environment script working (§10.3); repo with `CLAUDE.md`; pacing spreadsheet matching GDD §4; coloured boxes fighting in a Godot lane with economy and a scripted AI. Question answered: is it fun with boxes? |
 | M1 | **Systems prototype** | Every GDD system in graybox across all six ages; Tactician AI; headless sim reporting every §6 sim metric; match logs written. |
 | M2 | **Vertical slice** | Ages 1–2 at the §11 quality bar; post-match stats; sim green. **§7 blind test — go/no-go.** |
-| M3 | **Content production** | Ages 3–6, remaining turrets and abilities, both doctrine picks, four AI personalities. Sim re-run and green after each age lands. |
+| M3 | **Content production** | Ages 3–6, remaining turrets and skills, four AI personalities. Sim re-run and green after each age lands. |
 | M4 | **Modes & shell** | Chronicle with teaching battles, settings, saves, accessibility, rebinding. |
 | M5 | **Release prep** *(only if publishing)* | Performance pass on both §6 reference machines, platform exports, store page, trailer, demo build. |
 
@@ -251,8 +255,8 @@ M0 and M1 matter most. Art is the expensive part of this game; systems are cheap
 ## 14. Risks
 
 - **Art volume is the real cost.** Six ages × four roles, plus turrets, bases, backdrops, projectiles and effects. Modular rigs and the M2 gate are the mitigations; §9 lists what to cut.
-- **"More systems" can bury the hook.** Pillar 1 is the veto. v2 already merged the front-line rewards and dropped a doctrine pick; the Chronicle teaching battles introduce systems one at a time.
-- **Balance is combinatorial.** Six ages × doctrine picks × four personalities won't hand-tune. The headless sim is load-bearing, not optional.
+- **"More systems" can bury the hook.** Pillar 1 is the veto. v3 removed veterancy, doctrines, momentum and stances after the first playtest; the Chronicle teaching battles introduce systems one at a time.
+- **Balance is combinatorial.** Six ages × upgrade paths × four personalities won't hand-tune. The headless sim is load-bearing, not optional.
 - **The sim can be wrong.** An AI that plays badly produces misleading balance data. Compare playtest match logs with sim logs (§7) and treat big gaps as AI bugs.
 - **Visual quality can't be verified in the cloud.** Agents can build the animation and VFX systems but can't judge them. Every visual task needs a local review step, or quality will drift.
 - **Performance** with many skeletal units plus particles. Unit caps, pooling and animation LOD are designed in from M1 (GDD §16).
@@ -261,7 +265,7 @@ M0 and M1 matter most. Art is the expensive part of this game; systems are cheap
 
 ## 15. Open Questions
 
-- Should the Chronicle unlock doctrines progressively, or should everything be available in Skirmish from the start?
+- Should the Chronicle unlock upgrades progressively, or should everything be available in Skirmish from the start?
 - Controller support on PC — worth it for a mouse-driven game?
 - Final name.
 

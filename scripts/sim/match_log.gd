@@ -5,13 +5,16 @@ extends RefCounted
 
 var seed: int = 0
 var meta: Dictionary = {}
-## Each sample: {t, front, tide, esc, sides: [{gold, xp, momentum, army, age, base_hp, base_max}, ...]}
+## Each sample: {t, front, tide, esc, sides: [{gold, xp, army, age, base_hp, base_max}, ...]}
 var timeline: Array[Dictionary] = []
 var events: Array[Dictionary] = []
 ## unit id -> {spawned, gold, dealt, absorbed}, per side.
 var unit_stats: Array[Dictionary] = [{}, {}]
 var base_damage: PackedFloat32Array = PackedFloat32Array([0.0, 0.0])
 var ability_pulses: PackedInt32Array = PackedInt32Array([0, 0])
+## Gold value of units that died, by where they died: 12 buckets of 200 px of the victim's own
+## progress (0 = at its own gate, 11 = at the enemy gate). Shows whether pushes die at the gates.
+var deaths: PackedFloat32Array = PackedFloat32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
 
 func sample(sim: MatchSim) -> void:
@@ -22,7 +25,6 @@ func sample(sim: MatchSim) -> void:
 			"xp": snappedf(s.xp, 0.1),
 			"xp_earned": snappedf(s.stat_xp_earned, 0.1),
 			"gold_earned": snappedf(s.stat_gold_earned, 0.1),
-			"momentum": snappedf(s.momentum, 0.1),
 			"army": snappedf(s.army_value(), 0.1),
 			"units": s.units.size(),
 			"age": s.age,
@@ -57,6 +59,10 @@ func count_damage(side: int, def: UnitDef, dmg: float) -> void:
 
 func count_absorbed(side: int, def: UnitDef, dmg: float) -> void:
 	_stat(side, def).absorbed += dmg
+
+
+func count_death(progress: float, lane: float, value: float) -> void:
+	deaths[clampi(int(progress / lane * 12.0), 0, 11)] += value
 
 
 func count_base_damage(by_side: int, dmg: float) -> void:

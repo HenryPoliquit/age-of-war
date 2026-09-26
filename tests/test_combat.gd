@@ -31,24 +31,15 @@ func test_never_walks_past_enemy() -> void:
 func test_allies_do_not_overlap() -> void:
 	var sim := new_sim()
 	var front := place(sim, 0, "heavy", 500.0)
+	# A standing ally: its own copy of the unit data with no speed (the shared data stays untouched).
+	front.def = front.def.duplicate()
+	front.def.speed = 0.0
 	var back := place(sim, 0, "vanguard", 400.0)
-	sim.set_stance(0, &"hold", 500.0)
 	run_for(sim, 5.0)
 	check(back.progress <= front.progress - sim.rules.unit_spacing + 0.01, "spacing held")
 
 
-func test_hold_stops_at_rally_line() -> void:
-	var sim := new_sim()
-	var u := place(sim, 0, "vanguard", 0.0)
-	sim.set_stance(0, &"hold", 600.0)
-	run_for(sim, 20.0)
-	check_near(u.progress, 600.0, 0.01)
-	sim.set_stance(0, &"advance")
-	run_for(sim, 2.0)
-	check(u.progress > 600.0, "released")
-
-
-func test_base_damage_gives_xp_and_defender_momentum() -> void:
+func test_base_damage_gives_xp() -> void:
 	var sim := new_sim(false)
 	place(sim, 0, "vanguard", sim.rules.lane_length - 10.0)
 	run_for(sim, 1.0)
@@ -56,22 +47,20 @@ func test_base_damage_gives_xp_and_defender_momentum() -> void:
 	check(r.base_hp < r.base_max_hp, "base hit")
 	var dmg := r.base_max_hp - r.base_hp
 	check_near(sim.sides[0].xp, dmg * 0.1, 0.01, "1 XP per 10 damage")
-	check_near(r.momentum, dmg / r.base_max_hp * 100.0 * 0.5, 0.01, "1 momentum per 2% lost")
 
 
-func test_only_siege_damages_turrets() -> void:
+func test_all_units_damage_turrets_before_base() -> void:
 	var sim := new_sim()
 	sim.sides[1].age = 2
 	sim.build_turret(1, 0, sim.data.turret_for_kind(2, "sentry"))
 	var t: SimTurret = sim.sides[1].turrets[0]
 	var v := place(sim, 0, "vanguard", sim.rules.lane_length - 5.0, 2)
 	v.hp = 1e9
+	var base_hp := sim.sides[1].base_hp
+	sim.step()
+	check_near(t.max_hp - t.hp, v.def.damage * sim.rules.matrix(v.def.damage_type, "structure"), 0.01, "vanguard hits the turret at its structure multiplier")
 	run_for(sim, 2.0)
-	check_near(t.hp, t.max_hp, 0.01, "vanguard must not hit turrets")
-	var ram := place(sim, 0, "siege", sim.rules.lane_length - 5.0, 2)
-	ram.hp = 1e9
-	run_for(sim, 3.0)
-	check(t.hp < t.max_hp, "ram hits turret")
+	check_near(sim.sides[1].base_hp, base_hp, 0.01, "base untouched while a turret stands")
 
 
 func test_ranged_siege_min_range() -> void:
@@ -80,8 +69,7 @@ func test_ranged_siege_min_range() -> void:
 	var e := place(sim, 1, "vanguard", sim.rules.lane_length - 1000.0 - 60.0, 3)
 	e.hp = 1e9
 	var before := e.hp
-	sim.set_stance(1, &"hold", sim.to_world(1, e.progress))
-	run_for(sim, 4.0)
+	run_pinned(sim, 4.0, [e])
 	check_near(e.hp, before, 0.01, "cannot hit inside min range")
 	check(treb.alive())
 
@@ -91,7 +79,6 @@ func test_sentry_targets_most_advanced() -> void:
 	sim.build_turret(1, 0, sim.data.turret_for_kind(1, "sentry"))
 	var near := place(sim, 0, "vanguard", sim.rules.lane_length - 100.0)
 	var far := place(sim, 0, "vanguard", sim.rules.lane_length - 250.0)
-	sim.set_stance(0, &"hold", 0.0)
-	run_for(sim, 0.2)
+	run_pinned(sim, 0.2, [near, far])
 	check(near.hp < near.max_hp, "closest to base hit")
 	check_near(far.hp, far.max_hp, 0.01)

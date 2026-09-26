@@ -11,6 +11,15 @@ const LEFT := 0
 const RIGHT := 1
 const DRAW := 2
 const ROLES: Array[String] = ["vanguard", "ranged", "heavy", "siege"]
+## Upgrade rows and the stats each offers (GDD §6.1). Unit rows are the four roles.
+const UPGRADES := {
+	"vanguard": ["attack", "health", "defence"],
+	"ranged": ["attack", "health", "defence"],
+	"heavy": ["attack", "health", "defence"],
+	"siege": ["attack", "health", "defence"],
+	"turret": ["attack", "health", "range"],
+	"income": ["income"],
+}
 
 var data: GameData
 var rules: RulesDef
@@ -22,7 +31,7 @@ var front_x: float
 var escalation: int = 0
 var rng := RandomNumberGenerator.new()
 var match_log: MatchLog
-## Pending ability pulses: {side, def, center, next_t, pulse, age}
+## Pending skill pulses: {side, def, lo, hi, next_t, pulse, kills}
 var effects: Array[Dictionary] = []
 ## Short-lived records for the view (hits, shots, deaths). Cleared by the consumer.
 var fx: Array[Dictionary] = []
@@ -44,10 +53,22 @@ func _init(p_data: GameData = null, p_seed: int = 1) -> void:
 		s.turret_slots = rules.start_turret_slots
 		s.base_max_hp = data.age(1).base_max_hp
 		s.base_hp = s.base_max_hp
-		s.rally_progress = rules.lane_length * 0.35
 		sides.append(s)
 	match_log = MatchLog.new()
 	match_log.seed = p_seed
+
+
+## Skirmish option (GDD §12.1): both sides start in `age`, with base HP and starting gold for that age.
+## Call before the first step.
+func set_start_age(age: int) -> void:
+	age = clampi(age, 1, GameData.AGE_COUNT)
+	for s in sides:
+		s.age = age
+		s.base_max_hp = data.age(age).base_max_hp
+		s.base_hp = s.base_max_hp
+		s.gold = rules.start_gold * rules.age_cost_mult(age)
+		for a in range(1, age):
+			s.age_times[a] = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -73,14 +94,8 @@ func is_over() -> bool:
 # ---------------------------------------------------------------------------
 # Prices and availability (shared by the HUD and the AI)
 
-func unit_price(side: int, def: UnitDef) -> float:
-	var s := sides[side]
-	var c := float(def.cost)
-	for d in s.doctrines:
-		c *= d.unit_cost_mult
-		if def.role == "siege":
-			c *= d.siege_cost_mult
-	return roundf(c)
+func unit_price(_side: int, def: UnitDef) -> float:
+	return float(def.cost)
 
 
 func roster(side: int) -> Array[UnitDef]:
@@ -98,31 +113,74 @@ func evolve_cost(side: int) -> float:
 	return float(data.age(s.age + 1).evolve_cost)
 
 
-func veterancy_cost(side: int) -> float:
-	var s := sides[side]
-	if s.vet_ranks >= rules.veterancy_fractions.size():
-		return INF
-	return roundf(rules.veterancy_fractions[s.vet_ranks] * data.age(s.age).veterancy_base_xp)
-
-
-func forge_cost(side: int) -> float:
-	var s := sides[side]
-	if s.forge_level >= rules.forge_costs.size():
-		return INF
-	return roundf(rules.forge_costs[s.forge_level] * rules.age_cost_mult(s.age))
-
-
 func slot_cost(side: int) -> float:
 	var s := sides[side]
-	if s.turret_slots >= s.max_turret_slots():
+	if s.turret_slots >= max_turret_slots():
 		return INF
 	return roundf(rules.turret_slot_costs[s.turret_slots] * rules.age_cost_mult(s.age))
+
+
+
+func upgrade_level(side: int, row: String, stat: String) -> int:
+	return sides[side].upgrade_level(row, stat)
+
+
+## Gold for the next level; INF when maxed, unknown, or the row has no unit this age (PLAN D22).
+func upgrade_cost(side: int, row: String, stat: String) -> float:
+	if not UPGRADES.has(row) or not stat in UPGRADES[row]:
+		return INF
+	var s := sides[side]
+	var level := s.upgrade_level(row, stat)
+	if row == "income":
+		if level >= rules.income_upgrade_costs.size():
+			return INF
+		return roundf(rules.income_upgrade_costs[level] * rules.age_cost_mult(s.age))
+	if level >= rules.upgrade_cost_factors.size():
+		return INF
+	var basis := 0.0
+	if row == "turret":
+		var roster := turret_roster(side)
+		for t in roster:
+			basis += t.cost
+		basis /= maxf(1.0, roster.size())
+	else:
+		var def := data.unit_for_role(s.age, row)
+		if def == null:
+			return INF
+		basis = unit_price(side, def)
+	return roundf(rules.upgrade_cost_factors[level] * basis)
+
+
+func can_buy_upgrade(side: int, row: String, stat: String) -> bool:
+	return not is_over() and sides[side].gold >= upgrade_cost(side, row, stat)
+
+
+## Multipliers from upgrades; `row` is a role or "turret". Read at damage/HP time so they apply to
+## everything already fielded, whatever its age (PLAN D18).
+func attack_mult(side: int, row: String) -> float:
+	return 1.0 + rules.upgrade_attack_bonus * sides[side].upgrade_level(row, "attack")
+
+
+func health_mult(side: int, row: String) -> float:
+	return 1.0 + rules.upgrade_health_bonus * sides[side].upgrade_level(row, "health")
+
+
+func defence_mult(side: int, role: String) -> float:
+	return maxf(0.0, 1.0 - rules.upgrade_defence_bonus * sides[side].upgrade_level(role, "defence"))
+
+
+func turret_range_mult(side: int) -> float:
+	return 1.0 + rules.upgrade_range_bonus * sides[side].upgrade_level("turret", "range")
+
+
+func max_turret_slots() -> int:
+	return rules.turret_slot_costs.size()
 
 
 func income_rate(side: int) -> float:
 	var s := sides[side]
 	return rules.base_income * rules.tide_multiplier_at(time) \
-		* (1.0 + rules.forge_income_bonus * s.forge_level) * (1.0 + s.income_bonus)
+		* (1.0 + rules.income_upgrade_bonus * s.upgrade_level("income", "income")) * (1.0 + s.income_bonus)
 
 
 func can_queue(side: int, def: UnitDef) -> bool:
@@ -136,14 +194,13 @@ func can_evolve(side: int) -> bool:
 	return not is_over() and not s.is_evolving() and s.age < GameData.AGE_COUNT and s.xp >= evolve_cost(side)
 
 
-func can_buy_veterancy(side: int) -> bool:
-	var s := sides[side]
-	return not is_over() and not s.is_evolving() and s.xp >= veterancy_cost(side)
+func ability_cost(side: int) -> float:
+	return float(data.age(sides[side].age).ability.xp_cost)
 
 
 func can_fire_ability(side: int) -> bool:
 	var s := sides[side]
-	return not is_over() and s.momentum >= rules.ability_cost and s.ability_cooldown <= 0.0
+	return not is_over() and s.ability_cooldown <= 0.0 and s.xp >= ability_cost(side)
 
 
 # ---------------------------------------------------------------------------
@@ -188,32 +245,29 @@ func evolve(side: int) -> bool:
 	return true
 
 
-func buy_veterancy(side: int) -> bool:
-	if not can_buy_veterancy(side):
+func buy_upgrade(side: int, row: String, stat: String) -> bool:
+	if not can_buy_upgrade(side, row, stat):
 		return false
 	var s := sides[side]
-	s.xp -= veterancy_cost(side)
-	var old_mult := 1.0 + rules.veterancy_bonus * s.vet_ranks
-	s.vet_ranks += 1
-	var ratio := (1.0 + rules.veterancy_bonus * s.vet_ranks) / old_mult
-	for u in s.units:
-		if u.age == s.age:
-			u.vet_rank = s.vet_ranks
-			u.max_hp *= ratio
-			u.hp *= ratio
-	_emit({"type": "veterancy", "side": side, "rank": s.vet_ranks, "age": s.age})
-	return true
-
-
-func buy_forge(side: int) -> bool:
-	var s := sides[side]
-	var c := forge_cost(side)
-	if is_over() or s.gold < c:
-		return false
+	var c := upgrade_cost(side, row, stat)
+	var old_hp := health_mult(side, row)
 	s.gold -= c
 	s.stat_gold_spent += c
-	s.forge_level += 1
-	_emit({"type": "forge", "side": side, "level": s.forge_level})
+	s.set_upgrade_level(row, stat, s.upgrade_level(row, stat) + 1)
+	if stat == "health":
+		# Max HP rises for everything already fielded; current HP keeps its percentage (PLAN D19).
+		var ratio := health_mult(side, row) / old_hp
+		if row == "turret":
+			for t in s.turrets:
+				if t != null:
+					t.max_hp *= ratio
+					t.hp *= ratio
+		else:
+			for u in s.units:
+				if u.def.role == row:
+					u.max_hp *= ratio
+					u.hp *= ratio
+	_emit({"type": "upgrade", "side": side, "row": row, "stat": stat, "level": s.upgrade_level(row, stat)})
 	return true
 
 
@@ -239,8 +293,8 @@ func build_turret(side: int, slot: int, def: TurretDef) -> bool:
 	var t := SimTurret.new()
 	t.def = def
 	t.slot = slot
-	t.max_hp = def.hp
-	t.hp = def.hp
+	t.max_hp = def.hp * health_mult(side, "turret")
+	t.hp = t.max_hp
 	s.turrets[slot] = t
 	_emit({"type": "turret_build", "side": side, "slot": slot, "turret": String(def.id)})
 	return true
@@ -267,38 +321,73 @@ func first_free_slot(side: int) -> int:
 	return -1
 
 
-func choose_doctrine(side: int, doctrine: DoctrineDef) -> bool:
-	var s := sides[side]
-	if not s.awaiting_doctrine or doctrine == null:
-		return false
-	if not doctrine in data.age(s.age + 1).doctrine_options:
-		return false
-	s.doctrines.append(doctrine)
-	s.awaiting_doctrine = false
-	_emit({"type": "doctrine", "side": side, "doctrine": String(doctrine.id)})
-	return true
-
-
-func set_stance(side: int, stance: StringName, rally_world_x: float = NAN) -> void:
-	var s := sides[side]
-	if stance != s.stance:
-		_emit({"type": "stance", "side": side, "stance": String(stance)})
-	s.stance = stance
-	if not is_nan(rally_world_x):
-		s.rally_progress = clampf(to_progress(side, rally_world_x), 0.0, rules.lane_length)
-
-
-func fire_ability(side: int, world_x: float) -> bool:
+## Fires this side's current-era skill where its shape lands now (PLAN D20). Fails, costing nothing,
+## when there is nothing to hit (D21).
+func fire_ability(side: int) -> bool:
 	if not can_fire_ability(side):
+		return false
+	var zone := ability_zone(side)
+	if zone.is_empty():
 		return false
 	var s := sides[side]
 	var def := data.age(s.age).ability
-	s.momentum -= rules.ability_cost
+	s.xp -= def.xp_cost
 	s.ability_cooldown = rules.ability_cooldown
-	var center := clampf(world_x, 0.0, rules.lane_length)
-	effects.append({"side": side, "def": def, "center": center, "next_t": time + def.telegraph, "pulse": 0})
-	_emit({"type": "ability", "side": side, "ability": String(def.id), "x": center})
+	var center: float = (zone[0] + zone[1]) * 0.5
+	effects.append({"side": side, "def": def, "lo": zone[0], "hi": zone[1], "next_t": time + def.telegraph, "pulse": 0, "kills": 0})
+	_emit({"type": "ability", "side": side, "ability": String(def.id), "x": center, "lo": zone[0], "hi": zone[1]})
 	return true
+
+
+## [lo, hi] in world x where this side's skill would land now, or [] if no enemy unit is on the lane.
+func ability_zone(side: int) -> Array:
+	var def := data.age(sides[side].age).ability
+	var enemy := enemy_of(side)
+	var front := _front_unit(enemy)
+	if front == null:
+		return []
+	match def.shape:
+		"sweep":
+			return [0.0, rules.lane_length]
+		"strip":
+			# From the enemy's front unit back toward the enemy base.
+			var x := to_world(enemy, front.progress)
+			return [x, x + def.width] if enemy == RIGHT else [x - def.width, x]
+		_:
+			var c := _densest_window(enemy, def.width)
+			return [c - def.width * 0.5, c + def.width * 0.5]
+
+
+## Gold value of the enemy units inside this side's skill zone right now.
+func ability_zone_value(side: int) -> float:
+	var zone := ability_zone(side)
+	if zone.is_empty():
+		return 0.0
+	var enemy := enemy_of(side)
+	var v := 0.0
+	for u in sides[enemy].units:
+		var x := to_world(enemy, u.progress)
+		if u.alive() and x >= zone[0] and x <= zone[1]:
+			v += u.cost_paid
+	return v
+
+
+## Centre of the `width` window holding the most gold of `of_side`'s units. Candidate windows start or
+## end at a unit; the first best window in unit order wins ties (deterministic).
+func _densest_window(of_side: int, width: float) -> float:
+	var best := NAN
+	var best_v := -1.0
+	for u in sides[of_side].units:
+		var start := to_world(of_side, u.progress)
+		for c in [start + width * 0.5, start - width * 0.5]:
+			var v := 0.0
+			for w in sides[of_side].units:
+				if w.alive() and absf(to_world(of_side, w.progress) - c) <= width * 0.5:
+					v += w.cost_paid
+			if v > best_v:
+				best_v = v
+				best = c
+	return best
 
 
 # ---------------------------------------------------------------------------
@@ -324,7 +413,7 @@ func step() -> void:
 		_turrets_act(s, dt)
 	_resolve_effects()
 	_remove_dead()
-	_front_and_momentum(dt)
+	_update_front()
 	_check_end()
 	_log_accum += dt
 	if _log_accum >= 1.0 - 1e-6:
@@ -339,32 +428,17 @@ func _economy(s: SimSide, dt: float) -> void:
 
 
 func _evolution(s: SimSide, dt: float) -> void:
-	if s.evolve_left <= 0.0 or s.awaiting_doctrine:
-		return
-	# The doctrine choice opens as the transition starts; its timer pauses until chosen (GDD §13.5).
-	if s.evolve_left >= rules.evolve_time - 1e-6 and not data.age(s.age + 1).doctrine_options.is_empty() \
-			and _doctrine_pending(s):
-		s.awaiting_doctrine = true
-		_emit({"type": "doctrine_offer", "side": s.index, "age": s.age + 1})
+	if s.evolve_left <= 0.0:
 		return
 	s.evolve_left -= dt
 	if s.evolve_left <= 1e-6:
 		s.evolve_left = 0.0
 		var pct := s.base_hp / s.base_max_hp
 		s.age += 1
-		s.vet_ranks = 0
 		s.base_max_hp = data.age(s.age).base_max_hp
 		s.base_hp = s.base_max_hp * pct
 		s.age_times[s.age - 1] = time
 		_emit({"type": "evolve", "side": s.index, "age": s.age})
-
-
-func _doctrine_pending(s: SimSide) -> bool:
-	var options := data.age(s.age + 1).doctrine_options
-	for d in s.doctrines:
-		if d in options:
-			return false
-	return true
 
 
 func _training(s: SimSide, dt: float) -> void:
@@ -391,16 +465,9 @@ func _spawn(s: SimSide, def: UnitDef, paid: float) -> SimUnit:
 	u.def = def
 	u.age = def.age
 	u.cost_paid = paid
-	var hp_mult := 1.0
-	var dmg_mult := 1.0
-	for d in s.doctrines:
-		hp_mult *= d.unit_hp_mult
-		dmg_mult *= d.unit_damage_mult
-	u.vet_rank = s.vet_ranks if def.age == s.age else 0
-	var vet := 1.0 + rules.veterancy_bonus * u.vet_rank
-	u.max_hp = def.hp * hp_mult * vet
+	u.max_hp = def.hp * health_mult(s.index, def.role)
 	u.hp = u.max_hp
-	u.base_damage = def.damage * dmg_mult
+	u.base_damage = def.damage
 	s.units.append(u)
 	match_log.count_spawn(s.index, def, paid)
 	return u
@@ -423,7 +490,7 @@ func _apply_auras() -> void:
 			if t == null or t.def.kind != "support":
 				continue
 			for u in sides[enemy_of(s.index)].units:
-				if rules.lane_length - u.progress <= t.def.aura_radius:
+				if rules.lane_length - u.progress <= t.def.aura_radius * turret_range_mult(s.index):
 					u.slow = maxf(u.slow, t.def.aura_slow)
 
 
@@ -457,22 +524,24 @@ func _units_act(s: SimSide, enemy_front: SimUnit, dt: float) -> void:
 			if u.cooldown <= 0.0:
 				u.cooldown = def.attack_interval
 				u.last_attack_time = time
+				if record_fx:
+					var to_x := to_world(enemy.index, target_unit.progress) if target_unit != null else to_world(enemy.index, 0.0)
+					fx.append({"type": "shot", "side": u.side, "unit": u, "def": def, "from_x": to_world(u.side, u.progress),
+						"to_x": to_x, "structure": target_unit == null, "target": target_unit})
 				if target_unit != null:
-					_hit_unit(u, target_unit, u.base_damage * u.damage_mult(rules.veterancy_bonus), def.damage_type)
+					_hit_unit(u, target_unit, u.base_damage * attack_mult(u.side, def.role), def.damage_type)
 				else:
 					_hit_structures(u, enemy)
 		# Melee presses in to contact distance while fighting so the allies behind it come into reach;
 		# ranged units hold at their range.
 		var melee := def.range <= rules.melee_range_max and not def.is_ranged_siege()
 		if not attacking or melee:
-			# Movement is code-driven; blocked by the ally ahead, the nearest enemy and a Hold rally line.
+			# Movement is code-driven; blocked by the ally ahead and the nearest enemy.
 			var limit := lane - rules.melee_contact
 			if ahead != null:
 				limit = minf(limit, ahead.progress - rules.unit_spacing)
 			if enemy_front != null and enemy_front.alive():
 				limit = minf(limit, lane - enemy_front.progress - rules.melee_contact)
-			if s.stance == &"hold" and not attacking:
-				limit = minf(limit, s.rally_progress)
 			var target_p := u.progress + def.speed * (1.0 - u.slow) * dt
 			var new_p := maxf(u.progress, minf(target_p, limit))
 			if not attacking:
@@ -491,9 +560,7 @@ func _hit_unit(attacker: SimUnit, target: SimUnit, raw: float, dtype: String) ->
 func _damage_unit(target: SimUnit, raw: float, dtype: String, by_side: int) -> float:
 	if not target.alive():
 		return 0.0
-	var dmg := raw * rules.matrix(dtype, target.def.armour)
-	if target.armour_buff_until > time:
-		dmg /= 1.0 + target.armour_buff
+	var dmg := raw * rules.matrix(dtype, target.def.armour) * defence_mult(target.side, target.def.role)
 	dmg = minf(dmg, target.hp)
 	target.hp -= dmg
 	target.stat_damage_taken += dmg
@@ -508,36 +575,34 @@ func _damage_unit(target: SimUnit, raw: float, dtype: String, by_side: int) -> f
 
 func _on_kill(victim: SimUnit, by_side: int) -> void:
 	var s := sides[by_side]
+	match_log.count_death(victim.progress, rules.lane_length, victim.cost_paid)
 	var bounty := victim.cost_paid * rules.bounty_fraction
 	s.gold += bounty
 	s.stat_gold_earned += bounty
 	s.xp += victim.cost_paid * rules.xp_per_kill_fraction
 	s.stat_xp_earned += victim.cost_paid * rules.xp_per_kill_fraction
-	s.momentum = minf(rules.momentum_cap, s.momentum + victim.def.momentum_on_kill)
 	if record_fx:
-		fx.append({"type": "death", "x": to_world(victim.side, victim.progress), "side": victim.side, "role": victim.def.role})
+		fx.append({"type": "death", "x": to_world(victim.side, victim.progress), "side": victim.side, "role": victim.def.role,
+			"def": victim.def, "unit_id": victim.id})
 
 
 func _hit_structures(u: SimUnit, enemy: SimSide) -> void:
-	var own := sides[u.side]
-	var raw := u.base_damage * u.damage_mult(rules.veterancy_bonus) * rules.matrix(u.def.damage_type, "structure")
+	var raw := u.base_damage * attack_mult(u.side, u.def.role) * rules.matrix(u.def.damage_type, "structure")
 	raw *= 1.0 + rules.escalation_structure_bonus * escalation
-	if u.def.role == "siege":
-		for d in own.doctrines:
-			raw *= d.siege_structure_mult
-		# Only Siege reaches turrets; it knocks them out before the base (PLAN D3).
-		for t in enemy.turrets:
-			if t != null and t.alive():
-				var dmg := minf(raw, t.hp)
-				t.hp -= dmg
-				u.stat_damage_dealt += dmg
-				match_log.count_damage(u.side, u.def, dmg)
-				if t.hp <= 0.0:
-					enemy.turrets[t.slot] = null
-					_emit({"type": "turret_destroyed", "side": enemy.index, "slot": t.slot, "turret": String(t.def.id)})
-				if record_fx:
-					fx.append({"type": "hit", "x": to_world(enemy.index, 0.0), "dtype": u.def.damage_type, "side": enemy.index, "structure": true})
-				return
+	# Any unit at the gate knocks out turrets (lowest slot first) before the base; the matrix makes
+	# Siege the structure-breaker (spec §2.3, superseding PLAN D3).
+	for t in enemy.turrets:
+		if t != null and t.alive():
+			var dmg := minf(raw, t.hp)
+			t.hp -= dmg
+			u.stat_damage_dealt += dmg
+			match_log.count_damage(u.side, u.def, dmg)
+			if t.hp <= 0.0:
+				enemy.turrets[t.slot] = null
+				_emit({"type": "turret_destroyed", "side": enemy.index, "slot": t.slot, "turret": String(t.def.id)})
+			if record_fx:
+				fx.append({"type": "hit", "x": to_world(enemy.index, 0.0), "dtype": u.def.damage_type, "side": enemy.index, "structure": true})
+			return
 	u.stat_damage_dealt += minf(raw, enemy.base_hp)
 	match_log.count_damage(u.side, u.def, minf(raw, enemy.base_hp))
 	damage_base(enemy, raw, u.side)
@@ -552,7 +617,6 @@ func damage_base(s: SimSide, raw: float, by_side: int) -> void:
 	var attacker := sides[by_side]
 	attacker.xp += dmg * rules.xp_per_base_damage
 	attacker.stat_xp_earned += dmg * rules.xp_per_base_damage
-	s.momentum = minf(rules.momentum_cap, s.momentum + dmg / s.base_max_hp * 100.0 * rules.momentum_per_base_pct)
 	match_log.count_base_damage(by_side, dmg)
 	if record_fx:
 		fx.append({"type": "hit", "x": to_world(s.index, 0.0), "dtype": "siege", "side": s.index, "structure": true})
@@ -568,23 +632,24 @@ func _turrets_act(s: SimSide, dt: float) -> void:
 		if t.cooldown > 0.0:
 			continue
 		var mult := 1.0 - rules.escalation_turret_penalty * escalation
-		for d in s.doctrines:
-			mult *= d.turret_damage_mult
-		var raw: float = t.def.damage * mult
+		var raw: float = t.def.damage * mult * attack_mult(s.index, "turret")
+		var reach: float = t.def.range * turret_range_mult(s.index)
 		if t.def.kind == "sentry":
 			# Enemy unit closest to our base = the most advanced enemy.
 			var target := _front_unit(enemy.index)
-			if target != null and lane - target.progress <= t.def.range:
+			if target != null and lane - target.progress <= reach:
 				t.cooldown = t.def.attack_interval
 				t.last_fire_time = time
 				t.last_target_x = to_world(enemy.index, target.progress)
+				if record_fx:
+					fx.append({"type": "turret_shot", "side": s.index, "slot": t.slot, "def": t.def, "to_x": t.last_target_x, "target": target if t.def.kind == "sentry" else null})
 				t.stat_damage_dealt += _damage_unit(target, raw, t.def.damage_type, s.index)
 		elif t.def.kind == "artillery":
 			var best: SimUnit = null
 			var best_count := 0
 			for u in enemy.units:
 				var d := lane - u.progress
-				if not u.alive() or d < t.def.min_range or d > t.def.range:
+				if not u.alive() or d < t.def.min_range or d > reach:
 					continue
 				var count := 0
 				for v in enemy.units:
@@ -597,10 +662,26 @@ func _turrets_act(s: SimSide, dt: float) -> void:
 				t.cooldown = t.def.attack_interval
 				t.last_fire_time = time
 				t.last_target_x = to_world(enemy.index, best.progress)
+				if record_fx:
+					fx.append({"type": "turret_shot", "side": s.index, "slot": t.slot, "def": t.def, "to_x": t.last_target_x, "target": null})
 				var center := best.progress
 				for v in enemy.units:
 					if v.alive() and absf(v.progress - center) <= t.def.splash:
 						t.stat_damage_dealt += _damage_unit(v, raw, t.def.damage_type, s.index)
+
+
+func _update_front() -> void:
+	var lf := _front_unit(LEFT)
+	var rf := _front_unit(RIGHT)
+	var lane := rules.lane_length
+	if lf == null and rf == null:
+		return
+	if lf == null:
+		front_x = 0.0
+	elif rf == null:
+		front_x = lane
+	else:
+		front_x = (lf.progress + lane - rf.progress) * 0.5
 
 
 func _resolve_effects() -> void:
@@ -613,20 +694,22 @@ func _resolve_effects() -> void:
 			e.next_t += def.pulse_interval
 		if e.pulse < def.pulses:
 			keep.append(e)
+		else:
+			_emit({"type": "ability_end", "side": e.side, "ability": String(def.id), "kills": e.kills})
 	effects = keep
 
 
 func _ability_pulse(e: Dictionary) -> void:
 	var def: AbilityDef = e.def
-	var lo: float = e.center - def.width * 0.5
-	var hi: float = e.center + def.width * 0.5
-	if def.sweep and def.pulses > 1:
-		var slice := def.width / def.pulses
-		# Sweeps travel away from the caster, toward the enemy base.
+	var lo: float = e.lo
+	var hi: float = e.hi
+	if def.shape == "sweep" and def.pulses > 1:
+		# Sweeps travel away from the caster, one slice per pulse.
+		var slice := (hi - lo) / def.pulses
 		var i: int = e.pulse if e.side == LEFT else def.pulses - 1 - e.pulse
-		lo = e.center - def.width * 0.5 + slice * i
+		lo = e.lo + slice * i
 		hi = lo + slice
-	var target_side: int = e.side if def.affects == "ally" else enemy_of(e.side)
+	var target_side := enemy_of(e.side)
 	if record_fx:
 		fx.append({"type": "ability_pulse", "lo": lo, "hi": hi, "side": e.side, "ability": String(def.id)})
 	for u in sides[target_side].units:
@@ -635,13 +718,11 @@ func _ability_pulse(e: Dictionary) -> void:
 		var x := to_world(u.side, u.progress)
 		if x < lo or x > hi:
 			continue
-		if def.affects == "ally":
-			u.armour_buff = def.armour_buff
-			u.armour_buff_until = time + def.buff_duration
-		else:
-			_damage_unit(u, def.damage, def.damage_type, e.side)
-			if def.knockback > 0.0 and u.alive():
-				u.progress = maxf(0.0, u.progress - def.knockback)
+		_damage_unit(u, def.damage, def.damage_type, e.side)
+		if not u.alive():
+			e.kills += 1
+		elif def.knockback > 0.0:
+			u.progress = maxf(0.0, u.progress - def.knockback)
 	match_log.count_ability_damage(e.side)
 
 
@@ -652,26 +733,6 @@ func _remove_dead() -> void:
 			if u.alive():
 				alive.append(u)
 		s.units = alive
-
-
-func _front_and_momentum(dt: float) -> void:
-	var lf := _front_unit(LEFT)
-	var rf := _front_unit(RIGHT)
-	var lane := rules.lane_length
-	if lf != null or rf != null:
-		var lx := lf.progress if lf != null else 0.0
-		var rx := lane - rf.progress if rf != null else lane
-		if lf == null:
-			front_x = 0.0
-		elif rf == null:
-			front_x = lane
-		else:
-			front_x = (lx + rx) * 0.5
-	var half := lane * 0.5
-	if front_x > half + 1e-6:
-		sides[LEFT].momentum = minf(rules.momentum_cap, sides[LEFT].momentum + rules.momentum_push_rate * dt)
-	elif front_x < half - 1e-6:
-		sides[RIGHT].momentum = minf(rules.momentum_cap, sides[RIGHT].momentum + rules.momentum_push_rate * dt)
 
 
 func _check_end() -> void:
