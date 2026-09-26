@@ -393,77 +393,72 @@ static func _elf(ci: CanvasItem, age: int, h: float, tm: Color, glow: Color) -> 
 				ci.draw_line(Vector2(x * 0.6, -h + 2), Vector2(x, -h + 5.5), Color(0, 0, 0, 0.25), 0.8)
 			_ferns(ci, [-19.0, 18.0], leaf)
 		5:
-			# A great flower on a curving stem: veined leaves, layered petals, stamens, dew and pollen.
-			var stem := PackedVector2Array()
-			for n in 15:
-				var u := n / 14.0
-				stem.append(Vector2(sin(u * 3.0) * 5.0, -u * (h - 8)))
-			ci.draw_polyline(stem, INK, 8.6)
-			ci.draw_polyline(stem, _d(leaf), 6.8)
-			var hi := PackedVector2Array()
-			for v in stem:
-				hi.append(v + Vector2(-1.8, 0))
-			ci.draw_polyline(hi, Color(_d(leaf).lightened(0.3), 0.6), 1.2)
-			for side in [-1.0, 1.0]:
-				var base := Vector2(sin((0.3 if side < 0 else 0.5) * 3.0) * 5.0, -h * (0.3 if side < 0 else 0.5))
-				_shape(ci, [base, base + Vector2(side * 12, -12), base + Vector2(side * 27, -7), base + Vector2(side * 14, 3)], leaf.lightened(0.08), 0.9)
-				ci.draw_line(base, base + Vector2(side * 25, -7), _d(leaf.darkened(0.25)), 1.0)
-				for k in 3:
-					var m := base + Vector2(side * (7 + k * 6), -4.5 - k * 0.6)
-					ci.draw_line(m, m + Vector2(side * 3, -4), _d(leaf.darkened(0.2)), 0.7)
-			_oval(ci, Vector2(0, -h + 8), Vector2(6, 4), leaf.darkened(0.1), 0.8)
-			var petal := Color("eef2fa")
-			for layer in 2:
-				for n in 5:
-					var a := PI + (n + 0.5 + layer * 0.5) * PI / 5.5
-					var d := Vector2(cos(a), sin(a))
-					var c := Vector2(0, -h + 6)
-					var len := 22.0 - layer * 5.0
-					_shape(ci, [c, c + d * len * 0.6 + d.orthogonal() * 6.5, c + d * len, c + d * len * 0.6 - d.orthogonal() * 6.5], petal.lerp(glow, 0.12 + 0.12 * layer), 0.8)
-					ci.draw_line(c + d * 3, c + d * (len - 4), Color(_d(glow), 0.4), 0.8)
-			for n in 5:
-				var a := PI * 1.15 + n * PI * 0.17
-				var tip := Vector2(0, -h + 4) + Vector2(cos(a), sin(a)) * 11.0
-				ci.draw_line(Vector2(0, -h + 4), tip, _d(Color("e8d890")), 0.8)
-				ci.draw_circle(tip, 1.2, _d(Color("f2c94c")))
-			ci.draw_circle(Vector2(-12, -h * 0.5 - 6), 1.2, Color(1, 1, 1, 0.8))
+			# Moon-mushroom: a pale stalk with a ring and shelf-fungus steps, a broad capped top with
+			# glowing gills, spots, and a lantern hanging from the rim.
+			var stalk := Color("e6e0cc")
+			var cap := Color("b9c6e0")
+			_oval(ci, Vector2(0, -3), Vector2(20, 6), moss, 0.9)
+			_shape(ci, [Vector2(-11, -2), Vector2(-7, -h * 0.5), Vector2(-6, -h + 10), Vector2(6, -h + 10), Vector2(7, -h * 0.5), Vector2(11, -2)], stalk)
+			for x in [-3.0, 0.5, 4.0]:
+				ci.draw_line(Vector2(x * 1.5, -4), Vector2(x, -h + 12), Color(0, 0, 0, 0.12), 1.0)
+			_rim(ci, Vector2(-10, -4), Vector2(-6, -h + 12), stalk)
+			# Skirt ring and three shelf fungi spiralling up the stalk.
+			_shape(ci, [Vector2(-10, -h * 0.52), Vector2(10, -h * 0.52), Vector2(12, -h * 0.46), Vector2(-12, -h * 0.46)], stalk.darkened(0.08), 0.9)
+			for n in 3:
+				var side := -1.0 if n % 2 == 0 else 1.0
+				var y := -12.0 - n * (h * 0.22)
+				var c := Vector2(side * 9.0, y)
+				_shape(ci, [c + Vector2(-side * 2, 2), c + Vector2(side * 9, 1), c + Vector2(side * 7, -3), c + Vector2(-side * 1, -3)], Color("c8a878"), 0.8)
+				ci.draw_line(c + Vector2(-side * 1, -1.5), c + Vector2(side * 7, -1.5), _d(Color("e8d0a0")), 0.8)
+			# Cap: a broad dome whose flat top carries the turret; gills glow underneath.
+			var rim_y := -h + 9.0
+			for n in 9:
+				var x := -22.0 + n * 5.5
+				ci.draw_line(Vector2(x * 0.3, rim_y - 1), Vector2(x, rim_y + 1.5), Color(glow, 0.35 + 0.35 * BaseArt.night), 1.2)
+			_shape(ci, [Vector2(-28, rim_y), Vector2(-22, -h + 1), Vector2(-10, -h - 2), Vector2(10, -h - 2), Vector2(22, -h + 1), Vector2(28, rim_y), Vector2(16, rim_y + 3), Vector2(-16, rim_y + 3)], cap)
+			_rim(ci, Vector2(-22, -h + 1), Vector2(-10, -h - 2), cap)
+			for p in [Vector2(-17, -h + 3), Vector2(-7, -h), Vector2(15, -h + 2), Vector2(21, -h + 6), Vector2(-23, -h + 7)]:
+				ci.draw_circle(p, 1.6, _d(Color("f2f4fa")))
+			_lantern(ci, Vector2(22, rim_y + 2), glow.lerp(Color.WHITE, 0.4), Color("6a6a7a"))
 			var k := 0.6 + 0.4 * sin(_t * 2.0)
-			for n in 5:
-				var a := _t * 0.8 + n * TAU / 5.0
-				ci.draw_circle(Vector2(cos(a) * 18.0, -h - 4 + sin(a) * 6.0), 1.4, Color(glow, 0.75 * k))
-			_ferns(ci, [-14.0, 14.0], leaf)
-			ci.draw_circle(Vector2(-18, -1), 1.8, _d(Color("c8a0e8")))
-			ci.draw_circle(Vector2(19, -1), 1.8, _d(Color("f2d8e6")))
+			for n in 4:
+				var a := _t * 0.7 + n * TAU / 4.0
+				ci.draw_circle(Vector2(cos(a) * 30.0, -h * 0.6 + sin(a) * 8.0), 1.4, Color(glow, 0.7 * k))
+			_mushrooms(ci, [Vector2(-16, -2), Vector2(-13, -1), Vector2(15, -2)], Color("b9c6e0"))
+			_ferns(ci, [-21.0, 21.0], leaf)
 		_:
-			# Crystal bloom: two-tone faceted shards from a mossy mound, inner light, a floating leaf.
-			_oval(ci, Vector2(0, -4), Vector2(22, 8), moss.darkened(0.05), 0.9)
-			for p in [Vector2(-16, -6), Vector2(14, -8), Vector2(2, -9)]:
-				_moss(ci, p, Vector2(5, 2.5), moss)
-			var crystal := Color("cfe6f2").lerp(glow, 0.35)
+			# Crystal spire: a faceted pillar grown from a mossy stone, flat-topped for the turret, with
+			# smaller crystals at its foot, a moonsilver vine and a pulsing core.
+			var crystal := Color("6fa4cc").lerp(glow, 0.25)
 			var k := 0.6 + 0.4 * sin(_t * 1.8)
-			ci.draw_circle(Vector2(0, -h * 0.45), 18.0, Color(glow, 0.1 + 0.08 * k))
-			for p in [[-10.0, 0.55, -0.28], [10.0, 0.62, 0.24], [-4.0, 0.78, -0.08], [4.0, 0.92, 0.06]]:
-				var x: float = p[0]
-				var sh: float = p[1] * (h - 14)
-				var lean: float = p[2]
-				var base := Vector2(x, -6)
-				var tip := base + Vector2(0, -sh).rotated(lean)
-				var side := Vector2(5.5, 0).rotated(lean)
-				var sh_top := Vector2(0, 8).rotated(lean)
-				_shape(ci, [base - side, tip - side * 0.6 + sh_top, tip, tip + side * 0.6 + sh_top, base + side], crystal, 0.9)
-				ci.draw_colored_polygon(PackedVector2Array([base, tip, tip + side * 0.6 + sh_top, base + side]), Color(_d(crystal).darkened(0.18), 0.8))
-				ci.draw_line(base - side * 0.3, tip - side * 0.2, Color(1, 1, 1, 0.55), 0.9)
-			for p in [Vector2(-18, -2), Vector2(19, -3)]:
-				_shape(ci, [p + Vector2(-2, 0), p + Vector2(0, -6), p + Vector2(2, 0)], crystal, 0.6)
-			for n in 5:
-				var u := fmod(_t * 0.5 + n * 0.2, 1.0)
-				ci.draw_circle(Vector2(-8 + n * 4, lerpf(-h * 0.8, -h + 6, u)), 1.4, Color(glow, 0.8 * (1.0 - u)))
-			var hover := sin(_t * 1.5) * 2.0
-			ci.draw_circle(Vector2(0, -h + 6 + hover), 16.0, Color(glow, 0.1 + 0.08 * k))
-			_shape(ci, [Vector2(-28, -h + 1 + hover), Vector2(-16, -h + 7 + hover), Vector2(16, -h + 7 + hover), Vector2(28, -h + 1 + hover), Vector2(16, -h - 3 + hover), Vector2(-16, -h - 3 + hover)], leaf.lerp(glow, 0.25))
-			ci.draw_line(Vector2(-26, -h + 2 + hover), Vector2(26, -h + 2 + hover), Color(glow, 0.85), 1.3)
-			for x in [-16.0, -8.0, 8.0, 16.0]:
-				ci.draw_line(Vector2(x * 0.5, -h + 2 + hover), Vector2(x, -h + 5.5 + hover), Color(glow, 0.5), 0.8)
+			_rock(ci, Vector2(-14, 0), 8.0, stone.darkened(0.1))
+			_rock(ci, Vector2(13, 0), 7.0, stone.darkened(0.18))
+			_oval(ci, Vector2(0, -5), Vector2(17, 5), stone, 0.9)
+			_moss(ci, Vector2(-8, -8), Vector2(7, 2.5), moss)
+			ci.draw_circle(Vector2(0, -h * 0.5), 22.0, Color(glow, 0.08 + 0.07 * k))
+			var top := -h + 3.0
+			_shape(ci, [Vector2(-10, -8), Vector2(-8, top + 6), Vector2(-12, top), Vector2(12, top), Vector2(8, top + 6), Vector2(10, -8)], crystal)
+			ci.draw_colored_polygon(PackedVector2Array([Vector2(1, -8), Vector2(1, top + 2), Vector2(12, top), Vector2(8, top + 6), Vector2(10, -8)]), Color(_d(crystal).darkened(0.2), 0.85))
+			ci.draw_rect(Rect2(-2.5, top + 10, 5, -top - 22), Color(glow, 0.35 + 0.35 * k))
+			ci.draw_line(Vector2(-5, -10), Vector2(-5, top + 6), Color(1, 1, 1, 0.55), 1.0)
+			_shape(ci, UnitArt._ellipse_pts(Vector2(0, top), Vector2(12.5, 3.2), 0.0, 12), crystal.lightened(0.2), 0.9)
+			for p in [[-12.0, 26.0, -0.45], [12.0, 22.0, 0.4], [-6.0, 16.0, -0.15], [7.0, 14.0, 0.2]]:
+				var base := Vector2(p[0], -6)
+				var tip := base + Vector2(0, -float(p[1])).rotated(float(p[2]))
+				var side := Vector2(3.5, 0).rotated(float(p[2]))
+				_shape(ci, [base - side, tip - side * 0.5 + Vector2(0, 4).rotated(float(p[2])), tip, tip + side * 0.5 + Vector2(0, 4).rotated(float(p[2])), base + side], crystal, 0.8)
+				ci.draw_colored_polygon(PackedVector2Array([base, tip, tip + side * 0.5 + Vector2(0, 4).rotated(float(p[2])), base + side]), Color(_d(crystal).darkened(0.2), 0.8))
+			for y in [-h * 0.3, -h * 0.62]:
+				var w := lerpf(10.0, 8.5, -y / h)
+				_shape(ci, [Vector2(-w - 1.5, y - 2), Vector2(w + 1.5, y - 2), Vector2(w + 1, y + 2), Vector2(-w - 1, y + 2)], gold, 0.8)
+				ci.draw_circle(Vector2(0, y), 1.5, Color(glow, 0.9))
+			for p in [Vector2(-7, -h * 0.45), Vector2(4, -h * 0.78), Vector2(-3, -h * 0.18)]:
+				ci.draw_line(p, p + Vector2(3, -6), Color(1, 1, 1, 0.45), 0.9)
+			for n in 3:
+				var a := _t * 1.1 + n * TAU / 3.0
+				var p := Vector2(cos(a) * 20.0, top + 14 + sin(a) * 5.0)
+				if sin(a) > -0.3:
+					_shape(ci, [p + Vector2(0, -4), p + Vector2(2, 0), p + Vector2(0, 4), p + Vector2(-2, 0)], crystal.lightened(0.2), 0.6)
 	# Team colour: a leaf-shaped ribbon tied round the tower.
 	var ry := -h * 0.42
 	_shape(ci, [Vector2(8, ry), Vector2(18, ry + 3), Vector2(24, ry + 10), Vector2(16, ry + 8), Vector2(8, ry + 5)], tm, 0.8)
