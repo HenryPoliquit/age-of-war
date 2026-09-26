@@ -4,7 +4,7 @@
 **Author:** Paul
 **Status:** Draft v2
 **Last updated:** 2026-09-25
-**Companion document:** `GDD_Timefront.md` — the Game Design Document. This PRD says *why* and *what counts as success*; the GDD says *how the game works*, with the numbers. In the spec-driven chain (PRD → spec → plan → tasks → implement), the GDD plays the role of the spec/SRD.
+**Companion document:** `docs/GDD.md` — the Game Design Document. This PRD says *why* and *what counts as success*; the GDD says *how the game works*, with the numbers. In the spec-driven chain (PRD → spec → plan → tasks → implement), the GDD plays the role of the spec/SRD.
 
 ### What changed in v2
 

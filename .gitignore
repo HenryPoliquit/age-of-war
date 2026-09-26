@@ -1,0 +1,8 @@
+.godot/
+/tools/godot
+/build/
+/logs/
+/reports/*.json
+*.kra
+*.psd
+export_presets.cfg.local

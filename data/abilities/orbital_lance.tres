@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AbilityDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ability_def.gd" id="1_714xn"]
+
+[resource]
+script = ExtResource("1_714xn")
+id = &"orbital_lance"
+display_name = "Orbital Lance"
+age = 6
+width = 90.0
+telegraph = 1.5
+damage = 9904.0

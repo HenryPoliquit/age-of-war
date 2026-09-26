@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="AbilityDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ability_def.gd" id="1_ylyhm"]
+
+[resource]
+script = ExtResource("1_ylyhm")
+id = &"shieldwall"
+display_name = "Shieldwall"
+age = 2
+affects = "ally"
+telegraph = 0.2
+armour_buff = 0.4
+buff_duration = 8.0

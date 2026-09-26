@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="AiPersonalityDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ai_personality_def.gd" id="1_62vmv"]
+
+[resource]
+script = ExtResource("1_62vmv")
+id = &"economist"
+display_name = "Economist"
+role_mix = {
+"heavy": 0.25,
+"ranged": 0.3,
+"siege": 0.05,
+"vanguard": 0.4
+}
+reserve_seconds = 6.0
+forge_target = 3
+forge_after = 10.0
+doctrine_prefs = Array[StringName]([&"elite", &"siegecraft"])

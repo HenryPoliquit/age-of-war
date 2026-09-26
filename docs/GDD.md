@@ -4,7 +4,7 @@
 **Author:** Paul
 **Status:** Draft v2
 **Last updated:** 2026-09-25
-**Companion document:** `PRD_Timefront.md` — goals, success metrics, scope, engine choice, development workflow. This document is the spec: how the game works, with starting numbers.
+**Companion document:** `docs/PRD.md` — goals, success metrics, scope, engine choice, development workflow. This document is the spec: how the game works, with starting numbers.
 
 > **About the numbers.** Every value here is a *starting baseline* for the balance harness (§15), not a final answer. Values live in data files, not code, and are expected to move. What should not move without revisiting the PRD are the *systems* and the *acceptance targets*.
 

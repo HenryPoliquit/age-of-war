@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="AiPersonalityDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ai_personality_def.gd" id="1_l2v8i"]
+
+[resource]
+script = ExtResource("1_l2v8i")
+id = &"turtle"
+display_name = "Turtle"
+role_mix = {
+"heavy": 0.2,
+"ranged": 0.35,
+"siege": 0.05,
+"vanguard": 0.4
+}
+reserve_seconds = 6.0
+age_plan = "strong"
+turret_target = 4
+turret_after = 20.0
+turret_panic_hp = 0.95
+doctrine_prefs = Array[StringName]([&"elite", &"bastion"])

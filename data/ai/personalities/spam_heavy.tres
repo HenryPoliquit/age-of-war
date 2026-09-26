@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="AiPersonalityDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ai_personality_def.gd" id="1_vf5r8"]
+
+[resource]
+script = ExtResource("1_vf5r8")
+id = &"spam_heavy"
+display_name = "Spam: Heavy"
+sim_only = true
+spam_role = "heavy"
+age_plan = "fast"

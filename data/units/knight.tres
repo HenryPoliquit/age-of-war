@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="UnitDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/unit_def.gd" id="1_7sqbm"]
+
+[resource]
+script = ExtResource("1_7sqbm")
+id = &"knight"
+display_name = "Knight"
+age = 3
+role = "heavy"
+armour = "heavy"
+damage_type = "blast"
+cost = 289
+train_time = 3.0
+hp = 1516.0
+damage = 110.5
+attack_interval = 1.6
+range = 40.0
+min_range = 0.0
+speed = 45.0
+momentum_on_kill = 3

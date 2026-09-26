@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="TurretDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/turret_def.gd" id="1_2qm6i"]
+
+[resource]
+script = ExtResource("1_2qm6i")
+id = &"pulse_turret"
+display_name = "Pulse Turret"
+age = 6
+kind = "sentry"
+damage_type = "pierce"
+cost = 1420
+hp = 9904.0
+damage = 267.4
+attack_interval = 1.4
+range = 300.0
+min_range = 0.0
+splash = 0.0
+aura_radius = 0.0
+aura_slow = 0.0
