@@ -74,8 +74,25 @@ func test_fx_records_only_when_enabled() -> void:
 
 
 func test_ai_buys_unit_or_turret_upgrades() -> void:
+	# Emergent behaviour, so judged over several matches rather than one seed.
 	var gd := GameData.get_default()
-	var r := MatchRunner.run(gd, {"personality": &"tactician"}, {"personality": &"turtle"}, 11)
-	var bought: Array = r.log.events.filter(func(ev): return ev.type == "upgrade" and ev.row != "income")
-	check(not bought.is_empty(), "some unit or turret upgrade was bought")
-	check(bought.any(func(ev): return ev.row == "turret" and ev.side == 1), "Turtle upgrades its turrets")
+	var turtle_turret_upgrades := 0
+	for seed in range(11, 16):
+		var r := MatchRunner.run(gd, {"personality": &"tactician"}, {"personality": &"turtle"}, seed)
+		var bought: Array = r.log.events.filter(func(ev): return ev.type == "upgrade" and ev.row != "income")
+		check(not bought.is_empty(), "seed %d: some unit or turret upgrade was bought" % seed)
+		turtle_turret_upgrades += bought.filter(func(ev): return ev.row == "turret" and ev.side == 1).size()
+	check(turtle_turret_upgrades > 0, "Turtle upgrades its turrets in at least one of five matches")
+
+
+func test_ai_upgrades_only_what_pays_off() -> void:
+	var sim := new_sim()
+	var ai := UtilityAI.make(sim.data, &"tactician", &"hard", 0)
+	place(sim, 0, "vanguard", 100.0)
+	place(sim, 0, "vanguard", 90.0)
+	ai._buy_upgrade(sim, false)
+	check(sim.sides[0].upgrades.is_empty(), "two Vanguards (40 g) don't justify a 12 g upgrade")
+	for i in 8:
+		place(sim, 0, "vanguard", 80.0 - i * 7.0)
+	ai._buy_upgrade(sim, false)
+	check(not sim.sides[0].upgrades.is_empty(), "ten Vanguards (200 g) do")

@@ -12,6 +12,6 @@ xp_cost = 60
 telegraph = 0.5
 pulses = 8
 pulse_interval = 0.15
-damage = 80.0
+damage = 35.0
 damage_type = "slash"
 knockback = 60.0

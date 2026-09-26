@@ -84,41 +84,53 @@ func _spend_xp(sim: MatchSim, pressure: bool) -> void:
 # ---------------------------------------------------------------------------
 # Gold
 
-## Leftover gold buys the best-value upgrade: rows the army actually uses, weighted by personality.
-## At most one per decision; never under pressure or with a thin army.
+## Leftover gold buys the best-value upgrade, but only one that pays for itself: its bonus on the gold
+## already fielded in that row (× personality bias) must cover its price. At most one per decision;
+## never under pressure or with a thin army.
 func _buy_upgrade(sim: MatchSim, pressure: bool) -> void:
 	var s := sim.sides[side]
 	if pressure or s.army_value() < sim.income_rate(side) * personality.upgrade_after_army_seconds:
 		return
-	var share := {}
-	var total := 0.0
+	var fielded := {}
 	for u in s.units:
-		share[u.def.role] = share.get(u.def.role, 0.0) + u.cost_paid
-		total += u.cost_paid
+		fielded[u.def.role] = fielded.get(u.def.role, 0.0) + u.cost_paid
+	for t in s.turrets:
+		if t != null:
+			fielded["turret"] = fielded.get("turret", 0.0) + t.def.cost
 	var best_row := ""
 	var best_stat := ""
 	var best_score := 0.0
 	for row in MatchSim.UPGRADES:
 		if row == "income":
 			continue
-		var weight: float = personality.upgrade_bias.get(row, 0.0)
-		if row == "turret":
-			weight *= s.turret_count() / 2.0
-		else:
-			weight *= share.get(row, 0.0) / maxf(total, 1.0)
-		if weight <= 0.0:
+		var value: float = fielded.get(row, 0.0) * personality.upgrade_bias.get(row, 0.0)
+		if value <= 0.0:
 			continue
 		for stat in MatchSim.UPGRADES[row]:
 			var cost := sim.upgrade_cost(side, row, stat)
-			if cost > s.gold:
+			var benefit := value * _upgrade_bonus(sim, stat)
+			if cost > s.gold or benefit < cost:
 				continue
-			var score := weight / cost
+			var score := benefit / cost
 			if score > best_score:
 				best_score = score
 				best_row = row
 				best_stat = stat
 	if best_row != "":
 		sim.buy_upgrade(side, best_row, best_stat)
+
+
+
+func _upgrade_bonus(sim: MatchSim, stat: String) -> float:
+	match stat:
+		"attack":
+			return sim.rules.upgrade_attack_bonus
+		"health":
+			return sim.rules.upgrade_health_bonus
+		"defence":
+			return sim.rules.upgrade_defence_bonus
+		_:
+			return sim.rules.upgrade_range_bonus
 
 
 func _spend_gold(sim: MatchSim, pressure: bool) -> void:
