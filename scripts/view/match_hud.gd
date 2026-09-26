@@ -17,10 +17,10 @@ var shake_scale := 1.0
 var _root: Control
 var _theme: Theme
 var _top: TopBar
+var _grid: UpgradeGrid
 var _minimap: Minimap
 var _cards: Array[UnitCard] = []
 var _queue: QueueStrip
-var _income: Button
 var _slots: Array[Button] = []
 var _slot_menu: PopupMenu
 var _slot_menu_index := -1
@@ -44,6 +44,12 @@ func _ready() -> void:
 	_build_cards()
 	_build_commands()
 	_build_banner()
+	_grid = UpgradeGrid.new(self)
+	_root.add_child(_grid)
+	_top.upgrades_button.toggled.connect(func(on: bool): _grid.visible = on)
+	# Dev aid for screenshots: open the HUD's pop-ups without clicking.
+	if "--hud-demo" in OS.get_cmdline_user_args():
+		get_tree().create_timer(2.0).timeout.connect(func(): _top.upgrades_button.button_pressed = true)
 	_slot_menu = PopupMenu.new()
 	_slot_menu.id_pressed.connect(_on_slot_menu)
 	_root.add_child(_slot_menu)
@@ -140,10 +146,6 @@ func _build_commands() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 6)
 	p.add_child(v)
-	var row3 := HBoxContainer.new()
-	v.add_child(row3)
-	_income = _btn(row3, "", func(): feedback(sim.buy_upgrade(0, "income", "income")))
-	_income.custom_minimum_size = Vector2(170, 34)
 	var tl := _label(v, "Turrets — click an empty slot to build, a turret to sell (Q W E R)", 13, Color(1, 1, 1, 0.6))
 	tl.autowrap_mode = TextServer.AUTOWRAP_WORD
 	var row4 := HBoxContainer.new()
@@ -244,16 +246,13 @@ func _process(delta: float) -> void:
 		return
 	var me := sim.sides[0]
 	_top.refresh()
+	_grid.refresh()
 	_flash = maxf(0.0, _flash - delta)
 	for c in _cards:
 		c.queue_redraw()
 		c.refresh()
 	_queue.queue_redraw()
 	_minimap.queue_redraw()
-	var inc := sim.upgrade_level(0, "income", "income")
-	_income.text = "💰 Income %s  %s" % ["●".repeat(inc) + "○".repeat(3 - inc), "" if inc >= 3 else "%dg" % sim.upgrade_cost(0, "income", "income")]
-	_income.tooltip_text = "Income: +20% passive income per level. Unit and turret upgrades arrive with the new HUD."
-	_income.disabled = not sim.can_buy_upgrade(0, "income", "income")
 	for i in 4:
 		var b := _slots[i]
 		var key := "QWER"[i]
