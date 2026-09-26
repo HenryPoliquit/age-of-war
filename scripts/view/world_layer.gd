@@ -159,7 +159,7 @@ func _draw_base(s: SimSide, t: float) -> void:
 	var build := clampf((t - view.base_rebuilt.get(s.index, -10.0)) / 1.1, 0.0, 1.0)
 	var xf := Transform2D(0.0, Vector2(dir, 1), 0.0, Vector2(gate, GROUND_Y + 4))
 	UnitArt.begin(self, xf)
-	BaseArt.draw_base(self, s.age, team, s.base_hp / s.base_max_hp, t, build, s.turret_slots, self)
+	BaseArt.draw_base(self, s.age, team, s.base_hp / s.base_max_hp, t, build, s.turret_slots, self, s.race)
 	# Doctrine banners hang on the base (GDD §9: shown so the player can counter-plan).
 	for i in s.doctrines.size():
 		var p := Vector2(-170 + i * 40, -60)
@@ -179,7 +179,7 @@ func _draw_base(s: SimSide, t: float) -> void:
 		var aim := atan2((GROUND_Y - 20) - world.y, absf(target_x - world.x))
 		var kick := clampf(1.0 - (sim.time - tur.last_fire_time) / 0.25, 0.0, 1.0)
 		draw_set_transform_matrix(xf * Transform2D(0.0, sp))
-		BaseArt.draw_turret(self, tur.def, team, aim, kick, t, tur.def.age < s.age)
+		BaseArt.draw_turret(self, tur.def, team, aim, kick, t, tur.def.age < s.age, s.race)
 		if tur.hp < tur.max_hp:
 			draw_rect(Rect2(-14, 16, 28, 3), Color(0, 0, 0, 0.6))
 			draw_rect(Rect2(-14, 16, 28 * tur.hp / tur.max_hp, 3), Color("e05050"))

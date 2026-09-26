@@ -4,9 +4,6 @@ extends Node2D
 ## the per-age ambient tint. Muzzle flashes, explosions and abilities light nearby units and ground.
 
 const MAX_LIGHTS := 10
-## Ambient multiplier per age: night and storm ages sit darker so lights read.
-const AMBIENT := [Color(1.0, 0.97, 0.93), Color(1.0, 1.0, 1.0), Color(0.93, 0.95, 0.95),
-	Color(0.8, 0.83, 0.92), Color(0.9, 0.84, 0.8), Color(0.76, 0.74, 0.9)]
 
 var enabled := true
 ## Lights read stronger at night (set by the view from the day/night cycle).

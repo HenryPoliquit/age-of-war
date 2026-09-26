@@ -96,7 +96,7 @@ func _ready() -> void:
 	camera.make_current()
 	for i in 2:
 		var b := Backdrop.new()
-		b.setup(i, sim.sides[i].age)
+		b.setup(i, sim.sides[i].age, races[i])
 		add_child(b)
 		backdrops.append(b)
 	world = WorldLayer.new()
@@ -111,7 +111,7 @@ func _ready() -> void:
 	apply_settings()
 	for i in 2:
 		var fl := FrontLayer.new()
-		fl.setup(i, sim.sides[i].age)
+		fl.setup(i, sim.sides[i].age, races[i])
 		add_child(fl)
 		fronts.append(fl)
 	var post := CanvasLayer.new()
@@ -230,8 +230,10 @@ func _process(delta: float) -> void:
 	var la := sim.sides[0].age
 	var ra := sim.sides[1].age
 	var w := smoothstep(-500.0, 500.0, cam_x - sim.front_x)
-	var amb_l: Color = LightPool.AMBIENT[la - 1] * dn.tint(la)
-	var amb_r: Color = LightPool.AMBIENT[ra - 1] * dn.tint(ra)
+	var look_l := Scenery.look(races[0], la)
+	var look_r := Scenery.look(races[1], ra)
+	var amb_l: Color = look_l.ambient * dn.tint(look_l.dn)
+	var amb_r: Color = look_r.ambient * dn.tint(look_r.dn)
 	lights.night_boost = 1.0 + 0.8 * (1.0 - dn.daylight)
 	lights.update(anim_time, amb_l.lerp(amb_r, w))
 	if aiming:

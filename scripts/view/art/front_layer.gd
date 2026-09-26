@@ -8,14 +8,14 @@ func has_layers() -> bool:
 	return false
 
 
-func setup(p_side: int, p_age: int) -> void:
-	super.setup(p_side, p_age)
+func setup(p_side: int, p_age: int, p_race: StringName = &"human") -> void:
+	super.setup(p_side, p_age, p_race)
 	_mat.set_shader_parameter("opaque_left", false)
 	_mat.set_shader_parameter("grain", 0.0)
 
 
 func _draw() -> void:
-	var sc := Scenery.for_age(age)
+	var sc := Scenery.for_look(race, age)
 	var vp := get_viewport_rect().size
 	var left := cam_x - vp.x * 0.5 - 40
 	var right := cam_x + vp.x * 0.5 + 40
@@ -61,6 +61,16 @@ func _draw_weather(w: Dictionary, left: float, right: float, vp: Vector2, t: flo
 				draw_line(Vector2(x, y), Vector2(x - len * 0.18, y + len), c, 1.2 if w.kind != "rain" else 1.5)
 				if y > Scenery.GROUND_Y and y < Scenery.GROUND_Y + 60 and w.kind == "rain":
 					draw_arc(Vector2(x, Scenery.GROUND_Y + 30.0 + h3 * 20.0), 3.0 + fposmod(t * 8.0 + i, 5.0), PI, TAU, 6, Color(c, 0.25), 1.0)
+			"snow":
+				var x := left + fposmod(h1 * width + sin(t * 0.7 + i) * 24.0 - t * 14.0, width)
+				var y := fposmod(h2 * 1000.0 + t * (40.0 + h3 * 30.0), 1000.0) - 100.0
+				draw_circle(Vector2(x, y), 1.2 + h3 * 1.6, col)
+			"leaves":
+				var x := left + fposmod(h1 * width + t * (26.0 + h3 * 20.0) + sin(t * 1.1 + i) * 30.0, width)
+				var y := fposmod(h2 * 1000.0 + t * (36.0 + h3 * 24.0), 1000.0) - 100.0
+				var a := t * (1.5 + h3 * 2.0) + i
+				var d := Vector2(cos(a), sin(a) * 0.5) * (4.0 + h3 * 2.0)
+				draw_colored_polygon(PackedVector2Array([Vector2(x, y) - d, Vector2(x, y) + d.orthogonal() * 0.5, Vector2(x, y) + d, Vector2(x, y) - d.orthogonal() * 0.5]), Color(col, col.a * (0.7 + 0.3 * h2)))
 			"ash":
 				var x := left + fposmod(h1 * width + sin(t * 0.6 + i) * 30.0 + t * 12.0, width)
 				var y := fposmod(h2 * 1000.0 + t * (18.0 + h3 * 20.0), 1000.0) - 100.0

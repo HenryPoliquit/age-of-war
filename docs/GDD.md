@@ -88,24 +88,28 @@ A 0–100 meter per side, spent on the age ability (§7). Sources in §8.2.
 
 ### 4.1 The Six Ages
 
-| # | Age | Palette & lighting | Lane backdrop |
-| --- | --- | --- | --- |
-| 1 | **Stone** | Warm dawn, long soft shadows | Savanna, rock outcrops, smoke from fires |
-| 2 | **Bronze** | Bright midday sun, high contrast | Coastal cliffs, whitewashed ruins, sea haze |
-| 3 | **Medieval** | Overcast, cool greens and greys | Highland moor, stone walls, banners in wind |
-| 4 | **Gunpowder** | Stormy, lightning flashes | Rocky coast, gun smoke drifting across the lane |
-| 5 | **Industrial** | Smog dusk, sodium-orange lamps | Trenches, rail lines, factory silhouettes |
-| 6 | **Future** | Night, neon cyan and magenta rim light | Glass towers, holographic signage, drones |
+The ages run from the Stone Age to an **Arcane** finale of "steam and sorcery" — no modern or space
+ages, so the fantasy races of §5.7 fit every age. Each race has its own backdrop per age (below);
+stats, pacing and ability mechanics are the same for all races.
+
+| # | Age | Humans | Elves | Dwarves |
+| --- | --- | --- | --- | --- |
+| 1 | **Stone** | Warm dawn savanna, mesas, fire smoke | Primeval glade at dawn, fireflies | Cold highland foothills, pines, cairns |
+| 2 | **Bronze** | Bright coast, whitewashed ruins, gulls | Birch riverwood, standing stones, petals | Red-rock copper pass, carved guardians |
+| 3 | **Iron** | Mediterranean hills, aqueducts, cypresses | Overcast deepwood, tree-halls, lanterns | Snowbound mountain gates, braziers, snowfall |
+| 4 | **Medieval** | Overcast moor, castles, banners, drizzle | Golden autumn wood, white towers, falling leaves | Deep forges under a smoky dusk, ash |
+| 5 | **Gunpowder** | Stormy coast, lightning, gun smoke | Misty moonlit wood, pale spires | Steam valley of chimneys and pipes |
+| 6 | **Arcane** | Violet twilight, floating isles, wizard towers, airships | Starlit grove, glowing leaves, floating crystals | Rune halls under the stars, floating runestones |
 
 ### 4.2 Evolution Costs
 
 | To age | XP cost |
 | --- | --- |
 | 2 Bronze | 300 |
-| 3 Medieval | 650 |
-| 4 Gunpowder | 1,200 |
-| 5 Industrial | 2,050 |
-| 6 Future | 3,750 |
+| 3 Iron | 650 |
+| 4 Medieval | 1,200 |
+| 5 Gunpowder | 2,050 |
+| 6 Arcane | 3,750 |
 
 ### 4.3 Pacing Model
 
@@ -177,14 +181,17 @@ Reading it: Ranged shreds Vanguards and other Ranged but bounces off Heavies; He
 
 ### 5.3 Roster (working names — original designs)
 
+Units are data slots (`iron_vanguard`, …) with one stat line each; every race names and draws the
+slot its own way (§5.7). Human names:
+
 | Age | Vanguard | Ranged | Heavy | Siege |
 | --- | --- | --- | --- | --- |
-| Stone | Brawler | Slinger | Tusk Rider | — |
+| Stone | Brawler | Slinger | Boar Rider | — |
 | Bronze | Hoplite | Javelineer | Chariot | Ram Crew |
+| Iron | Legionary | Auxilia Archer | Cataphract | Onager |
 | Medieval | Man-at-Arms | Longbowman | Knight | Trebuchet |
-| Gunpowder | Halberdier | Musketeer | Cuirassier | Mortar Team |
-| Industrial | Trench Raider | Rifleman | Armoured Car | Field Howitzer |
-| Future | Aegis Trooper | Pulse Rifleman | Strider Mech | Rail Artillery |
+| Gunpowder | Halberdier | Musketeer | Cuirassier | Great Cannon |
+| Arcane | Spellblade | Arcane Rifleman | Steam Juggernaut | Sky Cannon |
 
 ### 5.4 Age 1 Baseline Stats
 
@@ -203,6 +210,28 @@ Reading it: Ranged shreds Vanguards and other Ranged but bounces off Heavies; He
 | Ram Crew | 90 | 160 | 60 | 2.5 s | 30 (melee) | 40 |
 
 From Age 3, Siege units are ranged (Trebuchet onward: range 380 px, minimum range 120 px) — see §5.6.
+
+### 5.7 Races
+
+Players pick a **race** for each side: **Humans**, **Elves** or **Dwarves**. Races are cosmetic —
+every race fields the same slots with the same stats, costs, abilities and turrets — so balance and
+the AI never need per-race tuning. What changes: unit names and looks, the base, turrets, the
+battlefield of every age (§4.1) and the flavour of each ability (§7).
+
+| Age | Elves (V / R / H / S) | Dwarves (V / R / H / S) |
+| --- | --- | --- |
+| Stone | Thornblade / Hunter / Stag Rider / — | Hammerer / Stone Thrower / Ram Rider / — |
+| Bronze | Grove Warden / Javelin Dancer / Elk Chariot / Rootbreaker | Shieldbearer / Axe Thrower / Goat Chariot / Battering Ram |
+| Iron | Glade Guard / Longstrider / Elk Lancer / Bolt Engine | Ironbreaker / Crossbowman / Boar Knight / Stone Hurler |
+| Medieval | Bladesinger / Ranger / Silver Knight / Great Ballista | Hearthguard / Arbalester / Bear Knight / Siege Bombard |
+| Gunpowder | Sentinel / Starbow Archer / Wild Rider / Moonfire Catapult | Longbeard / Thunderer / Ironhorn Rider / Flame Cannon |
+| Arcane | Moonblade / Arcanist / Treant / Starfall Obelisk | Runeguard / Rune Rifleman / Steam Golem / Rune Cannon |
+
+Look: elves are tall and slender with pointed ears, long hair, leaf helms, recurved bows, stags and
+elk; dwarves are short and broad with braided beards, round helms, axes, hammers, crossbows, rams and
+bears; humans follow their history, from hides to legions to knights to arcane engineers. Each race
+has a magic colour for its Arcane age (human violet, elven moon-blue, dwarven forge-orange).
+Names live in `data/races/*.tres`; looks in `scripts/view/art/race_look.gd`.
 
 ### 5.5 Spawning & Lane Rules
 
@@ -243,10 +272,17 @@ Each age has one **signature ability**, costing **100 momentum**, with a 45 s mi
 | --- | --- | --- |
 | Stone | **Stampede** | A herd charges across a targeted 300 px section, knocking back and damaging enemies |
 | Bronze | **Shieldwall** | Allies in a targeted zone gain +40% armour for 8 s |
-| Medieval | **Arrow Storm** | Three volleys land in a targeted 250 px area over 3 s (Pierce) |
-| Gunpowder | **Broadside** | Cannon fire walks across a 400 px strip (Blast) |
-| Industrial | **Air Raid** | A bomber pass along a targeted line; heavy Blast, telegraphed shadow first |
-| Future | **Orbital Lance** | A charged beam at one point after a 1.5 s telegraph; massive damage in a narrow column |
+| Iron | **Volley** | Three volleys land in a targeted 250 px area over 3 s (Pierce) |
+| Medieval | **Bombardment** | Siege shot walks across a 400 px strip (Blast) |
+| Gunpowder | **Cannonade** | A heavier barrage along a targeted line; heavy Blast, telegraphed first |
+| Arcane | **Starfall** | A charged beam at one point after a 1.5 s telegraph; massive damage in a narrow column |
+
+Each race names and dresses the same ability: Stampede is boars, stags or rams; Volley is pila,
+arrows or throwing axes; Bombardment is a trebuchet barrage, a hail of ballista bolts or a rockslide;
+Cannonade is cannon balls or falling moonfire; Starfall is an arcane lance, starfall or a thunder rune
+in the race's magic colour. Human / elf / dwarf names: Stampede / Wild Hunt / Ram Charge,
+Shieldwall / Barkskin / Shield Oath, Pilum Volley / Arrow Rain / Axe Storm, Trebuchet Barrage / Hail
+of Thorns / Rockslide, Cannonade / Moonfire / Grand Cannonade, Arcane Lance / Starfall / Thunder Rune.
 
 Ability damage scales by age like units. The AI gets the same abilities under the same rules and must also aim them.
 
@@ -381,9 +417,9 @@ Hand-painted 2D, stylised proportions (slightly large heads and hands for readab
 | Rig | Used by |
 | --- | --- |
 | Humanoid | All Vanguard and Ranged, Siege crews |
-| Mounted | Tusk Rider, Knight, Cuirassier |
-| Vehicle | Chariot, Armoured Car, siege engines (wheels, recoil, articulated parts) |
-| Mech | Strider Mech, Future turrets |
+| Mounted | Heavy riders on boars, horses, stags, elk, rams and bears |
+| Vehicle | Chariots, siege engines (ram, onager/catapult, ballista, trebuchet, cannon), Steam Juggernaut |
+| Walker | Steam Golem, Treant |
 
 A new unit is new painted parts on an existing rig plus shared animations.
 
@@ -426,9 +462,9 @@ Effects are built per damage type, so the counter system is visible:
 | Hitstop | 40–60 ms micro-freeze on Heavy and Siege impacts only |
 | Screen shake | Heavy impacts, abilities, base hits; short and capped; slider in settings |
 | Lights | Muzzle flashes, explosions and abilities spawn short-lived 2D lights that shade nearby units |
-| Glow | Emissive effects (muzzle flashes, Future-age energy weapons, ability beams) glow; confirm how 2D glow behaves in the chosen renderer during M2 |
+| Glow | Emissive effects (muzzle flashes, Arcane-age magic weapons, ability beams) glow; confirm how 2D glow behaves in the chosen renderer during M2 |
 | Knockback | Blast damage pushes units back a few pixels with a small hop |
-| Telegraphs | Ground decal before every ability; Air Raid shows a moving shadow first |
+| Telegraphs | Ground decal before every ability; Starfall shows a charging column first |
 | Damage numbers | Optional, off by default |
 
 ### 13.5 The Evolution Moment

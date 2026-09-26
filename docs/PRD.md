@@ -17,7 +17,7 @@
 
 ## 1. Summary
 
-Timefront is a 2D side-view lane battler in the "evolve through the ages" genre popularised by the Flash game Age of War and its sequel. Two bases sit at opposite ends of a single lane. Players spend gold to send units down the lane, build turrets to defend, and spend experience to advance their civilisation through six ages — Stone Age to Future — with every unit, turret, the base and the battlefield itself transforming at each evolution.
+Timefront is a 2D side-view lane battler in the "evolve through the ages" genre popularised by the Flash game Age of War and its sequel. Two bases sit at opposite ends of a single lane. Players spend gold to send units down the lane, build turrets to defend, and spend experience to advance their civilisation through six ages — Stone Age to an Arcane age of steam and sorcery — as Humans, Elves or Dwarves, with every unit, turret, the base and the battlefield itself transforming at each evolution.
 
 The goal is not to remake Age of War. It is to take the genre's proven core loop and fix what holds it back: **stalemates, blunt balance, shallow decisions, and dated presentation.** Timefront keeps the one-lane readability and "one more match" pacing, and adds a front line that rewards pushing, readable counters, a real evolve-now-or-strengthen-now tradeoff, doctrines for replayability, and hand-painted skeletal animation with modern VFX.
 
@@ -141,7 +141,8 @@ The blind head-to-head is the M2 go/no-go gate, so it needs a fixed method:
 
 ### Full game (v1.0)
 
-- Six ages (Stone, Bronze, Medieval, Gunpowder, Industrial, Future), four unit roles each (three in Age 1), turrets, one signature ability per age.
+- Six ages (Stone, Bronze, Iron, Medieval, Gunpowder, Arcane), four unit roles each (three in Age 1), turrets, one signature ability per age.
+- Three playable races (Humans, Elves, Dwarves) with the same stats and different names, looks, bases and battlefields (GDD §5.7).
 - Two doctrine picks per match, four AI personalities, five difficulties.
 - **First-time experience:** Chronicle battles 1–5 each introduce one system (queueing & counters → turrets → evolving → front line & abilities → veterancy & doctrines), so no player meets everything at once.
 - Skirmish, and a Campaign ("Chronicle") of ~18 handcrafted battles with modifiers.

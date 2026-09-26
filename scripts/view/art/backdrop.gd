@@ -10,6 +10,7 @@ const GROUND := preload("res://shaders/ground.gdshader")
 
 var side := 0
 var age := 1
+var race: StringName = &"human"
 ## Set by the owner every frame: camera centre x, seam (front line) world x, and animation time.
 var cam_x := 960.0
 var seam_x := 1200.0
@@ -27,9 +28,10 @@ var _sky: Node2D
 var _ground: Node2D
 
 
-func setup(p_side: int, p_age: int) -> void:
+func setup(p_side: int, p_age: int, p_race: StringName = &"human") -> void:
 	side = p_side
 	age = p_age
+	race = p_race
 	_mat = ShaderMaterial.new()
 	_mat.shader = SHADER
 	_mat.set_shader_parameter("side", float(side))
@@ -84,9 +86,10 @@ func _draw_ground_rect() -> void:
 func _update_layers(seam_uv: float) -> void:
 	if _sky == null:
 		return
-	var sc := Scenery.for_age(age)
+	var sc := Scenery.for_look(race, age)
 	var pal := sc.palette
-	var cl: Dictionary = Scenery.CLOUDS[age - 1]
+	var cl: Dictionary = pal.clouds
+	var starry: bool = pal.get("stars", false)
 	var sm: ShaderMaterial = _sky.material
 	var gm: ShaderMaterial = _ground.material
 	var top: Color = pal.sky[0]
@@ -95,12 +98,12 @@ func _update_layers(seam_uv: float) -> void:
 	var sun_uv := Vector2(pal.sun_pos.x, pal.sun_pos.y / 1080.0)
 	var sun_size: float = pal.sun_r / 1080.0
 	var moon := 0.0
-	var star_a := 1.0 if age == 6 else 0.0
+	var star_a := 1.0 if starry else 0.0
 	if dn != null:
-		var k: float = DayNight.STRENGTH[age - 1]
+		var k: float = pal.dn
 		top = top.lerp(Color("0b1030"), (1.0 - dn.daylight) * k)
 		horizon = horizon.lerp(Color("2a3358"), (1.0 - dn.daylight) * k).lerp(Color("f08a5a"), dn.twilight * 0.5 * k)
-		if age != 6:
+		if not starry:
 			var bp := dn.body_pos()
 			sun_uv = Vector2(bp.x, bp.y / 1080.0)
 			star_a = dn.stars()
@@ -121,7 +124,7 @@ func _update_layers(seam_uv: float) -> void:
 	gm.set_shader_parameter("top_color", pal.ground[0])
 	gm.set_shader_parameter("bottom_color", pal.ground[1])
 	gm.set_shader_parameter("road_color", pal.road)
-	gm.set_shader_parameter("kind", Scenery.GROUND_KIND[age - 1])
+	gm.set_shader_parameter("kind", int(pal.kind))
 	gm.set_shader_parameter("ground_y", Scenery.GROUND_Y - 8.0)
 	gm.set_shader_parameter("time_s", time)
 	for m in [sm, gm]:
@@ -138,7 +141,7 @@ func set_age(new_age: int) -> void:
 	if _old != null:
 		_old.queue_free()
 	_old = get_script().new()
-	_old.setup(side, age)
+	_old.setup(side, age, race)
 	_old.show_behind_parent = true
 	add_child(_old)
 	# Draw the outgoing age first, underneath this one's sky, scenery and ground.
@@ -168,7 +171,7 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	var sc := Scenery.for_age(age)
+	var sc := Scenery.for_look(race, age)
 	var pal := sc.palette
 	var cam := Vector2(cam_x, 0)
 	var vp := get_viewport_rect().size
@@ -259,6 +262,31 @@ func _draw_anim(a: Dictionary, t: float, off: float, left: float, right: float) 
 			var p := Vector2(x, a.pos.y + sin(t * 2.0 + a.pos.x) * 6.0)
 			draw_rect(Rect2(p - Vector2(7, 2), Vector2(14, 4)), Color("30324a"))
 			draw_circle(p + Vector2(0, 3), 2.0, Color("ff4fd8") if fmod(t, 1.0) < 0.5 else Color("37e7ff"))
+		"glow":
+			var k := 0.75 + 0.25 * sin(t * 1.7 + a.pos.x * 0.01)
+			var night := 1.0 - dn.daylight if dn != null else 0.3
+			var c: Color = a.col
+			for i in 3:
+				draw_circle(a.pos, a.r * (0.35 + i * 0.3), Color(c, (0.1 + 0.08 * night) * k))
+		"rune":
+			var k := 0.55 + 0.45 * sin(t * 1.3 + a.pts[0].x * 0.02)
+			draw_polyline(a.pts, Color(a.col, 0.25 * k), 6.0)
+			draw_polyline(a.pts, Color(a.col, 0.85 * k), 2.0)
+		"airship":
+			var x: float = fposmod(a.pos.x + t * a.speed - Scenery.X0, Scenery.X1 - Scenery.X0) + Scenery.X0
+			var p := Vector2(x, a.pos.y + sin(t * 0.6 + a.pos.x) * 5.0)
+			var hull := Color("3a2e48")
+			var pts := PackedVector2Array()
+			for i in 14:
+				var ang := TAU * i / 14.0
+				pts.append(p + Vector2(cos(ang) * 38.0, sin(ang) * 13.0))
+			draw_colored_polygon(pts, hull.lightened(0.1))
+			draw_line(p + Vector2(-30, 0), p + Vector2(30, 0), hull.darkened(0.2), 1.0)
+			draw_line(p + Vector2(-12, 12), p + Vector2(-10, 20), hull, 1.0)
+			draw_line(p + Vector2(12, 12), p + Vector2(10, 20), hull, 1.0)
+			draw_rect(Rect2(p + Vector2(-14, 20), Vector2(28, 7)), hull.darkened(0.2))
+			draw_colored_polygon(PackedVector2Array([p + Vector2(-36, -4), p + Vector2(-48, -14), p + Vector2(-46, 4)]), hull)
+			draw_circle(p + Vector2(0, 24), 1.5, Color("ffd6a0"))
 		"shimmer":
 			for i in 12:
 				var x := left - off + fposmod(i * 173.0 + t * 20.0, right - left)

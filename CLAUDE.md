@@ -27,6 +27,8 @@ timeout 90 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolu
 # Unit gallery (colour / greyscale / silhouette of every unit) for the PRD §11 silhouette check:
 timeout 90 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolution 1920x1080 -s tools/unit_gallery.gd -- --out=reports/unit_gallery.png
 # (--race=elf for one race's three modes; --race=all for the three races side by side.)
+# Base gallery (every race × age base with its turrets mounted; --night=1 lights the windows):
+timeout 90 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolution 1920x1080 -s tools/base_gallery.gd -- --out=reports/base_gallery.png
 ```
 
 After adding a new `class_name` script, run `timeout 100 tools/godot --headless --path . --import` once so the class is registered.

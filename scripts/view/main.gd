@@ -36,7 +36,7 @@ func _ready() -> void:
 	_bg_root.add_child(holder)
 	for i in 2:
 		var b := Backdrop.new()
-		b.setup(i, 1 if i == 0 else 6)
+		b.setup(i, 1 if i == 0 else 6, &"human" if i == 0 else &"elf")
 		holder.add_child(b)
 		_backdrops.append(b)
 	_parade = MenuParade.new()
@@ -218,6 +218,7 @@ func _update_parade() -> void:
 	for i in 2:
 		var ob := _race if i == 0 else _enemy_race
 		_parade.races[i] = _r_ids[ob.selected] if ob.selected < _r_ids.size() else _r_ids[(i + 1) % _r_ids.size()]
+		_backdrops[i].race = _parade.races[i]
 
 
 ## Units of the two ages marching toward the seam behind the menu.

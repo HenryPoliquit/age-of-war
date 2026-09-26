@@ -1,13 +1,12 @@
 class_name DayNight
 extends RefCounted
 ## Purely visual day/night cycle driven by match time. Nothing in the sim reads it.
-## Each age keeps its signature lighting (GDD §4.1): the cycle modulates around it, strongest in
-## the daylit ages and gentle in ages that are already stormy or nocturnal.
+## Each look keeps its signature lighting (GDD §4.1): the cycle modulates around it by the look's
+## strength (Scenery.LOOKS "dn"), strongest in daylit ages and gentle in stormy or nocturnal ones.
 
 const PERIOD := 240.0
 ## Start mid-morning so a match opens in daylight.
 const START_PHASE := 0.12
-const STRENGTH := [0.9, 1.0, 0.85, 0.55, 0.7, 0.4]
 const NIGHT := Color(0.42, 0.48, 0.74)
 const DUSK := Color(1.0, 0.72, 0.52)
 
@@ -31,9 +30,8 @@ static func at(time: float, enabled := true) -> DayNight:
 	return d
 
 
-## Multiplier for the canvas ambient for an age.
-func tint(age: int) -> Color:
-	var k: float = STRENGTH[age - 1]
+## Multiplier for the canvas ambient, for a look whose cycle strength is `k`.
+func tint(k: float) -> Color:
 	var c := NIGHT.lerp(Color.WHITE, daylight)
 	c = c.lerp(DUSK, twilight * 0.45)
 	return Color.WHITE.lerp(c, k)
