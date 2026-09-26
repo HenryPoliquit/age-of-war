@@ -205,9 +205,17 @@ func _process(delta: float) -> void:
 		b.seam_x = sim.front_x
 		b.time = anim_time
 	_audio_state()
-	# Ambient tint follows whichever age fills most of the screen.
+	# Purely visual day/night cycle on match time; ambient tint follows the age filling the screen.
+	var dn := DayNight.at(sim.time, GameSettings.get_value("day_night"))
+	for b in backdrops + fronts:
+		b.dn = dn
+	var la := sim.sides[0].age
+	var ra := sim.sides[1].age
 	var w := smoothstep(-500.0, 500.0, cam_x - sim.front_x)
-	lights.update(anim_time, LightPool.AMBIENT[sim.sides[0].age - 1].lerp(LightPool.AMBIENT[sim.sides[1].age - 1], w))
+	var amb_l: Color = LightPool.AMBIENT[la - 1] * dn.tint(la)
+	var amb_r: Color = LightPool.AMBIENT[ra - 1] * dn.tint(ra)
+	lights.night_boost = 1.0 + 0.8 * (1.0 - dn.daylight)
+	lights.update(anim_time, amb_l.lerp(amb_r, w))
 	if aiming:
 		aim_x = clampf(get_global_mouse_position().x, 0.0, sim.rules.lane_length)
 	if sim.is_over() and not _logged:

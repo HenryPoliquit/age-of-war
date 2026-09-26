@@ -11,6 +11,7 @@ const DEFAULTS := {
 	"flash_reduction": false,
 	"vfx_preset": 2,  # 0 Low, 1 Medium, 2 High (GDD §16)
 	"colourblind": false,
+	"day_night": true,
 }
 
 static var values: Dictionary = {}
@@ -72,8 +73,8 @@ static func make_panel(on_close: Callable) -> PanelContainer:
 	p.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	p.offset_left = -260
 	p.offset_right = 260
-	p.offset_top = -200
-	p.offset_bottom = 190
+	p.offset_top = -220
+	p.offset_bottom = 210
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	p.add_child(v)
@@ -104,7 +105,7 @@ static func make_panel(on_close: Callable) -> PanelContainer:
 	vfx.select(int(get_value("vfx_preset")))
 	vfx.item_selected.connect(func(i): set_value("vfx_preset", i))
 	v.add_child(vfx)
-	for spec in [["Reduce flashing", "flash_reduction"], ["Colour-blind team palette", "colourblind"]]:
+	for spec in [["Day/night cycle", "day_night"], ["Reduce flashing", "flash_reduction"], ["Colour-blind team palette", "colourblind"]]:
 		var c := CheckBox.new()
 		c.text = spec[0]
 		c.button_pressed = get_value(spec[1])

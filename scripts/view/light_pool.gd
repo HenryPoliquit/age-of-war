@@ -9,6 +9,8 @@ const AMBIENT := [Color(1.0, 0.97, 0.93), Color(1.0, 1.0, 1.0), Color(0.93, 0.95
 	Color(0.8, 0.83, 0.92), Color(0.9, 0.84, 0.8), Color(0.76, 0.74, 0.9)]
 
 var enabled := true
+## Lights read stronger at night (set by the view from the day/night cycle).
+var night_boost := 1.0
 var _lights: Array[PointLight2D] = []
 var _state: Array[Dictionary] = []
 var _next := 0
@@ -49,9 +51,9 @@ func flash(pos: Vector2, col: Color, energy: float, radius: float, life: float, 
 	l.position = pos
 	l.color = col
 	l.texture_scale = radius / 128.0
-	l.energy = energy
+	l.energy = energy * night_boost
 	l.enabled = true
-	_state[i] = {"born": now, "life": life, "energy": energy}
+	_state[i] = {"born": now, "life": life, "energy": energy * night_boost}
 
 
 func update(now: float, ambient: Color) -> void:
