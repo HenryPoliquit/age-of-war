@@ -7,7 +7,6 @@ var gold: float = 0.0
 var xp: float = 0.0
 var momentum: float = 0.0
 var age: int = 1
-var vet_ranks: int = 0
 var forge_level: int = 0
 var turret_slots: int = 2
 var turrets: Array = [null, null, null, null, null]

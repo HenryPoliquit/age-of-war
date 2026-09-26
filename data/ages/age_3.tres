@@ -17,7 +17,6 @@ script = ExtResource("3_5cf3f")
 index = 3
 display_name = "Iron"
 evolve_cost = 300
-veterancy_base_xp = 700
 base_max_hp = 2890.0
 units = Array[ExtResource("8_5vl5e")]([ExtResource("9_k8x6u"), ExtResource("10_036px"), ExtResource("11_ijf60"), ExtResource("12_3v06d")])
 turrets = Array[ExtResource("4_vcips")]([ExtResource("5_ktpy0"), ExtResource("6_x22gb"), ExtResource("7_j7sw3")])

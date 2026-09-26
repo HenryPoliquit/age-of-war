@@ -124,7 +124,7 @@ func _draw_side_units(side: int, n: Node2D) -> void:
 	n.draw_set_transform(Vector2.ZERO)
 
 
-## HP bars, veterancy chevrons and the ability aim marker, drawn over the outlined units.
+## HP bars and the ability aim marker, drawn over the outlined units.
 func _draw_overlay() -> void:
 	var sim := view.sim
 	for s in sim.sides:
@@ -214,9 +214,6 @@ func _draw_unit(ci: CanvasItem, u: SimUnit, rt: float, t: float) -> void:
 func _draw_bars(ci: CanvasItem, u: SimUnit) -> void:
 	var pos := unit_pos(u)
 	var h := UnitArt.height_for(u.def, view.race_of(u.side)) * UNIT_SCALE + 10.0
-	if u.vet_rank > 0:
-		for i in u.vet_rank:
-			ci.draw_colored_polygon(PackedVector2Array([pos + Vector2(-8 + i * 7, -h - 8), pos + Vector2(-5 + i * 7, -h - 12), pos + Vector2(-2 + i * 7, -h - 8)]), Color("f2c14e"))
 	if u.hp >= u.max_hp:
 		return
 	var w := 26.0 if u.def.role != "heavy" else 38.0

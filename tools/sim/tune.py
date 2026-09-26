@@ -17,7 +17,7 @@ PERSONALITIES = ["tactician", "rusher", "turtle", "economist", "fast_age", "stro
 # name, kind, target, start value, step multipliers (for scale) or candidate values (for set)
 PARAMS = [
     ("base_hp", "scale", ["ages:index=*.base_max_hp"], 1.0, [0.8, 1.4, 2.0]),
-    ("evolve_cost", "scale", ["ages:index=*.evolve_cost", "ages:index=*.veterancy_base_xp"], 1.0, [0.6, 0.8, 1.15]),
+    ("evolve_cost", "scale", ["ages:index=*.evolve_cost"], 1.0, [0.6, 0.8, 1.15]),
     ("turret_dmg", "scale", ["turrets:kind=*.damage"], 1.0, [0.8, 1.25]),
     ("turret_cost", "scale", ["turrets:kind=*.cost"], 1.0, [0.8, 1.25]),
     ("heavy_cost", "scale", ["units:role=heavy.cost"], 1.0, [0.88, 1.14]),
@@ -25,7 +25,6 @@ PARAMS = [
     ("ranged_dmg", "scale", ["units:role=ranged.damage"], 1.0, [0.88, 1.14]),
     ("vanguard_hp", "scale", ["units:role=vanguard.hp"], 1.0, [0.88, 1.14]),
     ("siege_dmg", "scale", ["units:role=siege.damage"], 1.0, [0.85, 1.2]),
-    ("vet_bonus", "set", ["rules.veterancy_bonus"], 0.1, "rel:0.8,1.25"),
     ("forge_bonus", "set", ["rules.forge_income_bonus"], 0.2, "rel:0.8,1.25"),
     ("counter", "set_all", ["counter_strength"], 1.5, "rel:0.67,1.5"),
     ("turtle_turrets", "set", ["ai/personalities/turtle.turret_target"], 4, [3, 2]),

@@ -17,7 +17,6 @@ script = ExtResource("3_osjng")
 index = 6
 display_name = "Arcane"
 evolve_cost = 2800
-veterancy_base_xp = 6000
 base_max_hp = 14199.0
 units = Array[ExtResource("8_pxl3g")]([ExtResource("9_4l3wi"), ExtResource("10_bxpkl"), ExtResource("11_dbq23"), ExtResource("12_e6vsf")])
 turrets = Array[ExtResource("4_4a1dv")]([ExtResource("5_klel0"), ExtResource("6_il1sb"), ExtResource("7_kcsrw")])

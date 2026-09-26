@@ -340,8 +340,6 @@ func _hotkey(k: Key) -> void:
 			hud.slot_pressed([KEY_Q, KEY_W, KEY_E, KEY_R].find(k))
 		KEY_T:
 			hud.feedback(sim.evolve(0))
-		KEY_V:
-			hud.feedback(sim.buy_veterancy(0))
 		KEY_F:
 			hud.feedback(sim.buy_forge(0))
 		KEY_SPACE:

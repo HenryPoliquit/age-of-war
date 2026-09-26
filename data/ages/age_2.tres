@@ -16,7 +16,6 @@ script = ExtResource("5_r0x17")
 index = 2
 display_name = "Bronze"
 evolve_cost = 240
-veterancy_base_xp = 300
 base_max_hp = 1700.0
 units = Array[ExtResource("9_oihin")]([ExtResource("10_va7y2"), ExtResource("11_xe26h"), ExtResource("12_wr674"), ExtResource("13_uovb2")])
 turrets = Array[ExtResource("6_2mdu0")]([ExtResource("7_ouha8"), ExtResource("8_3ryik")])

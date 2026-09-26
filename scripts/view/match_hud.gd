@@ -1,7 +1,7 @@
 class_name MatchHud
 extends CanvasLayer
 ## Match HUD (GDD §13.9): top status bar with both bases, lane minimap, unit cards with portraits,
-## command panel (economy, ability, evolve/veterancy, Forge, turrets, speed),
+## command panel (economy, ability, evolve, Forge, turrets, speed),
 ## event banners and the post-match screen. Reads MatchSim; acts only through its commands.
 
 const ACCENT := UiStyle.ACCENT
@@ -30,7 +30,6 @@ var _momentum: Meter
 var _ability: Button
 var _evolve: Button
 var _evolve_meter: Meter
-var _vet: Button
 var _forge: Button
 var _slots: Array[Button] = []
 var _speed_buttons: Array[Button] = []
@@ -235,8 +234,6 @@ func _build_commands() -> void:
 	_evolve_meter.col = XP
 	_evolve_meter.custom_minimum_size = Vector2(0, 6)
 	ev.add_child(_evolve_meter)
-	_vet = _btn(row2, "", func(): feedback(sim.buy_veterancy(0)))
-	_vet.custom_minimum_size = Vector2(160, 36)
 	var row3 := HBoxContainer.new()
 	v.add_child(row3)
 	_forge = _btn(row3, "", func(): feedback(sim.buy_forge(0)))
@@ -381,9 +378,6 @@ func _process(delta: float) -> void:
 			_evolve.text = "Evolving… %.1fs" % me.evolve_left
 		_evolve.disabled = not sim.can_evolve(0)
 		_evolve_meter.value = clampf(me.xp / cost, 0.0, 1.0)
-	_vet.text = "★ Veteran %s  %s" % ["●".repeat(me.vet_ranks) + "○".repeat(3 - me.vet_ranks), "" if me.vet_ranks >= 3 else "%d" % sim.veterancy_cost(0)]
-	_vet.tooltip_text = "Veterancy [V]: +10% HP and damage for this age's units per rank. Resets when you evolve."
-	_vet.disabled = not sim.can_buy_veterancy(0)
 	_forge.text = "⚒ Forge %s  %s" % ["●".repeat(me.forge_level) + "○".repeat(3 - me.forge_level), "" if me.forge_level >= 3 else "%dg" % sim.forge_cost(0)]
 	_forge.tooltip_text = "Forge [F]: +20% passive income per level."
 	_forge.disabled = me.gold < sim.forge_cost(0)

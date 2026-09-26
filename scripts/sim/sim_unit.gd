@@ -9,10 +9,9 @@ var age: int
 var progress: float = 0.0
 var hp: float
 var max_hp: float
-## Damage per hit before veterancy.
+## Damage per hit.
 var base_damage: float
 var cost_paid: float
-var vet_rank: int = 0
 var cooldown: float = 0.0
 var armour_buff: float = 0.0
 var armour_buff_until: float = -1.0
@@ -27,7 +26,3 @@ var stat_damage_taken: float = 0.0
 
 func alive() -> bool:
 	return hp > 0.0
-
-
-func damage_mult(vet_bonus: float) -> float:
-	return 1.0 + vet_bonus * vet_rank

@@ -13,7 +13,6 @@ func _init() -> void:
 	for i in range(1, r.tide_start_times.size()):
 		_check(r.tide_start_times[i] > r.tide_start_times[i - 1], "tide times increase")
 		_check(r.tide_multipliers[i] > r.tide_multipliers[i - 1], "tide multipliers increase")
-	_check(r.veterancy_fractions.size() == 3, "three veterancy ranks")
 	_check(r.turret_slot_costs.size() >= 5, "turret slot costs for 5 slots")
 	for dt in ["slash", "pierce", "blast", "siege"]:
 		for arm in ["light", "heavy", "structure"]:
@@ -25,7 +24,6 @@ func _init() -> void:
 		_check(a.display_name != "", tag + " name")
 		_check(a.base_max_hp > 0, tag + " base HP")
 		_check(a.index == 1 or a.evolve_cost > 0, tag + " evolve cost")
-		_check(a.veterancy_base_xp > 0, tag + " veterancy base")
 		_check(a.ability != null and a.ability.age == a.index, tag + " ability")
 		var roles := {}
 		for u in a.units:
@@ -64,7 +62,7 @@ func _init() -> void:
 			_check(rd.ability_names.has(String(a.ability.id)), "race %s names ability %s" % [rid, a.ability.id])
 	for id in gd.personalities:
 		var p: AiPersonalityDef = gd.personalities[id]
-		_check(p.age_plan in ["balanced", "fast", "strong"], "personality %s age_plan" % id)
+		_check(p.age_plan in ["balanced", "fast"], "personality %s age_plan" % id)
 	for id in gd.difficulties:
 		var d: AiDifficultyDef = gd.difficulties[id]
 		_check(d.decision_interval > 0, "difficulty %s interval" % id)

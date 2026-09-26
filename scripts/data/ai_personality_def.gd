@@ -22,10 +22,8 @@ extends Resource
 @export var counter_strength: float = 1.5
 
 @export_group("Evolution")
-## "balanced" | "fast" (evolve immediately, never veterancy) | "strong" (all 3 ranks first)
-@export_enum("balanced", "fast", "strong") var age_plan: String = "balanced"
-## Balanced plan: buy this many veterancy ranks per age before evolving.
-@export var balanced_vet_ranks: int = 0
+## "balanced" (Hard+ waits out pressure before evolving) | "fast" (evolve the moment XP allows)
+@export_enum("balanced", "fast") var age_plan: String = "balanced"
 
 @export_group("Economy & defence")
 ## Forge levels to target, and the earliest time to buy each.

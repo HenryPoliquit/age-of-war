@@ -17,7 +17,6 @@ script = ExtResource("5_yffcg")
 index = 4
 display_name = "Medieval"
 evolve_cost = 700
-veterancy_base_xp = 1100
 base_max_hp = 4913.0
 units = Array[ExtResource("10_sdbf1")]([ExtResource("11_kbfaq"), ExtResource("12_0u4ai"), ExtResource("13_cae2v"), ExtResource("14_62ta7")])
 turrets = Array[ExtResource("6_kmxrt")]([ExtResource("7_sobqm"), ExtResource("8_a7h46"), ExtResource("9_0wcn5")])

@@ -6,8 +6,6 @@ extends Resource
 @export var display_name: String
 ## XP needed to evolve INTO this age (0 for Age 1).
 @export var evolve_cost: int = 0
-## Veterancy ranks in this age cost fractions of this value (the next evolution's cost, GDD §4.5).
-@export var veterancy_base_xp: int = 300
 @export var base_max_hp: float = 1000.0
 @export var units: Array[UnitDef] = []
 @export var turrets: Array[TurretDef] = []

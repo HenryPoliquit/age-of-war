@@ -104,13 +104,6 @@ func evolve_cost(side: int) -> float:
 	return float(data.age(s.age + 1).evolve_cost)
 
 
-func veterancy_cost(side: int) -> float:
-	var s := sides[side]
-	if s.vet_ranks >= rules.veterancy_fractions.size():
-		return INF
-	return roundf(rules.veterancy_fractions[s.vet_ranks] * data.age(s.age).veterancy_base_xp)
-
-
 func forge_cost(side: int) -> float:
 	var s := sides[side]
 	if s.forge_level >= rules.forge_costs.size():
@@ -140,11 +133,6 @@ func can_queue(side: int, def: UnitDef) -> bool:
 func can_evolve(side: int) -> bool:
 	var s := sides[side]
 	return not is_over() and not s.is_evolving() and s.age < GameData.AGE_COUNT and s.xp >= evolve_cost(side)
-
-
-func can_buy_veterancy(side: int) -> bool:
-	var s := sides[side]
-	return not is_over() and not s.is_evolving() and s.xp >= veterancy_cost(side)
 
 
 func can_fire_ability(side: int) -> bool:
@@ -191,23 +179,6 @@ func evolve(side: int) -> bool:
 	s.xp -= evolve_cost(side)
 	s.evolve_left = rules.evolve_time
 	_emit({"type": "evolve_start", "side": side, "to_age": s.age + 1})
-	return true
-
-
-func buy_veterancy(side: int) -> bool:
-	if not can_buy_veterancy(side):
-		return false
-	var s := sides[side]
-	s.xp -= veterancy_cost(side)
-	var old_mult := 1.0 + rules.veterancy_bonus * s.vet_ranks
-	s.vet_ranks += 1
-	var ratio := (1.0 + rules.veterancy_bonus * s.vet_ranks) / old_mult
-	for u in s.units:
-		if u.age == s.age:
-			u.vet_rank = s.vet_ranks
-			u.max_hp *= ratio
-			u.hp *= ratio
-	_emit({"type": "veterancy", "side": side, "rank": s.vet_ranks, "age": s.age})
 	return true
 
 
@@ -331,7 +302,6 @@ func _evolution(s: SimSide, dt: float) -> void:
 		s.evolve_left = 0.0
 		var pct := s.base_hp / s.base_max_hp
 		s.age += 1
-		s.vet_ranks = 0
 		s.base_max_hp = data.age(s.age).base_max_hp
 		s.base_hp = s.base_max_hp * pct
 		s.age_times[s.age - 1] = time
@@ -362,9 +332,7 @@ func _spawn(s: SimSide, def: UnitDef, paid: float) -> SimUnit:
 	u.def = def
 	u.age = def.age
 	u.cost_paid = paid
-	u.vet_rank = s.vet_ranks if def.age == s.age else 0
-	var vet := 1.0 + rules.veterancy_bonus * u.vet_rank
-	u.max_hp = def.hp * vet
+	u.max_hp = def.hp
 	u.hp = u.max_hp
 	u.base_damage = def.damage
 	s.units.append(u)
@@ -428,7 +396,7 @@ func _units_act(s: SimSide, enemy_front: SimUnit, dt: float) -> void:
 					fx.append({"type": "shot", "side": u.side, "unit": u, "def": def, "from_x": to_world(u.side, u.progress),
 						"to_x": to_x, "structure": target_unit == null, "target": target_unit})
 				if target_unit != null:
-					_hit_unit(u, target_unit, u.base_damage * u.damage_mult(rules.veterancy_bonus), def.damage_type)
+					_hit_unit(u, target_unit, u.base_damage, def.damage_type)
 				else:
 					_hit_structures(u, enemy)
 		# Melee presses in to contact distance while fighting so the allies behind it come into reach;
@@ -489,7 +457,7 @@ func _on_kill(victim: SimUnit, by_side: int) -> void:
 
 
 func _hit_structures(u: SimUnit, enemy: SimSide) -> void:
-	var raw := u.base_damage * u.damage_mult(rules.veterancy_bonus) * rules.matrix(u.def.damage_type, "structure")
+	var raw := u.base_damage * rules.matrix(u.def.damage_type, "structure")
 	raw *= 1.0 + rules.escalation_structure_bonus * escalation
 	if u.def.role == "siege":
 		# Only Siege reaches turrets; it knocks them out before the base (PLAN D3).

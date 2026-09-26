@@ -7,4 +7,4 @@ script = ExtResource("1_r7vjy")
 id = &"strong_age"
 display_name = "Strong-age Tactician"
 sim_only = true
-age_plan = "strong"
+age_plan = "balanced"

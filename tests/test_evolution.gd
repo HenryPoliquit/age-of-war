@@ -27,23 +27,6 @@ func test_queue_paused_while_evolving() -> void:
 	check_eq(sim.sides[0].units.size(), 1, "trains after transition")
 
 
-func test_veterancy_buffs_current_age_and_resets() -> void:
-	var sim := new_sim()
-	var u := place(sim, 0, "vanguard", 50.0)
-	var hp := u.max_hp
-	var cost := sim.veterancy_cost(0)
-	check_near(cost, roundf(0.15 * sim.data.age(1).veterancy_base_xp), 0.01)
-	check(sim.buy_veterancy(0))
-	check_near(u.max_hp, hp * 1.1, 0.01)
-	check_eq(u.vet_rank, 1)
-	sim.buy_veterancy(0)
-	sim.buy_veterancy(0)
-	check(not sim.buy_veterancy(0), "max three ranks")
-	sim.evolve(0)
-	run_for(sim, 5.1)
-	check_eq(sim.sides[0].vet_ranks, 0, "ranks reset on evolving")
-
-
 func test_turrets_do_not_upgrade() -> void:
 	var sim := new_sim()
 	sim.build_turret(0, 0, sim.data.turret_for_kind(1, "sentry"))

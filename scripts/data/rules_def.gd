@@ -30,10 +30,8 @@ extends Resource
 @export var queue_slots: int = 5
 @export var field_cap: int = 30
 
-@export_group("Evolution & veterancy")
+@export_group("Evolution")
 @export var evolve_time: float = 5.0
-@export var veterancy_fractions: PackedFloat32Array = PackedFloat32Array([0.15, 0.2, 0.25])
-@export var veterancy_bonus: float = 0.1
 
 @export_group("Turrets")
 ## Cost to unlock slot N (index = slot number − 1). Multiplied by the age cost multiplier.

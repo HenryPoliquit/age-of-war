@@ -69,19 +69,6 @@ func _under_pressure(sim: MatchSim) -> bool:
 
 func _spend_xp(sim: MatchSim, pressure: bool) -> void:
 	var s := sim.sides[side]
-	var ranks_wanted := 0
-	match personality.age_plan:
-		"fast":
-			ranks_wanted = 0
-		"strong":
-			ranks_wanted = sim.rules.veterancy_fractions.size()
-		_:
-			ranks_wanted = personality.balanced_vet_ranks
-	if s.age >= GameData.AGE_COUNT:
-		ranks_wanted = sim.rules.veterancy_fractions.size()
-	if s.vet_ranks < ranks_wanted:
-		sim.buy_veterancy(side)
-		return
 	if not sim.can_evolve(side):
 		return
 	# Evolving under pressure is a gamble (5 s with a paused queue). Smarter AIs wait it out,
