@@ -44,18 +44,18 @@ A pose-derived draw order fixes both, which is what this design adds.
 | Spine | `hip` | Pelvis centre, as today. z 0. |
 | | ★`chest` | `hip.lerp(sh, 0.55)`. z 0. Anchor for the torso drawing and the `back` socket. |
 | | `sh` | Neck base, as today: `hip + (1.5, −SPINE)·b·body.y` rotated by `lean`. |
-| | ★`neck` | `sh + (0.8, −3.5)·b`, rotated by `0.5·lean`. |
+| | ★`neck` | `sh + (0.8, −3.5)·hb`, rotated by `0.5·lean`. |
 | | ★`head` | `neck + (1.0, −6.0)·hb`, rotated by `head_tilt = 0.25·lean` (hb = b·look.head). At lean 0 it equals today's `sh + (1.8, −9.5)·hb`. The head is drawn rotated by `head_tilt`. |
 | | ★`eye` | `head + (3.4, −0.9)·hb`, rotated by `head_tilt`. |
 | Pelvis | ★`hip_n` / `hip_f` | `hip + (±W·sin yaw_p, 0)`, z `±W·cos yaw_p`. These are the leg roots. |
-| Shoulders | `sh_n` / `sh_f` | Today's offsets (`(2, 1)·b + s`, `(−3, 1)·b + sf`) plus `(∓W·sin yaw_c, 0)`, z `±W·cos yaw_c` (clavicles on the chest). |
+| Shoulders | `sh_n` / `sh_f` | Today's offsets (`(2, 1)·b·body + s·b`, `(−3, 1)·b·body + sf·b`) plus `(±W·sin yaw_c, 0)`, z `±W·cos yaw_c` (clavicles on the chest; the same yaw convention as the hips, so with `yaw_c = −0.8·yaw_p` the near shoulder moves against the near hip). |
 | Arms | `elbow_*`, `hand_*` | IK to the same stance targets as today. |
 | Legs | `knee_*`, `foot_*` | IK from `hip_*`. `foot` stays the ankle. |
 | | ★`toe_n` / `toe_f` | Ball of the foot: `foot + (4.5, 1.5)·b` rotated by `rot`. |
 | | ★`toe_bend_*` | See §3. |
 | Hook | ★`sockets` | `{grip_n, grip_f, back}`, each `{p: Vector2, a: float, z: float}`. `grip_*` sit at the hands (`a` = weapon dir for near, forearm dir for far); `back` sits at the chest (`a` = spine angle). They feed the layering only, with no other consumers yet. |
 
-**Bone lengths in 3D.** THIGH, SHIN and SPINE are multiplied by `body.y`; UPPER and FORE are not (arms keep their own proportions, as today). Every bone keeps its exact length measured in (x, y, z).
+**Bone lengths in 3D.** THIGH, SHIN and SPINE are multiplied by `body.y`, and so are the leg-cycle distances (hip height, bob, crouch, stride, lift), so the shorter legs still reach. UPPER and FORE are not (arms keep their own proportions, as today). **A rider's seat is the exception:** the seated hip height is not scaled, so every race sits on the saddle (today riders are scaled about the hip). The stirrup-foot offset is scaled by `body`. Every bone keeps its exact length measured in (x, y, z).
 
 **Foreshortening replaces the `el` hack.** When a stance steers an elbow (`el`), the elbow's on-screen position is `el` (clamped so its screen distance from the shoulder is ≤ UPPER). Its depth is then `z_sh + sqrt(UPPER² − d²)`, toward the viewer. The hand's depth completes the forearm the same way (`z_el − sqrt(FORE² − d²)`, back toward the body). Unsteered arms are planar: elbow and hand take the shoulder's z. So mid-draw, the bow elbow points at the viewer (large z); at full draw it is back near the plane.
 
@@ -78,14 +78,16 @@ A pose-derived draw order fixes both, which is what this design adds.
 | 5 | far arm (upper, fore, hand) | mean of the far arm's joints (≈ −W) |
 | 6 | torso (body, armour, tabard, belt, pauldron) | 0 |
 | 7 | head (long hair, neck, face, beard, helmet, ears) | 0.5 |
-| 8 | shield | `grip_f.z + 2W` (in front of the chest and head: eyes over the rim) |
-| 9 | bow / starbow (limbs, string, arrow) | 1.0: over the head (the string anchors on the near side of the jaw), under any near-arm part (their z stays ≥ W − 1 > 1 at every draw frame). Weapons in `FkWeapons.HELD_FAR` use this part instead of rank 14. |
-| 10 | smear | 50 |
+| 8 | bow / starbow (limbs, string, arrow) | 1.0: over the head (the string anchors on the near side of the jaw), under any near-arm part (their z stays ≥ W − 1 > 1 at every draw frame). Weapons in `FkWeapons.HELD_FAR` use this part instead of rank 14. |
+| 9 | shield | `sh_n.z` (in front of the chest and head: eyes over the rim; ties with the near arm, so it stays under it at any yaw) |
+| 10 | smear | `sh_n.z` |
 | 11 | near upper arm | mean(`sh_n`, `elbow_n`) |
 | 12 | near forearm + fist | mean(`elbow_n`, `hand_n`) |
 | 13 | shoulder cap | `sh_n.z` |
 | 14 | other weapons | `grip_n.z + 0.01` |
 | 15–16 | impact accents, dust | 100, 101 |
+
+While the near arm is planar (elbow and hand at the shoulder's depth), the upper-arm part draws the whole arm with today's strokes (both inks, then sleeve, bracer, fist) and the forearm part draws nothing, so the arm looks exactly as it does now. Only an arm swinging out of the plane is split in two.
 
 Consequences:
 - **Unchanged at rest.** With yaw 0 and planar elbows the sorted order equals today's order.
@@ -146,6 +148,6 @@ Three stages, each ending with the animation page rebuilt and republished to the
 
 1. **Joints and depth in `solve()`**: new joints, `look`, z, sockets, 3D foreshortening. Nothing visual changes (the drawing still uses the old keys).
 2. **Layering**: `figure.gd` moves to bone-length proportions and the depth-sorted part list. This fixes the bow artefact.
-3. **Movement**: counter-rotation, level head, toe joint.
+3. **Movement**: counter-rotation and the toe joint. (The head is drawn at its joint and tilt from stage 2, since that stage rewrites the head drawing anyway.)
 
 The owner reviews locally. The sim and balance are untouched: all changes are in `addons/figure_kit/` and its tests.
