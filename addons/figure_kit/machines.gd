@@ -8,7 +8,9 @@ static func wood(pose: Dictionary) -> Color:
 	return FkPaint.tint(Color("7a5532"), pose)
 
 
-static func ram(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pose: Dictionary, seed: int) -> void:
+static func ram(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int) -> void:
+	var pal: Array = st.palette
+	var team: Color = st.team
 	var variant: String = st.get("variant", "wood")
 	var wood := FkPaint.tint(Color("75512f"), pose)
 	var roof := FkPaint.tint(Color("8c6b3f"), pose)
@@ -18,7 +20,7 @@ static func ram(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pose: D
 	var roll: float = pose.get("walk", 0.0)
 	var t: float = pose.get("t", 0.0)
 	FkPaint.shadow(ci, 38)
-	FkFigure.crew(ci, st, pal, team, pose, seed, Vector2(-26, 0))
+	FkFigure.crew(ci, st, pose, seed, Vector2(-26, 0))
 	match variant:
 		"root":
 			# Rootbreaker: a living trunk, still sprouting, slung under a canopy of woven boughs.
@@ -60,7 +62,9 @@ static func ram(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pose: D
 
 ## Torsion engine (onager / stone hurler / moonfire catapult): the arm lies back loaded and slams
 ## up into the crossbar on release.
-static func catapult(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pose: Dictionary, seed: int) -> void:
+static func catapult(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int) -> void:
+	var pal: Array = st.palette
+	var team: Color = st.team
 	var variant: String = st.get("variant", "onager")
 	var atk: float = pose.get("atk", -1.0)
 	var t: float = pose.get("t", 0.0)
@@ -78,7 +82,7 @@ static func catapult(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, po
 	if atk >= 0.0:
 		arm = lerpf(rest, fire, ease(clampf((atk - 0.25) / 0.15, 0.0, 1.0), 0.3)) if atk < 0.7 else lerpf(fire, rest, (atk - 0.7) / 0.3)
 	FkPaint.shadow(ci, 40)
-	FkFigure.crew(ci, st, pal, team, pose, seed, Vector2(-46, 0))
+	FkFigure.crew(ci, st, pose, seed, Vector2(-46, 0))
 	# Frame: sill beams, uprights and the stop-beam.
 	ci.draw_line(Vector2(-34, -14), Vector2(34, -14), wood.darkened(0.2), 7.0)
 	ci.draw_line(Vector2(-28, -22), Vector2(28, -22), wood.darkened(0.1), 4.0)
@@ -100,7 +104,7 @@ static func catapult(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, po
 	if loaded:
 		match variant:
 			"moonfire":
-				var g: Color = FkUnits.look.glow
+				var g: Color = st.look.glow
 				FkPaint.halo(ci, cup + Vector2(0, -4).rotated(arm + PI * 0.5), 9.0, g, 0.8 + 0.2 * sin(t * 5.0))
 				ci.draw_circle(cup + Vector2(0, -4).rotated(arm + PI * 0.5), 3.4, Color(1, 1, 1, 0.9))
 			_:
@@ -114,7 +118,9 @@ static func catapult(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, po
 
 
 ## Bolt thrower on a wheeled stand: the bow limbs flex back, then the bolt flies.
-static func ballista(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pose: Dictionary, seed: int) -> void:
+static func ballista(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int) -> void:
+	var pal: Array = st.palette
+	var team: Color = st.team
 	var great: bool = st.get("variant", "") == "great"
 	var k := 1.25 if great else 1.0
 	var atk: float = pose.get("atk", -1.0)
@@ -128,9 +134,9 @@ static func ballista(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, po
 	if atk >= 0.0:
 		pull = 1.0 if atk < 0.4 else (0.0 if atk < 0.7 else (atk - 0.7) / 0.3)
 	FkPaint.shadow(ci, 36 * k)
-	FkFigure.crew(ci, st, pal, team, pose, seed, Vector2(-40 * k, 0))
+	FkFigure.crew(ci, st, pose, seed, Vector2(-40 * k, 0))
 	if great:
-		FkFigure.crew(ci, st, pal, team, pose, seed + 1, Vector2(-26 * k, 0))
+		FkFigure.crew(ci, st, pose, seed + 1, Vector2(-26 * k, 0))
 	ci.draw_line(Vector2(-30, -12) * k, Vector2(28, -12) * k, wood.darkened(0.3), 6.0)
 	ci.draw_line(Vector2(-4, -12) * k, Vector2(0, -32) * k, wood.darkened(0.15), 5.0)
 	ci.draw_line(Vector2(10, -12) * k, Vector2(2, -32) * k, wood.darkened(0.2), 4.0)
@@ -162,7 +168,9 @@ static func ballista(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, po
 		FkPaint.wheel(ci, Vector2(x, -9) * k, 9 * k, roll, wood.darkened(0.2), metal, 6)
 
 
-static func trebuchet(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pose: Dictionary, seed: int) -> void:
+static func trebuchet(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int) -> void:
+	var pal: Array = st.palette
+	var team: Color = st.team
 	var wood := wood(pose)
 	var atk: float = pose.get("atk", -1.0)
 	var arm := -2.3
@@ -182,12 +190,14 @@ static func trebuchet(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, p
 	ci.draw_rect(Rect2(Vector2(-12, -36), Vector2(24, 10)), FkPaint.tint(team, pose))
 	for x in [-26.0, 26.0]:
 		FkPaint.wheel(ci, Vector2(x, -8), 8, roll, wood, FkPaint.tint(pal[2], pose), 5)
-	FkFigure.crew(ci, st, pal, team, pose, seed, Vector2(-44, 0))
+	FkFigure.crew(ci, st, pose, seed, Vector2(-44, 0))
 
 
 ## Wheeled gun: great cannon (bronze), bombard (squat, banded, on a sled), flame cannon (dragon
 ## muzzle) and rune cannon (dark iron with glowing rune bands).
-static func cannon(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pose: Dictionary, seed: int) -> void:
+static func cannon(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int) -> void:
+	var pal: Array = st.palette
+	var team: Color = st.team
 	var variant: String = st.get("variant", "great")
 	var kick := maxf(0.0, FkUnits.swing(pose.get("atk", -1.0))) * 7.0
 	var roll: float = pose.get("walk", 0.0)
@@ -195,11 +205,11 @@ static func cannon(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pose
 	var metal: Color = FkPaint.tint(pal[2], pose)
 	var tm := FkPaint.tint(team, pose)
 	var wood := wood(pose)
-	var g: Color = FkUnits.look.glow
+	var g: Color = st.look.glow
 	var barrel_col: Color = {"great": Color("b98a3e"), "bombard": Color("4e4c4a"), "flame": Color("a8743a"), "rune": Color("3a3a44")}.get(variant, Color("5b604a"))
 	var gun := FkPaint.tint(barrel_col, pose)
 	FkPaint.shadow(ci, 38)
-	FkFigure.crew(ci, st, pal, team, pose, seed, Vector2(-38, 0))
+	FkFigure.crew(ci, st, pose, seed, Vector2(-38, 0))
 	var elev := -0.5 if variant == "bombard" else -0.22
 	var dirv := Vector2(1, 0).rotated(elev)
 	var breech := Vector2(-6, -28) - dirv * kick
@@ -240,11 +250,12 @@ static func cannon(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pose
 
 ## Steam Juggernaut: a riveted brass-and-iron hull on a great drive wheel, smokestack puffing,
 ## with a crystal cannon in the cupola.
-static func steamtank(ci: CanvasItem, _pal: Array, team: Color, pose: Dictionary) -> void:
+static func steamtank(ci: CanvasItem, st: Dictionary, pose: Dictionary, _seed: int) -> void:
+	var team: Color = st.team
 	var brass := FkPaint.tint(Color("b8914a"), pose)
 	var iron := FkPaint.tint(Color("4a4c52"), pose)
 	var tm := FkPaint.tint(team, pose)
-	var g: Color = FkUnits.look.glow
+	var g: Color = st.look.glow
 	var t: float = pose.get("t", 0.0)
 	var roll: float = pose.get("walk", 0.0) * 1.6
 	var kick := maxf(0.0, FkUnits.swing(pose.get("atk", -1.0))) * 4.0
@@ -277,7 +288,8 @@ static func steamtank(ci: CanvasItem, _pal: Array, team: Color, pose: Dictionary
 
 
 ## Steam Golem: an iron-and-brass walker with a furnace chest and a hammer fist.
-static func golem(ci: CanvasItem, _pal: Array, team: Color, pose: Dictionary) -> void:
+static func golem(ci: CanvasItem, st: Dictionary, pose: Dictionary, _seed: int) -> void:
+	var team: Color = st.team
 	var mv := FkPaint.move_amount(pose)
 	var walk: float = pose.get("walk", 0.0) * 0.8
 	var t: float = pose.get("t", 0.0)
@@ -285,7 +297,7 @@ static func golem(ci: CanvasItem, _pal: Array, team: Color, pose: Dictionary) ->
 	var iron := FkPaint.tint(Color("5a5a62"), pose)
 	var brass := FkPaint.tint(Color("c09a4a"), pose)
 	var tm := FkPaint.tint(team, pose)
-	var g: Color = FkUnits.look.glow
+	var g: Color = st.look.glow
 	var bob := lerpf(sin(t * 1.3) * 0.8, absf(sin(walk)) * 3.0, mv)
 	var hip := Vector2(0, -40 + bob)
 	FkPaint.shadow(ci, 30)
@@ -337,7 +349,8 @@ static func golem(ci: CanvasItem, _pal: Array, team: Color, pose: Dictionary) ->
 
 
 ## Treant: a walking tree — root feet, bark body, branch arms and a leafy crown.
-static func treant(ci: CanvasItem, team: Color, pose: Dictionary, seed: int) -> void:
+static func treant(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int) -> void:
+	var team: Color = st.team
 	var mv := FkPaint.move_amount(pose)
 	var walk: float = pose.get("walk", 0.0) * 0.7
 	var t: float = pose.get("t", 0.0)
@@ -345,7 +358,7 @@ static func treant(ci: CanvasItem, team: Color, pose: Dictionary, seed: int) -> 
 	var bark := FkPaint.tint(Color("6a5038"), pose)
 	var leaf := FkPaint.tint(Color("4f7f3c"), pose)
 	var tm := FkPaint.tint(team, pose)
-	var g: Color = FkUnits.look.glow
+	var g: Color = st.look.glow
 	var bob := lerpf(sin(t * 1.1 + seed) * 0.8, absf(sin(walk)) * 2.5, mv)
 	var hip := Vector2(0, -34 + bob)
 	FkPaint.shadow(ci, 30)
@@ -396,14 +409,15 @@ static func treant(ci: CanvasItem, team: Color, pose: Dictionary, seed: int) -> 
 
 
 ## Sky Cannon: a long brass barrel on a gilded carriage, ringed with floating arcane circles.
-static func skycannon(ci: CanvasItem, _pal: Array, team: Color, pose: Dictionary) -> void:
+static func skycannon(ci: CanvasItem, st: Dictionary, pose: Dictionary, _seed: int) -> void:
+	var team: Color = st.team
 	var t: float = pose.get("t", 0.0)
 	var atk: float = pose.get("atk", -1.0)
 	var roll: float = pose.get("walk", 0.0)
 	var brass := FkPaint.tint(Color("c9a45c"), pose)
 	var dark := FkPaint.tint(Color("3a3448"), pose)
 	var tm := FkPaint.tint(team, pose)
-	var g: Color = FkUnits.look.glow
+	var g: Color = st.look.glow
 	var charge := clampf(atk / 0.35, 0.0, 1.0) if atk >= 0.0 and atk < 0.35 else 0.0
 	var kick := maxf(0.0, FkUnits.swing(atk)) * 5.0
 	FkPaint.shadow(ci, 42)
@@ -427,16 +441,17 @@ static func skycannon(ci: CanvasItem, _pal: Array, team: Color, pose: Dictionary
 
 
 ## Starfall Obelisk: a crystal spire hovering over a runner-sled, pushed by an elven crew.
-static func obelisk(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pose: Dictionary, seed: int) -> void:
+static func obelisk(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int) -> void:
+	var team: Color = st.team
 	var t: float = pose.get("t", 0.0)
 	var atk: float = pose.get("atk", -1.0)
 	var wood := FkPaint.tint(Color("b89a6a"), pose)
 	var stone := FkPaint.tint(Color("d8dce8"), pose)
 	var tm := FkPaint.tint(team, pose)
-	var g: Color = FkUnits.look.glow
+	var g: Color = st.look.glow
 	var charge := clampf(atk / 0.35, 0.0, 1.0) if atk >= 0.0 and atk < 0.35 else 0.0
 	FkPaint.shadow(ci, 38)
-	FkFigure.crew(ci, st, pal, team, pose, seed, Vector2(-40, 0))
+	FkFigure.crew(ci, st, pose, seed, Vector2(-40, 0))
 	# Sled with curled runners and a carved plinth.
 	ci.draw_polyline(PackedVector2Array([Vector2(-32, -3), Vector2(28, -3), Vector2(36, -8), Vector2(34, -13)]), wood.darkened(0.3), 3.0)
 	FkPaint.shade_poly(ci, [Vector2(-26, -6), Vector2(22, -6), Vector2(18, -18), Vector2(-22, -18)], wood)

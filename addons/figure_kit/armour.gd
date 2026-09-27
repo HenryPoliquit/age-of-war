@@ -6,7 +6,7 @@ extends RefCounted
 const ENCLOSED := ["greathelm", "visor", "hood", "rune"]
 
 
-static func pack(ci: CanvasItem, kind: String, sh: Vector2, hip: Vector2, b: float, pal: Array, tm: Color, pose: Dictionary, t: float) -> void:
+static func pack(ci: CanvasItem, kind: String, sh: Vector2, hip: Vector2, b: float, pal: Array, tm: Color, pose: Dictionary, t: float, lk: Dictionary) -> void:
 	var back := sh + Vector2(-8, 4) * b
 	match kind:
 		"quiver", "javelins":
@@ -31,13 +31,13 @@ static func pack(ci: CanvasItem, kind: String, sh: Vector2, hip: Vector2, b: flo
 			ci.draw_rect(Rect2(back + Vector2(-7, -6) * b, Vector2(10, 4) * b), FkPaint.tint(pal[1], pose).darkened(0.4))
 		"cell":
 			# Arcane power cell: brass casing with a glowing crystal core.
-			var g: Color = FkUnits.look.glow
+			var g: Color = lk.glow
 			ci.draw_rect(Rect2(back + Vector2(-6, -4) * b, Vector2(9, 16) * b), FkPaint.tint(Color(pal[2]).darkened(0.45), pose))
 			ci.draw_rect(Rect2(back + Vector2(-6, -4) * b, Vector2(9, 2) * b), FkPaint.tint(pal[2], pose))
 			ci.draw_rect(Rect2(back + Vector2(-4, -1) * b, Vector2(4, 10) * b), Color(g, 0.6 + 0.3 * sin(t * 4.0)))
 
 
-static func helmet(ci: CanvasItem, kind: String, head: Vector2, b: float, pal: Array, tm: Color, pose: Dictionary, t: float, seed: int, hair: Color) -> void:
+static func helmet(ci: CanvasItem, kind: String, head: Vector2, b: float, pal: Array, tm: Color, pose: Dictionary, t: float, seed: int, hair: Color, lk: Dictionary) -> void:
 	var metal: Color = FkPaint.tint(pal[2], pose)
 	var gold := FkPaint.tint(Color("d9b25c"), pose)
 	match kind:
@@ -82,7 +82,7 @@ static func helmet(ci: CanvasItem, kind: String, head: Vector2, b: float, pal: A
 			FkPaint.poly(ci, [head + Vector2(-11, -2) * b, head + Vector2(-6, -7) * b, head + Vector2(0, -12) * b, head + Vector2(6, -7) * b, head + Vector2(11, -2) * b], metal)
 		"hood":
 			FkPaint.ellipse(ci, head + Vector2(-1, -1) * b, Vector2(8, 8) * b, FkPaint.tint(Color(pal[0]).darkened(0.15), pose))
-			ci.draw_circle(head + Vector2(2, 0.5) * b, 5.2 * b, FkPaint.tint(FkUnits.look.skin[seed % FkUnits.look.skin.size()], pose))
+			ci.draw_circle(head + Vector2(2, 0.5) * b, 5.2 * b, FkPaint.tint(lk.skin[seed % lk.skin.size()], pose))
 			ci.draw_circle(head + Vector2(3.6, -0.6) * b, 0.8 * b, Color(0.08, 0.06, 0.05))
 		"tricorne":
 			FkPaint.poly(ci, [head + Vector2(-10, -3) * b, head + Vector2(-3, -10) * b, head + Vector2(4, -10) * b, head + Vector2(10, -3) * b], Color(0.12, 0.12, 0.15))
@@ -91,13 +91,13 @@ static func helmet(ci: CanvasItem, kind: String, head: Vector2, b: float, pal: A
 			# Arcane sallet: swept tail and a glowing eye-slit.
 			FkPaint.shade_poly(ci, [head + Vector2(-12, 1) * b, head + Vector2(-6, -8) * b, head + Vector2(3, -8.5) * b, head + Vector2(8, -2) * b,
 				head + Vector2(7.5, 4) * b, head + Vector2(-3, 5) * b], metal)
-			ci.draw_line(head + Vector2(-1, -1) * b, head + Vector2(8, -1) * b, Color(FkUnits.look.glow, 0.95), 2.2 * b)
+			ci.draw_line(head + Vector2(-1, -1) * b, head + Vector2(8, -1) * b, Color(lk.glow, 0.95), 2.2 * b)
 			ci.draw_line(head + Vector2(-6, -8) * b, head + Vector2(3, -8.5) * b, metal.lightened(0.25), 1.2 * b)
 		"goggles":
 			FkPaint.ellipse(ci, head + Vector2(-0.5, -3.5) * b, Vector2(7.2, 4.6) * b, FkPaint.tint(Color("5a3d28"), pose))
 			ci.draw_line(head + Vector2(-6, -2.5) * b, head + Vector2(6, -2.5) * b, FkPaint.tint(Color("3a2a1c"), pose), 1.6 * b)
 			ci.draw_circle(head + Vector2(3.5, -3.5) * b, 2.4 * b, metal)
-			ci.draw_circle(head + Vector2(3.5, -3.5) * b, 1.5 * b, Color(FkUnits.look.glow, 0.8))
+			ci.draw_circle(head + Vector2(3.5, -3.5) * b, 1.5 * b, Color(lk.glow, 0.8))
 		"leaf":
 			# Elven helm: a smooth bowl sweeping back into a long leaf point, gilt edge.
 			FkPaint.shade_poly(ci, [head + Vector2(6.5, -1) * b, head + Vector2(6.5, -4) * b, head + Vector2(1, -9) * b, head + Vector2(-5, -7) * b,
@@ -107,7 +107,7 @@ static func helmet(ci: CanvasItem, kind: String, head: Vector2, b: float, pal: A
 		"circlet":
 			FkPaint.ellipse(ci, head + Vector2(-1.5, -3.5) * b, Vector2(7, 4.2) * b, hair)
 			ci.draw_line(head + Vector2(-6.5, -2.5) * b, head + Vector2(6.5, -2.5) * b, gold, 1.3 * b)
-			ci.draw_circle(head + Vector2(5.4, -2.6) * b, 1.3 * b, Color(FkUnits.look.glow, 0.95))
+			ci.draw_circle(head + Vector2(5.4, -2.6) * b, 1.3 * b, Color(lk.glow, 0.95))
 		"antler":
 			FkPaint.ellipse(ci, head + Vector2(-1.5, -3) * b, Vector2(7, 4.5) * b, hair)
 			var bone := FkPaint.tint(Color("d8cbb0"), pose)
@@ -126,7 +126,7 @@ static func helmet(ci: CanvasItem, kind: String, head: Vector2, b: float, pal: A
 				var horn := FkPaint.tint(Color("e2d6b8"), pose)
 				FkPaint.shade_poly(ci, [head + Vector2(-4, -6) * b, head + Vector2(-2, -8) * b, head + Vector2(-8, -15) * b, head + Vector2(-13, -16) * b, head + Vector2(-9, -12) * b], horn)
 			if kind == "rune":
-				var g: Color = FkUnits.look.glow
+				var g: Color = lk.glow
 				ci.draw_polyline(PackedVector2Array([head + Vector2(-5, -4) * b, head + Vector2(-3, -7) * b, head + Vector2(-1, -4) * b, head + Vector2(1, -7) * b]),
 					Color(g, 0.75 + 0.25 * sin(t * 3.0 + seed)), 1.2 * b)
 				FkPaint.poly(ci, [head + Vector2(-2, -1) * b, head + Vector2(7.5, -1) * b, head + Vector2(7, 4) * b, head + Vector2(-1, 5) * b], metal.darkened(0.2))
@@ -136,9 +136,9 @@ static func helmet(ci: CanvasItem, kind: String, head: Vector2, b: float, pal: A
 			FkPaint.ellipse(ci, head + Vector2(0, -6) * b, Vector2(6, 3.5) * b, FkPaint.tint(Color("666a52"), pose))
 
 
-static func shield(ci: CanvasItem, kind: String, sh: Vector2, b: float, pal: Array, tm: Color, team: Color, pose: Dictionary, t: float, runes := false) -> void:
+static func shield(ci: CanvasItem, kind: String, sh: Vector2, b: float, pal: Array, tm: Color, team: Color, pose: Dictionary, t: float, lk: Dictionary, runes := false) -> void:
 	var metal: Color = FkPaint.tint(pal[2], pose)
-	var g: Color = FkUnits.look.glow
+	var g: Color = lk.glow
 	match kind:
 		"round":
 			var c := sh + Vector2(7, 11) * b

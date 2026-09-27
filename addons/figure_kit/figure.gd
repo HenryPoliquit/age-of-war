@@ -19,8 +19,10 @@ static func arm(ci: CanvasItem, from: Vector2, hand: Vector2, b: float, sleeve: 
 	ci.draw_circle(hand, 3.2 * b, skin)
 
 
-static func humanoid(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pose: Dictionary, seed: int, scale := 1.0, legs := true) -> void:
-	var lk := FkUnits.look
+static func humanoid(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, scale := 1.0, legs := true) -> void:
+	var pal: Array = st.palette
+	var team: Color = st.team
+	var lk: Dictionary = st.look
 	var body: Vector2 = lk.body
 	var build: float = st.get("build", 1.0) * scale
 	var mv := FkPaint.move_amount(pose)
@@ -69,7 +71,7 @@ static func humanoid(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, po
 		var flap := sin(t * 3.0 + seed) * 2.0 + mv * 3.0
 		FkPaint.shade_poly(ci, [sh + Vector2(-6, 0) * b, sh + Vector2(2, 1) * b, hip + Vector2(-2, 8) * b,
 			hip + Vector2(-12 - flap, 10) * b, hip + Vector2(-9 - flap * 0.5, -2) * b], tm.darkened(0.35))
-	FkArmour.pack(ci, st.get("pack", ""), sh, hip, build, pal, tm, pose, t)
+	FkArmour.pack(ci, st.get("pack", ""), sh, hip, build, pal, tm, pose, t, lk)
 	# Back arm swings opposite the front leg: upper arm, forearm, hand.
 	var arm_sw := sin(walk) * 0.5 * mv
 	var elbow := sh + Vector2(-3, 1) * b + Vector2(0, 10 * b).rotated(arm_sw)
@@ -135,15 +137,15 @@ static func humanoid(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, po
 		3:
 			if seed % 3 == 0 and helmet in ["hair", "band", "cap", "kettle", "morion", "tricorne", "brodie", "galea", "conical", "goggles"]:
 				FkPaint.shade_poly(ci, [head + Vector2(-2.5, 2) * hb, head + Vector2(4.8, 2.4) * hb, head + Vector2(3.5, 6.8) * hb, head + Vector2(0.5, 7.4) * hb, head + Vector2(-2, 5) * hb], hair)
-	FkArmour.helmet(ci, helmet, head, hb * 0.84, pal, tm, pose, t, seed, hair)
+	FkArmour.helmet(ci, helmet, head, hb * 0.84, pal, tm, pose, t, seed, hair, lk)
 	# Pointed ears sweep up and back past the hair or an open helm.
 	if lk.ears == "pointed" and open_face:
 		FkPaint.poly(ci, [head + Vector2(-0.6, 2.2) * hb, head + Vector2(-2.4, -0.6) * hb, head + Vector2(-8.5, -6.5) * hb, head + Vector2(-2.6, 2.8) * hb], skin.darkened(0.08))
 		ci.draw_line(head + Vector2(-2.2, 1.0) * hb, head + Vector2(-6.8, -4.8) * hb, skin.darkened(0.25), 0.7)
 	# Front arm + weapon.
 	# Shield (far arm) under the weapon arm, so the striking hand is always the top layer.
-	FkArmour.shield(ci, st.get("shield", ""), sh, build, pal, tm, team, pose, t, st.get("runes", false))
-	FkWeapons.weapon(ci, st.get("weapon", "sword"), sh, build, FkUnits.swing(atk), atk, pal, tm, skin, pose, t, armoured)
+	FkArmour.shield(ci, st.get("shield", ""), sh, build, pal, tm, team, pose, t, lk, st.get("runes", false))
+	FkWeapons.weapon(ci, st.get("weapon", "sword"), sh, build, FkUnits.swing(atk), atk, pal, tm, skin, pose, t, lk, armoured)
 
 
 static func _dwarf_beard(ci: CanvasItem, head: Vector2, b: float, hair: Color, t: float, seed: int) -> void:
@@ -160,14 +162,19 @@ static func _dwarf_beard(ci: CanvasItem, head: Vector2, b: float, hair: Color, t
 	FkPaint.ellipse(ci, head + Vector2(4.6, 3.3) * b, Vector2(2.6, 1.3) * b, hair.lightened(0.08), 0.25)
 
 
-static func offset_humanoid(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pose: Dictionary, seed: int, offset: Vector2) -> void:
+static func offset_humanoid(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, offset: Vector2) -> void:
 	# The humanoid rig draws around a hip at y≈−25; drawing it with a translated transform keeps one rig.
 	FkPaint.push(ci, Transform2D(0.0, offset))
-	humanoid(ci, st, pal, team, pose, seed, 1.0, false)
+	humanoid(ci, st, pose, seed, 1.0, false)
 	FkPaint.pop(ci)
 
 
-static func crew(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pose: Dictionary, seed: int, at: Vector2, weapon := "crew") -> void:
+static func crew(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, at: Vector2, weapon := "crew") -> void:
 	FkPaint.push(ci, Transform2D(0.0, Vector2(0.85, 0.85), 0.0, at))
-	humanoid(ci, {"helmet": st.get("crew", "cap"), "weapon": weapon}, pal, team, pose, seed)
+	humanoid(ci, dress(st, {"helmet": st.get("crew", "cap"), "weapon": weapon}), pose, seed)
 	FkPaint.pop(ci)
+
+
+## A sub-figure (crew, driver) wearing `extra`'s gear in the parent's race look and colours.
+static func dress(spec: Dictionary, extra: Dictionary) -> Dictionary:
+	return extra.merged({"look": spec.look, "palette": spec.palette, "team": spec.team})

@@ -12,12 +12,12 @@ const SHOTS := {"sling": "stone", "javelin": "javelin", "throwing_axe": "axe", "
 const CHOP := ["club", "sword", "gladius", "shovel", "baton", "saber", "axe", "hammer", "leafblade", "spellsword", "rune_hammer"]
 
 
-static func weapon(ci: CanvasItem, kind: String, sh: Vector2, b: float, s: float, atk: float, pal: Array, tm: Color, skin: Color, pose: Dictionary, t: float, armoured := false) -> void:
+static func weapon(ci: CanvasItem, kind: String, sh: Vector2, b: float, s: float, atk: float, pal: Array, tm: Color, skin: Color, pose: Dictionary, t: float, lk: Dictionary, armoured := false) -> void:
 	var wood := FkPaint.tint(Color("6b4a2b"), pose)
 	var metal: Color = FkPaint.tint(pal[2], pose)
 	var sleeve: Color = FkPaint.tint(pal[0], pose).lightened(0.12)
 	var bracer: Color = metal if armoured else FkPaint.tint(Color("4a3322"), pose)
-	var g: Color = FkUnits.look.glow
+	var g: Color = lk.glow
 	if kind in CHOP:
 		# Overhead chop: arm angle from straight down (0) to overhead (~2.9 rad). Guard at 1.2 holds
 		# the weapon out in front; the strike ends with the arm fully extended forward.
@@ -135,13 +135,13 @@ static func weapon(ci: CanvasItem, kind: String, sh: Vector2, b: float, s: float
 			var hand := sh + Vector2(15, 1) * b
 			FkFigure.arm(ci, sh + Vector2(2, 1), hand, b, sleeve, skin, bracer)
 			# Elves carry the tall recurved longbow.
-			var tall := 23.0 if FkUnits.look.long_hair else 19.0
+			var tall := 23.0 if lk.long_hair else 19.0
 			var top := hand + Vector2(-2, -tall) * b
 			var bot := hand + Vector2(-2, tall) * b
 			var pts := PackedVector2Array()
 			for i in 11:
 				var u := i / 10.0
-				var curl := (-2.5 if u < 0.08 or u > 0.92 else 0.0) if FkUnits.look.long_hair else 0.0
+				var curl := (-2.5 if u < 0.08 or u > 0.92 else 0.0) if lk.long_hair else 0.0
 				pts.append(top.lerp(bot, u) + Vector2((sin(u * PI) * 7 + curl) * b, 0))
 			var bow_col := wood if kind == "bow" else FkPaint.tint(Color("e8e4d4"), pose)
 			ci.draw_polyline(pts, bow_col, 2.6 * b)

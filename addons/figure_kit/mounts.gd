@@ -208,22 +208,28 @@ static func _antlers(ci: CanvasItem, at: Vector2, kind: int, col: Color) -> void
 		ci.draw_polyline(PackedVector2Array([at + Vector2(1, 0), at + Vector2(1, -7), at + Vector2(4, -14)]), col.darkened(0.2), 1.4)
 
 
-static func mounted(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pose: Dictionary, seed: int) -> void:
+static func mounted(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int) -> void:
+	var pal: Array = st.palette
+	var team: Color = st.team
 	var saddle := quadruped(ci, st.get("beast", "horse"), team, pose, seed, pal[2])
 	var p := pose.duplicate()
 	p["moving"] = false
 	p["move"] = 0.0
-	_rider(ci, st, pal, team, p, seed, saddle)
+	_rider(ci, st, p, seed, saddle)
 
 
-static func _rider(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pose: Dictionary, seed: int, at: Vector2) -> void:
+static func _rider(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, at: Vector2) -> void:
+	var pal: Array = st.palette
+	var team: Color = st.team
 	# Upper body only, offset to the saddle; legs drawn as a straddling thigh.
 	var cloth: Color = FkPaint.tint(pal[1], pose)
 	ci.draw_line(at + Vector2(0, -2), at + Vector2(8, 10), cloth, 6.0)
-	FkFigure.offset_humanoid(ci, st, pal, team, pose, seed, at + Vector2(0, 27))
+	FkFigure.offset_humanoid(ci, st, pose, seed, at + Vector2(0, 27))
 
 
-static func chariot(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pose: Dictionary, seed: int) -> void:
+static func chariot(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int) -> void:
+	var pal: Array = st.palette
+	var team: Color = st.team
 	var p := pose.duplicate()
 	FkPaint.push(ci, Transform2D(0.0, Vector2(26, 0)) * Transform2D(0.0, Vector2(0.78, 0.78), 0.0, Vector2.ZERO))
 	quadruped(ci, st.get("beast", "horse"), team, p, seed, pal[2])
@@ -249,4 +255,4 @@ static func chariot(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, pos
 			FkPaint.shade_poly(ci, [Vector2(-30, -16), Vector2(-6, -16), Vector2(-4, -36), Vector2(-26, -34)], metal)
 			FkPaint.poly(ci, [Vector2(-28, -19), Vector2(-8, -19), Vector2(-7, -31), Vector2(-25, -30)], tm)
 	FkPaint.wheel(ci, Vector2(-18, -13), 13, roll, wood, metal)
-	FkFigure.offset_humanoid(ci, {"helmet": st.get("crew", "crest"), "weapon": st.get("weapon", "spear")}, pal, team, pose, seed, Vector2(-16, 4))
+	FkFigure.offset_humanoid(ci, FkFigure.dress(st, {"helmet": st.get("crew", "crest"), "weapon": st.get("weapon", "spear")}), pose, seed, Vector2(-16, 4))

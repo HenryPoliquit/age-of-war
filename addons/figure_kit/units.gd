@@ -34,44 +34,35 @@ static func swing(atk: float) -> float:
 	return lerpf(1.0, 0.0, ease((atk - 0.55) / 0.45, 1.6))
 
 
-## Race body preset of the figure being drawn. Set by draw() from spec.look for the duration of one
-## draw call (removed in the next refactor step — everything will read spec.look).
-static var look: Dictionary = FkLooks.BODIES[&"human"]
-
-
 ## Draws one unit at the current FkPaint transform. spec = style keys + look, palette, team.
 static func draw(ci: CanvasItem, spec: Dictionary, pose: Dictionary, seed: int = 0) -> void:
-	look = spec.get("look", FkLooks.BODIES[&"human"])
-	var pal: Array = spec.palette
-	var team: Color = spec.team
 	match spec.rig:
 		"humanoid":
-			FkFigure.humanoid(ci, spec, pal, team, pose, seed)
+			FkFigure.humanoid(ci, spec, pose, seed)
 		"mounted":
-			FkMounts.mounted(ci, spec, pal, team, pose, seed)
+			FkMounts.mounted(ci, spec, pose, seed)
 		"chariot":
-			FkMounts.chariot(ci, spec, pal, team, pose, seed)
+			FkMounts.chariot(ci, spec, pose, seed)
 		"ram":
-			FkMachines.ram(ci, spec, pal, team, pose, seed)
+			FkMachines.ram(ci, spec, pose, seed)
 		"catapult":
-			FkMachines.catapult(ci, spec, pal, team, pose, seed)
+			FkMachines.catapult(ci, spec, pose, seed)
 		"ballista":
-			FkMachines.ballista(ci, spec, pal, team, pose, seed)
+			FkMachines.ballista(ci, spec, pose, seed)
 		"trebuchet":
-			FkMachines.trebuchet(ci, spec, pal, team, pose, seed)
+			FkMachines.trebuchet(ci, spec, pose, seed)
 		"cannon":
-			FkMachines.cannon(ci, spec, pal, team, pose, seed)
+			FkMachines.cannon(ci, spec, pose, seed)
 		"steamtank":
-			FkMachines.steamtank(ci, pal, team, pose)
+			FkMachines.steamtank(ci, spec, pose, seed)
 		"golem":
-			FkMachines.golem(ci, pal, team, pose)
+			FkMachines.golem(ci, spec, pose, seed)
 		"treant":
-			FkMachines.treant(ci, team, pose, seed)
+			FkMachines.treant(ci, spec, pose, seed)
 		"skycannon":
-			FkMachines.skycannon(ci, pal, team, pose)
+			FkMachines.skycannon(ci, spec, pose, seed)
 		"obelisk":
-			FkMachines.obelisk(ci, spec, pal, team, pose, seed)
-	look = FkLooks.BODIES[&"human"]
+			FkMachines.obelisk(ci, spec, pose, seed)
 
 
 ## Visual height in px (for HP bars and selection).

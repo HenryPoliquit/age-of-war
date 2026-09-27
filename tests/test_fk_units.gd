@@ -25,3 +25,10 @@ func test_swing_beats() -> void:
 	check_near(FkUnits.swing(-1.0), 0.0, 1e-6, "idle")
 	check_near(FkUnits.swing(0.35), -1.0, 1e-4, "full wind-up")
 	check_near(FkUnits.swing(0.55), 1.0, 1e-4, "contact")
+
+
+func test_kit_has_no_hidden_draw_state() -> void:
+	var src := FileAccess.get_file_as_string("res://addons/figure_kit/units.gd")
+	check(not src.contains("static var look"), "the race look is passed in the spec, not held in a static")
+	var figure := FileAccess.get_file_as_string("res://addons/figure_kit/figure.gd")
+	check(figure.contains("static func dress("), "crews inherit the parent's look through dress()")
