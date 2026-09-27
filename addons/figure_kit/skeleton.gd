@@ -53,6 +53,9 @@ const FAMILY := {
 ##   s / sf  near / far shoulder offset     e / ef  near / far elbow bend side
 ##   lean  torso lean (rad, + forward)      lunge  body shift forward (px)
 ##   crouch  hip drop (px)                  step  passing step (0..1: the back foot swings through to the front)
+##   wide  extra stance width (px)          zoom  weapon scale (foreshortening as it swings toward the viewer)
+##   lock  wrist locked (0..1): the weapon continues the forearm's line
+##   rim  shield top-rim position (the far hand then grips the shield below it, by the shield's size)
 ## path: "line" (the near hand travels straight between keys) or "arc" (around the shoulder, overhead chops).
 const STANCES := {
 	"idle": {"guard": {"h": Vector2(3, 16)}, "wind": {"h": Vector2(3, 16)}, "hit": {"h": Vector2(3, 16)}},
@@ -65,15 +68,18 @@ const STANCES := {
 			"crouch": 2.5, "lean": -0.05, "lunge": -1.0},
 		"hit": {"h": Vector2(22, 5), "a": 0.02, "f": Vector2(-1, 8), "s": Vector2(2, 1), "crouch": 3.0, "lean": 0.18,
 			"lunge": 7.0, "step": 1.0}},
-	# Sword or hand axe over a raised shield: low and compact, the shield forward on the centre line
-	# guarding chest and face (eyes over the rim), the weapon hand chambered high with the elbow tucked,
-	# then a tight steep arc straight over the rim, wrist locked, cleaving down at head/chest height.
+	# Sword or hand axe with a shield (owner brief 3): coil — deep wide crouch, weapon raised high and
+	# pulled back above the helmet, blade pointing back; cleave — a 45° line of action, the weapon sweeping
+	# a crescent over the shield's rim, foreshortened larger as it comes down; lockout — arm straight,
+	# wrist flat with the forearm, stopping rigid at chest-to-waist height. `rim` places the shield by
+	# its top rim (just under the eyes), whatever the shield's size.
 	"shield": {"path": "arc",
-		"guard": {"h": Vector2(10, -3), "a": -1.0, "f": Vector2(9, 3), "crouch": 2.5, "lean": 0.08},
-		"wind": {"h": Vector2(2, -12), "a": -2.2, "f": Vector2(9, 2), "s": Vector2(-0.5, -1.5), "e": Vector2(0.6, 1.0),
-			"crouch": 3.0, "lean": 0.02, "lunge": -1.0},
-		"hit": {"h": Vector2(16, -6), "a": 0.45, "f": Vector2(10, 4), "s": Vector2(2, 0), "crouch": 3.5, "lean": 0.18,
-			"lunge": 5.0}},
+		"guard": {"h": Vector2(0, -12), "a": -2.2, "rim": Vector2(10, -9.5), "s": Vector2(-0.5, -1), "crouch": 3.5,
+			"wide": 10.0, "lean": 0.06},
+		"wind": {"h": Vector2(-7, -15), "a": -2.7, "rim": Vector2(10, -9.5), "s": Vector2(-1.5, -2), "e": Vector2(1, 0),
+			"crouch": 5.0, "wide": 12.0, "lean": -0.05, "lunge": -1.0},
+		"hit": {"h": Vector2(20, 10), "a": 0.49, "rim": Vector2(11, -9.5), "s": Vector2(3, 1), "crouch": 5.5,
+			"wide": 14.0, "lean": 0.35, "lunge": 8.0, "zoom": 1.12, "lock": 1.0}},
 	"chop": {"path": "arc",
 		"guard": {"h": Vector2(14, 5), "a": -0.33},
 		"wind": {"h": Vector2(3.6, -14.5), "a": -2.03, "lean": -0.08, "lunge": -1.5},
@@ -110,7 +116,7 @@ const STANCES := {
 ## Far-hand shield grip (relative to sh) for shield bearers: holds the shield in front of the chest.
 const SHIELD_GRIP := Vector2(6, 11)
 
-const _FLOATS := ["a", "lean", "lunge", "crouch", "step"]
+const _FLOATS := {"a": 0.0, "lean": 0.0, "lunge": 0.0, "crouch": 0.0, "step": 0.0, "wide": 0.0, "zoom": 1.0, "lock": 0.0}
 const _VECTORS := {"s": Vector2.ZERO, "sf": Vector2.ZERO, "e": ELBOW, "ef": ELBOW}
 
 
@@ -133,7 +139,7 @@ static func key(family: String, atk: float) -> Dictionary:
 		k = ease((atk - 0.55) / 0.45, 1.6)
 	var out := {"two": st.get("two", false)}
 	for c in _FLOATS:
-		out[c] = lerpf(a.get(c, 0.0), z.get(c, 0.0), k)
+		out[c] = lerpf(a.get(c, _FLOATS[c]), z.get(c, _FLOATS[c]), k)
 	for c in _VECTORS:
 		out[c] = (a.get(c, _VECTORS[c]) as Vector2).lerp(z.get(c, _VECTORS[c]), k)
 	var h0: Vector2 = a.h
@@ -142,8 +148,9 @@ static func key(family: String, atk: float) -> Dictionary:
 		out["h"] = Vector2.from_angle(lerpf(h0.angle(), h1.angle(), k)) * lerpf(h0.length(), h1.length(), k)
 	else:
 		out["h"] = h0.lerp(h1, k)
-	if a.has("f"):
-		out["f"] = (a.f as Vector2).lerp(z.f, k)
+	for c in ["f", "rim"]:
+		if a.has(c):
+			out[c] = (a[c] as Vector2).lerp(z[c], k)
 	# The swinging foot of a passing step lifts mid-way through it.
 	out["step_lift"] = sin(k * PI) if a.get("step", 0.0) != z.get("step", 0.0) else 0.0
 	return out
@@ -166,14 +173,14 @@ static func _bell(d: float) -> float:
 	return cos(2.0 * w) if absf(w) < PI / 4 else 0.0
 
 
-## All joints for one frame. b = build; pose = {walk, move, atk, t}; shield = far hand holds a shield;
-## seated = rider (one leg in a stirrup, no walk cycle).
-static func solve(b: float, weapon: String, pose: Dictionary, shield := false, seated := false) -> Dictionary:
+## All joints for one frame. b = build; pose = {walk, move, atk, t}; shield = the shield kind the far
+## hand holds ("" = none); seated = rider (one leg in a stirrup, no walk cycle).
+static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seated := false) -> Dictionary:
 	var mv: float = pose.get("move", 1.0 if pose.get("moving", false) else 0.0)
 	var walk: float = pose.get("walk", 0.0)
 	var t: float = pose.get("t", 0.0)
 	var family: String = FAMILY.get(weapon, "idle")
-	if shield and family in ["blade", "chop"]:
+	if shield != "" and family in ["blade", "chop"]:
 		family = "shield"
 	var k := key(family, pose.get("atk", -1.0))
 	var bob := lerpf(sin(t * 2.1) * 0.7, absf(sin(walk)) * 2.2, mv)
@@ -182,7 +189,7 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := false, s
 	var hip := Vector2(lunge * 0.6, -HIP_Y * b + bob * 0.5 + crouch)
 	var sh := hip + Vector2(1.5 * b, -SPINE * b).rotated(k.lean)
 	var j := {"hip": hip, "sh": sh, "lean": k.lean, "lunge": lunge, "crouch": k.crouch, "dir": Vector2.from_angle(k.a),
-		"e_n": k.e, "e_f": k.ef}
+		"e_n": k.e, "e_f": k.ef, "zoom": k.zoom}
 	# Legs: feet on the ground line; a stride with lift and heel-to-toe roll while walking, the front
 	# foot planted forward on a lunge, the back foot swinging through on a passing step.
 	for i in 2:
@@ -196,6 +203,7 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := false, s
 			var fx := lerpf(2.8 if i == 0 else -3.6, 13.0 * sin(ph), mv)
 			var lift := 4.5 * maxf(0.0, cos(ph)) * mv
 			rot = _roll(ph) * mv
+			fx += k.wide * (0.5 if i == 0 else -0.5)
 			if i == 0:
 				fx += lunge * 1.6 / b * (1.0 - k.step)
 			else:
@@ -220,10 +228,14 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := false, s
 	var hand_n := reach(j.sh_n, sh + (k.h as Vector2) * b, UPPER * b, FORE * b)
 	j["hand_n"] = hand_n
 	j["elbow_n"] = ik(j.sh_n, hand_n, UPPER * b, FORE * b, k.e)
+	if k.lock > 0.0:
+		j["dir"] = (j.dir as Vector2).slerp((hand_n - (j.elbow_n as Vector2)).normalized(), k.lock)
 	var ft: Vector2
-	if k.has("f"):
+	if k.has("rim") and shield != "":
+		ft = sh + ((k.rim as Vector2) + Vector2(0, FkArmour.SHIELD_TOP.get(shield, 10.5))) * b
+	elif k.has("f"):
 		ft = sh + (k.f as Vector2) * b
-	elif shield:
+	elif shield != "":
 		ft = sh + SHIELD_GRIP * b
 	elif k.two:
 		ft = hand_n - (j.dir as Vector2) * 8.0 * b

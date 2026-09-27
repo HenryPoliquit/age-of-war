@@ -6,10 +6,12 @@ extends RefCounted
 
 ## Near (weapon) arm from solved joints: inked upper arm and bracered forearm, then the hand, so it
 ## reads over the body.
-static func arm(ci: CanvasItem, shoulder: Vector2, elbow: Vector2, hand: Vector2, hand_angle: float, b: float, sleeve: Color, skin: Color, bracer: Color) -> void:
+static func arm(ci: CanvasItem, shoulder: Vector2, elbow: Vector2, hand: Vector2, hand_angle: float, b: float, sleeve: Color, skin: Color, bracer: Color, ink_boost := 0.0) -> void:
 	var ink := Color(0.08, 0.06, 0.05)
-	FkPaint.seg(ci, shoulder, elbow, 7.8 * b, 7.0 * b, ink)
-	FkPaint.seg(ci, elbow, hand, 7.0 * b, 6.0 * b, ink)
+	# ink_boost (0..1) snaps the outline to full weight on an impact frame.
+	var k := 2.6 * ink_boost * b
+	FkPaint.seg(ci, shoulder, elbow, 7.8 * b + k, 7.0 * b + k, ink)
+	FkPaint.seg(ci, elbow, hand, 7.0 * b + k, 6.0 * b + k, ink)
 	FkPaint.seg(ci, shoulder, elbow, 5.4 * b, 4.6 * b, sleeve)
 	FkPaint.seg(ci, elbow, hand, 4.6 * b, 3.8 * b, bracer)
 	fist(ci, hand, hand_angle, b, skin)
@@ -55,7 +57,7 @@ static func humanoid(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int
 	var leather := FkPaint.tint(Color("4a3322"), pose)
 	var weapon: String = st.get("weapon", "none")
 	# One skeleton per frame; the idle-breath phase is offset per individual (as the old bob was).
-	var j := FkSkeleton.solve(build, weapon, pose.merged({"t": t + seed / 2.1}, true), st.get("shield", "") != "", not legs)
+	var j := FkSkeleton.solve(build, weapon, pose.merged({"t": t + seed / 2.1}, true), st.get("shield", ""), not legs)
 	var hip: Vector2 = j.hip
 	var sh: Vector2 = j.sh
 	var b := build
@@ -168,9 +170,12 @@ static func humanoid(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int
 	if fam in ["blade", "chop"]:
 		_smear(ci, st, pose, seed, build, weapon, pivot, body, not legs, metal)
 	var grip: float = (jn.hand_n - jn.elbow_n).angle() if fam in ["idle", "crew", "bow"] else (jn.dir as Vector2).angle()
-	arm(ci, jn.sh_n, jn.elbow_n, jn.hand_n, grip, b, cloth.lightened(0.12), skin, metal if armoured else leather)
+	var impact := clampf(1.0 - absf(atk - 0.52) / 0.08, 0.0, 1.0) if fam in ["blade", "chop"] else 0.0
+	arm(ci, jn.sh_n, jn.elbow_n, jn.hand_n, grip, b, cloth.lightened(0.12), skin, metal if armoured else leather, impact)
 	shoulder_cap(ci, jn.sh_n, jn.elbow_n, b, metal.lightened(0.05) if armoured else cloth.lightened(0.05))
 	FkWeapons.weapon(ci, weapon, jn, build, FkUnits.swing(atk), atk, pal, tm, skin, pose, t, lk)
+	if fam in ["blade", "chop"] and legs:
+		_impact_accents(ci, jn, j, weapon, build, atk, pivot, body)
 
 
 ## Motion smear behind a cutting weapon: the tip's actual path over the last part of the strike,
@@ -181,7 +186,7 @@ static func _smear(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, 
 		return
 	var fade := clampf((0.62 - atk) / 0.07, 0.0, 1.0)
 	var length := FkWeapons.weapon_length(weapon) * b
-	var shield: bool = st.get("shield", "") != ""
+	var shield: String = st.get("shield", "")
 	var pts := PackedVector2Array()
 	for i in 9:
 		var p := pose.merged({"atk": lerpf(0.33, minf(atk, 0.55), i / 8.0), "t": pose.get("t", 0.0) + seed / 2.1}, true)
@@ -190,7 +195,27 @@ static func _smear(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, 
 		pts.append((s.hand_n as Vector2) + off + (s.dir as Vector2) * length)
 	for i in pts.size() - 1:
 		var u := float(i + 1) / (pts.size() - 1)
-		ci.draw_line(pts[i], pts[i + 1], Color(metal.lightened(0.55), 0.5 * u * fade), (1.5 + 4.0 * u) * b)
+		# A crescent: thin where the cut began, full and bright at the blade.
+		ci.draw_line(pts[i], pts[i + 1], Color(metal.lightened(0.55).lerp(Color.WHITE, u), 0.6 * u * fade), (1.5 + 6.0 * u) * b)
+
+
+## Impact accents at the lockout: slash lines bursting from the blade along the cutting edge, and dirt
+## chips kicked out from under the braced front boot.
+static func _impact_accents(ci: CanvasItem, jn: Dictionary, j: Dictionary, weapon: String, b: float, atk: float, pivot: Vector2, body: Vector2) -> void:
+	if atk >= 0.44 and atk < 0.64:
+		var u := (atk - 0.44) / 0.2
+		var dir: Vector2 = jn.dir
+		var p: Vector2 = (jn.hand_n as Vector2) + dir * FkWeapons.weapon_length(weapon) * b * 0.7
+		var edge := FkWeapons.edge_normal(dir)
+		for i in 5:
+			var d := edge.rotated(-0.8 + i * 0.4)
+			ci.draw_line(p + d * (3.0 + 6.0 * u) * b, p + d * (6.0 + 14.0 * u) * b, Color(1, 1, 0.9, 0.9 * (1.0 - u)), 1.4 * b)
+	if atk >= 0.48 and atk < 0.72:
+		var u := (atk - 0.48) / 0.24
+		var foot: Vector2 = pivot + ((j.foot_n as Vector2) - pivot) * body
+		for i in 5:
+			var q := foot + Vector2(4.0 + i * 2.2 + u * (10.0 + i * 3.0), -u * (6.0 + i * 2.5) + u * u * 9.0) * b
+			ci.draw_rect(Rect2(q, Vector2(1.6, 1.3) * b), Color(0.42, 0.32, 0.22, 1.0 - u))
 
 
 static func _dwarf_beard(ci: CanvasItem, head: Vector2, b: float, hair: Color, t: float, seed: int) -> void:

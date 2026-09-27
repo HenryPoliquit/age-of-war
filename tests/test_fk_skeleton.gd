@@ -28,7 +28,7 @@ const FRAMES := [[0.0, 1.0, -1.0], [1.6, 1.0, -1.0], [3.1, 1.0, -1.0], [4.7, 1.0
 	[0.6, 0.0, -1.0], [0.6, 0.0, 0.2], [0.6, 0.0, 0.34], [0.6, 0.0, 0.45], [0.6, 0.0, 0.75], [2.0, 0.5, 0.4]]
 
 
-func _each_frame(weapon: String, fn: Callable, shield := false, seated := false) -> void:
+func _each_frame(weapon: String, fn: Callable, shield := "", seated := false) -> void:
 	for f in FRAMES:
 		fn.call(FkSkeleton.solve(1.16, weapon, {"walk": f[0], "move": f[1], "atk": f[2]}, shield, seated), f)
 
@@ -76,7 +76,7 @@ func test_wind_up_is_overhead_for_chops() -> void:
 
 
 func test_seated_foot_hangs_forward_below_hip() -> void:
-	var j := FkSkeleton.solve(1.0, "lance", {"atk": -1.0}, false, true)
+	var j := FkSkeleton.solve(1.0, "lance", {"atk": -1.0}, "", true)
 	check(j.foot_n.x > j.hip.x and j.foot_n.y > j.hip.y + 10.0, "stirrup foot forward and below")
 	check(j.knee_n.x > j.hip.x, "thigh along the saddle")
 
@@ -165,34 +165,49 @@ func test_blade_arm_straight_at_the_hit() -> void:
 	check(wind.hand_n.y < wind.sh.y - 8.0 and hit.hand_n.x > hit.sh.x + 18.0, "full sweep from ear to extended")
 
 
-# --- Sword / hand axe over a shield (owner brief 2) --------------------------------------------
+# --- Sword / hand axe with a shield: coil → rim cleave → lockout (owner brief 3) --------------
 
-func test_shield_held_forward_on_the_centre_line() -> void:
+func _rim_y(j: Dictionary, kind: String, b: float) -> float:
+	return (j.hand_f as Vector2).y - FkArmour.SHIELD_TOP[kind] * b
+
+
+func test_coil_weapon_high_and_back_deep_wide_crouch() -> void:
 	for w in ["sword", "axe"]:
-		for atk in [-1.0, 0.34, 0.5]:
-			var j := FkSkeleton.solve(1.0, w, {"atk": atk}, true)
-			var tag := "%s %s" % [w, atk]
-			check(j.hand_f.x > j.sh.x + 6.0, tag + ": shield forward")
-			check(j.hand_f.y > j.sh.y - 4.0 and j.hand_f.y < j.sh.y + 8.0, tag + ": shield at chest-to-face height")
+		var j := FkSkeleton.solve(1.0, w, {"atk": 0.34}, "round")
+		check(j.hand_n.y < j.sh.y - 12.0 and j.hand_n.x < j.sh.x, "%s: weapon hand raised high and pulled back above the helmet" % w)
+		check(j.dir.x < 0.0 and j.dir.y < 0.0, "%s: blade points up and back" % w)
+		check(j.crouch >= 4.0, "%s: deep crouch" % w)
+		check(j.foot_n.x - j.foot_f.x >= 14.0, "%s: legs wide" % w)
 
 
-func test_shield_strike_over_the_rim_into_the_band() -> void:
+func test_eyes_over_the_rim_for_every_shield() -> void:
+	for kind in FkArmour.SHIELD_TOP:
+		for atk in [-1.0, 0.34, 0.55]:
+			var j := FkSkeleton.solve(1.0, "sword", {"atk": atk}, kind)
+			var eye: float = j.sh.y - 10.4
+			var rim := _rim_y(j, kind, 1.0)
+			check(rim >= eye - 0.5 and rim <= eye + 5.0, "%s at %s: rim just under the eyes (rim %.1f, eye %.1f)" % [kind, atk, rim, eye])
+			check(j.hand_f.x > j.sh.x + 6.0, "%s at %s: shield forward on the centre line" % [kind, atk])
+
+
+func test_cleave_crosses_the_band_over_the_rim() -> void:
 	for w in ["sword", "axe"]:
-		var j := FkSkeleton.solve(1.0, w, {"atk": 0.5}, true)
-		# The shield's top rim is ~9 px above its grip; the weapon hand comes down just over it.
-		check(j.hand_n.y < j.hand_f.y - 4.0, "%s: hand over the rim" % w)
-		check(j.hand_n.x > j.hand_f.x, "%s: hand ahead of the shield" % w)
-		var tip := _tip(j, FkWeapons.weapon_length(w), 1.0)
-		check(tip.y > -60.0 and tip.y < -38.0, "%s: tip in the head-to-chest band (y = %.1f)" % [w, tip.y])
-		check(j.dir.y > 0.2, "%s: cleaving downward" % w)
+		var crossed := false
+		for i in 11:
+			var atk := 0.40 + i * 0.01
+			var j := FkSkeleton.solve(1.0, w, {"atk": atk}, "round")
+			var tip := _tip(j, FkWeapons.weapon_length(w), 1.0)
+			if tip.y > -60.0 and tip.y < -38.0 and tip.x > j.hand_f.x:
+				crossed = true
+		check(crossed, "%s: the edge sweeps through the head-to-chest band beyond the shield" % w)
 
 
-func test_shield_stance_is_compact() -> void:
-	for atk in [-1.0, 0.34, 0.5]:
-		var j := FkSkeleton.solve(1.0, "sword", {"atk": atk}, true)
-		if atk == 0.34:
-			# Hand chambered high: the elbow stays forward of the shoulder instead of flaring up and back.
-			check(j.elbow_n.x >= j.sh_n.x - 0.5, "elbow tucked forward at the wind-up")
-		else:
-			check(j.elbow_n.y > j.sh_n.y - 1.0, "elbow tucked, not flared, at %s" % atk)
-		check(j.crouch >= 2.0, "low stance at %s" % atk)
+func test_lockout_arm_straight_wrist_flat_chest_to_waist() -> void:
+	for w in ["sword", "axe"]:
+		var j := FkSkeleton.solve(1.0, w, {"atk": 0.55}, "round")
+		check(j.sh_n.distance_to(j.hand_n) > (FkSkeleton.UPPER + FkSkeleton.FORE) * 0.93, "%s: arm locked out straight" % w)
+		var fore: Vector2 = (j.hand_n - j.elbow_n).normalized()
+		check(absf(fore.angle_to(j.dir)) < 0.15, "%s: wrist flat with the forearm" % w)
+		check(j.hand_n.y > j.sh.y + 2.0 and j.hand_n.y < j.sh.y + 16.0, "%s: locks at chest-to-waist height" % w)
+		check(j.lean >= 0.3, "%s: strong diagonal line of action" % w)
+		check(j.zoom > 1.05, "%s: weapon foreshortened larger at the bottom of the cut" % w)

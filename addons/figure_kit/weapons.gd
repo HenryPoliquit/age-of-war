@@ -34,47 +34,49 @@ static func weapon(ci: CanvasItem, kind: String, j: Dictionary, b: float, s: flo
 	var dirv: Vector2 = j.dir
 	var en := edge_normal(dirv)
 	if kind in CHOP:
+		# Foreshortening: the weapon grows a little as the cut comes down toward the viewer.
+		var bw: float = b * j.get("zoom", 1.0)
 		var length := weapon_length(kind)
 		var orth := dirv.orthogonal()
-		var tip := hand + dirv * length * b
+		var tip := hand + dirv * length * bw
 		match kind:
 			"club":
-				ci.draw_line(hand, tip, wood, 4.5 * b)
-				ci.draw_circle(tip, 4.5 * b, wood.darkened(0.2))
+				ci.draw_line(hand, tip, wood, 4.5 * bw)
+				ci.draw_circle(tip, 4.5 * bw, wood.darkened(0.2))
 			"sword", "saber", "gladius", "spellsword":
-				ci.draw_line(hand - orth * 3 * b, hand + orth * 3 * b, metal.darkened(0.4), 2.2 * b)
-				ci.draw_line(hand - dirv * 3 * b, hand, wood.darkened(0.3), 2.4 * b)
-				ci.draw_line(hand, tip, metal.lightened(0.25), (3.6 if kind == "gladius" else 3.0) * b)
+				ci.draw_line(hand - orth * 3 * bw, hand + orth * 3 * bw, metal.darkened(0.4), 2.2 * bw)
+				ci.draw_line(hand - dirv * 3 * bw, hand, wood.darkened(0.3), 2.4 * bw)
+				ci.draw_line(hand, tip, metal.lightened(0.25), (3.6 if kind == "gladius" else 3.0) * bw)
 				if kind == "spellsword":
-					ci.draw_line(hand + dirv * 4 * b, tip, Color(g, 0.55 + 0.3 * sin(t * 7.0)), 5.0 * b)
-					ci.draw_line(hand + dirv * 4 * b, tip, Color(1, 1, 1, 0.9), 1.2 * b)
+					ci.draw_line(hand + dirv * 4 * bw, tip, Color(g, 0.55 + 0.3 * sin(t * 7.0)), 5.0 * bw)
+					ci.draw_line(hand + dirv * 4 * bw, tip, Color(1, 1, 1, 0.9), 1.2 * bw)
 			"leafblade":
 				# Curved elven blade; the belly of the curve is the cutting edge.
 				var pts := PackedVector2Array()
 				for i in 7:
 					var u := i / 6.0
-					pts.append(hand + dirv * length * b * u + en * sin(u * PI * 0.9) * 3.5 * b)
-				ci.draw_line(hand - orth * 2.5 * b, hand + orth * 2.5 * b, FkPaint.tint(Color("d9b25c"), pose), 1.8 * b)
-				ci.draw_polyline(pts, metal.lightened(0.3), 2.6 * b)
+					pts.append(hand + dirv * length * bw * u + en * sin(u * PI * 0.9) * 3.5 * bw)
+				ci.draw_line(hand - orth * 2.5 * bw, hand + orth * 2.5 * bw, FkPaint.tint(Color("d9b25c"), pose), 1.8 * bw)
+				ci.draw_polyline(pts, metal.lightened(0.3), 2.6 * bw)
 			"shovel":
-				ci.draw_line(hand, tip, wood, 3.0 * b)
-				FkPaint.ellipse(ci, tip, Vector2(4, 6) * b, metal, dirv.angle())
+				ci.draw_line(hand, tip, wood, 3.0 * bw)
+				FkPaint.ellipse(ci, tip, Vector2(4, 6) * bw, metal, dirv.angle())
 			"baton":
-				ci.draw_line(hand, tip, Color(0.15, 0.15, 0.2), 4.0 * b)
-				ci.draw_line(hand + dirv * 8, tip, Color(tm.lightened(0.6), 0.9), 2.5 * b)
+				ci.draw_line(hand, tip, Color(0.15, 0.15, 0.2), 4.0 * bw)
+				ci.draw_line(hand + dirv * 8, tip, Color(tm.lightened(0.6), 0.9), 2.5 * bw)
 			"axe":
 				# The bit sweeps out on the edge side, so the blade leads the chop.
-				ci.draw_line(hand - dirv * 3 * b, tip, wood, 2.8 * b)
-				var hd := hand + dirv * (length - 4) * b
-				FkPaint.shade_poly(ci, [hd + en * 1.5 * b, hd + dirv * 5 * b + en * 1.5 * b, hd + dirv * 8 * b + en * 7 * b, hd + en * 6 * b - dirv * 3 * b], metal)
-				ci.draw_line(hd + dirv * 8 * b + en * 7 * b, hd + en * 6 * b - dirv * 3 * b, metal.lightened(0.4), 1.2)
+				ci.draw_line(hand - dirv * 3 * bw, tip, wood, 2.8 * bw)
+				var hd := hand + dirv * (length - 4) * bw
+				FkPaint.shade_poly(ci, [hd + en * 1.5 * bw, hd + dirv * 5 * bw + en * 1.5 * bw, hd + dirv * 8 * bw + en * 7 * bw, hd + en * 6 * bw - dirv * 3 * bw], metal)
+				ci.draw_line(hd + dirv * 8 * bw + en * 7 * bw, hd + en * 6 * bw - dirv * 3 * bw, metal.lightened(0.4), 1.2)
 			"hammer", "rune_hammer":
-				ci.draw_line(hand - dirv * 3 * b, tip, wood if kind == "hammer" else Color(0.2, 0.18, 0.2), 2.8 * b)
-				var hc := tip - dirv * 2 * b
-				FkPaint.shade_poly(ci, [hc - orth * 6 * b - dirv * 3.5 * b, hc + orth * 6 * b - dirv * 3.5 * b, hc + orth * 6 * b + dirv * 3.5 * b, hc - orth * 6 * b + dirv * 3.5 * b], metal)
+				ci.draw_line(hand - dirv * 3 * bw, tip, wood if kind == "hammer" else Color(0.2, 0.18, 0.2), 2.8 * bw)
+				var hc := tip - dirv * 2 * bw
+				FkPaint.shade_poly(ci, [hc - orth * 6 * bw - dirv * 3.5 * bw, hc + orth * 6 * bw - dirv * 3.5 * bw, hc + orth * 6 * bw + dirv * 3.5 * bw, hc - orth * 6 * bw + dirv * 3.5 * bw], metal)
 				if kind == "rune_hammer":
-					ci.draw_line(hc - orth * 4 * b, hc + orth * 4 * b, Color(g, 0.7 + 0.3 * sin(t * 5.0)), 1.8 * b)
-					FkPaint.halo(ci, hc, 7 * b, g, 0.35)
+					ci.draw_line(hc - orth * 4 * bw, hc + orth * 4 * bw, Color(g, 0.7 + 0.3 * sin(t * 5.0)), 1.8 * bw)
+					FkPaint.halo(ci, hc, 7 * bw, g, 0.35)
 		return
 	match kind:
 		"spear", "halberd", "lance", "glaive":

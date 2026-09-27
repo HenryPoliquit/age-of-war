@@ -5,6 +5,11 @@ extends RefCounted
 
 const ENCLOSED := ["greathelm", "visor", "hood", "rune"]
 
+## Distance (× build) from a shield's grip up to its top rim, per shield kind — so a stance can hold
+## any shield with its rim just under the eyes.
+const SHIELD_TOP := {"round": 10.5, "kite": 10.0, "hide": 10.0, "scutum": 16.0, "leaf": 17.0, "moon": 17.0,
+	"dwarf": 12.5, "plate": 14.0, "energy": 16.0}
+
 
 static func pack(ci: CanvasItem, kind: String, sh: Vector2, hip: Vector2, b: float, pal: Array, tm: Color, pose: Dictionary, t: float, lk: Dictionary) -> void:
 	var back := sh + Vector2(-8, 4) * b
@@ -147,8 +152,8 @@ static func shield(ci: CanvasItem, kind: String, sh: Vector2, b: float, pal: Arr
 			ci.draw_circle(c, 2.5 * b, metal)
 		"kite":
 			var c := sh + Vector2(7, 9) * b
-			FkPaint.poly(ci, [c + Vector2(-7, -8), c + Vector2(7, -8), c + Vector2(6, 4), c + Vector2(0, 14), c + Vector2(-6, 4)], metal.darkened(0.3))
-			FkPaint.poly(ci, [c + Vector2(-5.5, -6.5), c + Vector2(5.5, -6.5), c + Vector2(4.5, 3.5), c + Vector2(0, 11.5), c + Vector2(-4.5, 3.5)], tm)
+			FkPaint.poly(ci, [c + Vector2(-7, -8) * b, c + Vector2(7, -8) * b, c + Vector2(6, 4) * b, c + Vector2(0, 14) * b, c + Vector2(-6, 4) * b], metal.darkened(0.3))
+			FkPaint.poly(ci, [c + Vector2(-5.5, -6.5) * b, c + Vector2(5.5, -6.5) * b, c + Vector2(4.5, 3.5) * b, c + Vector2(0, 11.5) * b, c + Vector2(-4.5, 3.5) * b], tm)
 		"hide":
 			var c := sh + Vector2(7, 12) * b
 			FkPaint.ellipse(ci, c, Vector2(8.5, 11) * b, FkPaint.tint(Color("6e4a2c"), pose))
