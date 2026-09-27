@@ -14,6 +14,11 @@ const SPINE := 20.0
 const HIP_Y := 28.0
 ## Boot outline around the ankle (× build): heel, instep, toe, sole. solve() keeps its lowest point on the ground.
 const BOOT := [Vector2(-3.2, -6), Vector2(3, -6), Vector2(4.5, -2), Vector2(8.5, -0.5), Vector2(8.5, 1.5), Vector2(-3.5, 1.5)]
+## Half the body's width at shoulders and hips (× build × body.x): the near side stands this far toward
+## the viewer in depth (z), the far side this far away.
+const HALF_W := 4.0
+## Ball of the foot in the boot's space (× build): the toe joint, where the boot bends.
+const BALL := Vector2(4.5, 1.5)
 ## Bend rules. An elbow always folds to the same side of its shoulder→hand line (below a forward
 ## reach, in front of an overhead one, behind a hanging one) and a knee to the other, so a limb can
 ## never snap across to its mirror solution between frames.
@@ -268,9 +273,15 @@ static func key(family: String, atk: float, carry := {}, mv := 0.0) -> Dictionar
 	return out
 
 
-## Boot outline points for an ankle at `foot`, rotated by `rot` (rad; − = toes up, + = heel up).
-static func boot(foot: Vector2, rot: float, b: float) -> Array:
-	return BOOT.map(func(p: Vector2) -> Vector2: return foot + (p * b).rotated(rot))
+## Boot outline points for an ankle at `foot`, rotated by `rot` (rad; − = toes up, + = heel up), the toe
+## cap bent back by `toe` at the ball of the foot; `body` gives the race's proportions.
+static func boot(foot: Vector2, rot: float, b: float, toe := 0.0, body := Vector2.ONE) -> Array:
+	var ball := BALL * body * b
+	return BOOT.map(func(p: Vector2) -> Vector2:
+		var q := p * body * b
+		if p.x > BALL.x:
+			q = ball + (q - ball).rotated(-toe)
+		return foot + q.rotated(rot))
 
 
 ## Heel-to-toe roll over a stride: `heel` as the foot lands in front (phase PI/2; toes up), `toe` as it
@@ -286,11 +297,17 @@ static func _bell(d: float) -> float:
 
 
 ## All joints for one frame. b = build; pose = {walk, move, atk, t}; shield = the shield kind the far
-## hand holds ("" = none); seated = rider (one leg in a stirrup, no walk cycle).
-static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seated := false) -> Dictionary:
+## hand holds ("" = none); seated = rider (one leg in a stirrup, no walk cycle); look = the race preset:
+## its `body` gives legs and spine their height (y) and the figure its width (x), its `head` the head's
+## size. Every joint also has a depth in j.z (+ toward the viewer), and every bone keeps its length in 3D.
+static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seated := false, look := {}) -> Dictionary:
 	var mv: float = pose.get("move", 1.0 if pose.get("moving", false) else 0.0)
 	var walk: float = pose.get("walk", 0.0)
 	var t: float = pose.get("t", 0.0)
+	var body: Vector2 = look.get("body", Vector2.ONE)
+	var hb: float = b * look.get("head", 1.0)
+	var by := b * body.y
+	var w := HALF_W * b * body.x
 	var family: String = FAMILY.get(weapon, "idle")
 	if seated:
 		family = "ride_blade" if family in ["blade", "chop"] else ("ride_thrust" if family in ["thrust", "pole"] else family)
@@ -301,26 +318,43 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 	var bob := lerpf(sin(t * 2.1) * 0.7, absf(sin(walk)) * g.bob, mv)
 	var lunge: float = k.lunge * b * (0.0 if seated else 1.0)
 	var crouch: float = k.crouch * b * (0.0 if seated else 1.0)
-	var hip := Vector2(lunge * 0.6, -HIP_Y * b + bob * 0.5 + crouch)
+	# On foot the hips stand at the race's leg height; a rider's seat is the saddle's whatever the race.
+	var hip := Vector2(lunge * 0.6, (-HIP_Y * b + bob * 0.5 + crouch) * (1.0 if seated else body.y))
 	# A rider's feet stay in the stirrups (relative to the saddle) while the hips rise off it; the hips
 	# sway with the mount's gait and the spine absorbs its bob so the head stays level.
 	var saddle_hip := hip
 	if seated:
 		hip.y -= k.rise * b
 		hip.x += sin(pose.get("ride_walk", 0.0) * 2.0) * 0.8 * pose.get("ride_mv", 0.0) * b
-	var sh := hip + Vector2(1.5 * b, -SPINE * b).rotated(k.lean)
+	var sh := hip + Vector2(1.5 * b, -SPINE * by).rotated(k.lean)
 	if seated:
 		sh.y -= pose.get("ride_bob", 0.0)
-	var j := {"hip": hip, "sh": sh, "lean": k.lean, "lunge": lunge, "crouch": k.crouch, "dir": Vector2.from_angle(k.a),
-		"zoom": k.zoom, "gait": gait_for(weapon, shield)}
-	# Legs: feet on the ground line; the gait's stride, lift and heel-to-toe roll while walking, the
-	# front foot planted forward on a lunge, the back foot swinging through on a passing step.
+	# Pelvis and chest turn against each other about the vertical axis as the figure walks.
+	var yaw_p := 0.0
+	var yaw_c := -0.8 * yaw_p
+	var j := {"hip": hip, "sh": sh, "chest": hip.lerp(sh, 0.55), "lean": k.lean, "lunge": lunge, "crouch": k.crouch,
+		"dir": Vector2.from_angle(k.a), "zoom": k.zoom, "gait": gait_for(weapon, shield), "w": w}
+	var z := {"hip": 0.0, "chest": 0.0, "sh": 0.0, "neck": 0.0, "head": 0.0, "eye": 0.0}
+	# Neck and head: the neck follows half the spine's lean and the head a quarter, so the gaze stays level.
+	j["head_tilt"] = k.lean * 0.25
+	j["neck"] = sh + Vector2(0.8, -3.5).rotated(k.lean * 0.5) * hb
+	j["head"] = (j.neck as Vector2) + Vector2(1.0, -6.0).rotated(j.head_tilt) * hb
+	j["eye"] = (j.head as Vector2) + Vector2(3.4, -0.9).rotated(j.head_tilt) * hb
+	# Legs: from hip roots either side of the pelvis; feet on the ground line; the gait's stride, lift and
+	# heel-to-toe roll while walking, the front foot planted forward on a lunge, the back foot swinging
+	# through on a passing step.
 	for i in 2:
+		var tag := "n" if i == 0 else "f"
+		var side := 1.0 if i == 0 else -1.0
+		var root := hip + Vector2(side * w * sin(yaw_p), 0)
+		j["hip_" + tag] = root
+		z["hip_" + tag] = side * w * cos(yaw_p)
 		var foot: Vector2
 		var rot := 0.0
+		var flex := 0.0
 		var ph := walk + PI * i
 		if seated:
-			foot = saddle_hip + Vector2(5.0 - 3.0 * i, 16.0) * b
+			foot = saddle_hip + Vector2(5.0 - 3.0 * i, 16.0) * b * body
 			rot = -0.3 - 0.05 * k.rise
 		else:
 			var fx := lerpf(2.8 if i == 0 else -3.6, g.stride * sin(ph), mv)
@@ -333,22 +367,28 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 				fx = lerpf(fx, 2.8 + lunge * 1.6 / b, k.step)
 				lift += 4.0 * k.step_lift
 				rot -= 0.2 * k.step_lift
-			foot = Vector2(fx * b, -lift * b)
+			foot = Vector2(fx, -lift) * by
 			# Keep the boot's lowest point on (never under) the ground.
 			var low := 0.0
-			for p in BOOT:
-				low = maxf(low, ((p as Vector2) * b).rotated(rot).y)
+			for p in boot(Vector2.ZERO, rot, b, flex, body):
+				low = maxf(low, (p as Vector2).y)
 			foot.y = minf(foot.y, -low)
-		foot = reach(hip, foot, THIGH * b, SHIN * b)
-		var tag := "n" if i == 0 else "f"
+		foot = reach(root, foot, THIGH * by, SHIN * by)
 		j["foot_" + tag] = foot
 		j["rot_" + tag] = rot
-		j["knee_" + tag] = ik(hip, foot, THIGH * b, SHIN * b, KNEE)
+		j["toe_bend_" + tag] = flex
+		j["toe_" + tag] = foot + (BALL * body * b).rotated(rot)
+		j["knee_" + tag] = ik(root, foot, THIGH * by, SHIN * by, KNEE)
 		j["dust_" + tag] = _bell(ph - PI / 2) * mv if g.get("dust", false) and not seated else 0.0
-	# Arms: shoulders move with the pose; near arm to the stance's hand target; far arm to the shield
-	# (by its rim), the stance's far target, the weapon (two-handed), or swinging with the gait.
-	j["sh_n"] = sh + Vector2(2, 1) * b + (k.s as Vector2) * b
-	j["sh_f"] = sh + Vector2(-3, 1) * b + (k.sf as Vector2) * b
+		for c in ["knee_", "foot_", "toe_"]:
+			z[c + tag] = z["hip_" + tag]
+	# Arms: shoulders ride on the chest (turned by its yaw) and move with the pose; near arm to the
+	# stance's hand target; far arm to the shield (by its rim), the stance's far target, the weapon
+	# (two-handed), or swinging with the gait.
+	j["sh_n"] = sh + Vector2(2, 1) * b * body + (k.s as Vector2) * b + Vector2(w * sin(yaw_c), 0)
+	j["sh_f"] = sh + Vector2(-3, 1) * b * body + (k.sf as Vector2) * b - Vector2(w * sin(yaw_c), 0)
+	z["sh_n"] = w * cos(yaw_c)
+	z["sh_f"] = -w * cos(yaw_c)
 	var target_n := sh + (k.h as Vector2) * b
 	if pose.get("atk", -1.0) < 0.0:
 		target_n.x -= sin(walk) * g.get("hswing", 0.0) * mv * b
@@ -362,8 +402,15 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 	j["bend_n"] = 1.0 if bend >= 0.0 else -1.0
 	j["elbow_n"] = ik(j.sh_n, hand_n, UPPER * b, FORE * b, j.bend_n if absf(bend) > 1e-3 else 0.0)
 	j["el_w"] = k.el_w
+	z["elbow_n"] = z.sh_n
+	z["hand_n"] = z.sh_n
 	if k.el_w > 0.0:
-		j["elbow_n"] = (j.elbow_n as Vector2).lerp(sh + (k.el as Vector2) * b, k.el_w)
+		# A steered elbow sits where it shows on screen; its depth keeps both bones their length, so an
+		# arm swinging round toward the viewer draws foreshortened.
+		var el := _fit((j.elbow_n as Vector2).lerp(sh + (k.el as Vector2) * b, k.el_w), j.sh_n, hand_n, UPPER * b, FORE * b)
+		j["elbow_n"] = el
+		z["elbow_n"] = z.sh_n + sqrt(maxf(0.0, pow(UPPER * b, 2) - el.distance_squared_to(j.sh_n)))
+		z["hand_n"] = z.elbow_n - sqrt(maxf(0.0, pow(FORE * b, 2) - el.distance_squared_to(hand_n)))
 	if k.lock > 0.0:
 		j["dir"] = (j.dir as Vector2).slerp((hand_n - (j.elbow_n as Vector2)).normalized(), k.lock)
 	var ft: Vector2
@@ -380,4 +427,22 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 	var hand_f := reach(j.sh_f, ft, UPPER * b, FORE * b)
 	j["hand_f"] = hand_f
 	j["elbow_f"] = ik(j.sh_f, hand_f, UPPER * b, FORE * b, ELBOW)
+	z["elbow_f"] = z.sh_f
+	z["hand_f"] = z.sh_f
+	j["z"] = z
+	# Attachment points (weapons and shields are still drawn from the hands; these are the hook).
+	j["sockets"] = {"grip_n": {"p": hand_n, "a": (j.dir as Vector2).angle(), "z": z.hand_n},
+		"grip_f": {"p": hand_f, "a": (hand_f - (j.elbow_f as Vector2)).angle(), "z": z.hand_f},
+		"back": {"p": j.chest, "a": (sh - hip).angle(), "z": 0.0}}
 	return j
+
+
+## `p` pulled within reach of both `a` (bone la) and `c` (bone lc): alternating projections onto the
+## two discs, so a steered joint never stretches either bone.
+static func _fit(p: Vector2, a: Vector2, c: Vector2, la: float, lc: float) -> Vector2:
+	for i in 8:
+		if p.distance_to(a) > la:
+			p = a + (p - a).normalized() * la
+		if p.distance_to(c) > lc:
+			p = c + (p - c).normalized() * lc
+	return p

@@ -38,18 +38,12 @@ func test_bones_never_stretch() -> void:
 	for w in ["sword", "axe", "spear", "halberd", "musket", "crossbow", "bow", "javelin", "sling", "staff", "crew", "none"]:
 		_each_frame(w, func(j: Dictionary, f: Array) -> void:
 			var tag := "%s %s" % [w, f]
-			check_near(j.hip.distance_to(j.knee_n), FkSkeleton.THIGH * b, 0.05, tag + " near thigh")
-			check_near(j.knee_n.distance_to(j.foot_n), FkSkeleton.SHIN * b, 0.05, tag + " near shin")
-			check_near(j.hip.distance_to(j.knee_f), FkSkeleton.THIGH * b, 0.05, tag + " far thigh")
-			if j.el_w > 0.0:
-				# The bow's drawing arm swings toward the viewer: drawn foreshortened, never longer.
-				check(j.sh_n.distance_to(j.elbow_n) <= FkSkeleton.UPPER * b + 0.05, tag + " upper arm (foreshortened)")
-				check(j.elbow_n.distance_to(j.hand_n) <= FkSkeleton.FORE * b + 0.05, tag + " forearm (foreshortened)")
-			else:
-				check_near(j.sh_n.distance_to(j.elbow_n), FkSkeleton.UPPER * b, 0.05, tag + " upper arm")
-				check_near(j.elbow_n.distance_to(j.hand_n), FkSkeleton.FORE * b, 0.05, tag + " forearm")
-			check_near(j.sh_f.distance_to(j.elbow_f), FkSkeleton.UPPER * b, 0.05, tag + " far upper arm")
-			check_near(j.elbow_f.distance_to(j.hand_f), FkSkeleton.FORE * b, 0.05, tag + " far forearm"))
+			for bone in [["hip_n", "knee_n", FkSkeleton.THIGH], ["knee_n", "foot_n", FkSkeleton.SHIN],
+					["hip_f", "knee_f", FkSkeleton.THIGH], ["knee_f", "foot_f", FkSkeleton.SHIN],
+					["sh_n", "elbow_n", FkSkeleton.UPPER], ["elbow_n", "hand_n", FkSkeleton.FORE],
+					["sh_f", "elbow_f", FkSkeleton.UPPER], ["elbow_f", "hand_f", FkSkeleton.FORE]]:
+				# Measured in 3D: the bow's drawing arm swings toward the viewer and draws foreshortened.
+				check_near(_d3(j, bone[0], bone[1]), bone[2] * b, 0.05, "%s %s-%s" % [tag, bone[0], bone[1]]))
 
 
 func test_knees_forward_elbows_down_feet_grounded() -> void:
@@ -57,8 +51,8 @@ func test_knees_forward_elbows_down_feet_grounded() -> void:
 		_each_frame(w, func(j: Dictionary, f: Array) -> void:
 			var tag := "%s %s" % [w, f]
 			# The knee lies forward (+x) of the hip→foot midpoint.
-			check(j.knee_n.x >= j.hip.lerp(j.foot_n, 0.5).x - 0.01, tag + " near knee forward")
-			check(j.knee_f.x >= j.hip.lerp(j.foot_f, 0.5).x - 0.01, tag + " far knee forward")
+			check(j.knee_n.x >= j.hip_n.lerp(j.foot_n, 0.5).x - 0.01, tag + " near knee forward")
+			check(j.knee_f.x >= j.hip_f.lerp(j.foot_f, 0.5).x - 0.01, tag + " far knee forward")
 			# The elbow always folds to the same side of the shoulder→hand line: below a forward reach,
 			# in front of an overhead one, behind a hanging one.
 			var d: Vector2 = j.hand_n - j.sh_n
@@ -191,7 +185,7 @@ func test_eyes_over_the_rim_for_every_shield() -> void:
 	for kind in FkArmour.SHIELD_TOP:
 		for atk in [-1.0, 0.34, 0.55]:
 			var j := FkSkeleton.solve(1.0, "sword", {"atk": atk}, kind)
-			var eye: float = j.sh.y - 10.4
+			var eye: float = j.eye.y
 			var rim := _rim_y(j, kind, 1.0)
 			check(rim >= eye - 0.5 and rim <= eye + 5.0, "%s at %s: rim just under the eyes (rim %.1f, eye %.1f)" % [kind, atk, rim, eye])
 			check(j.hand_f.x > j.sh.x + 6.0, "%s at %s: shield forward on the centre line" % [kind, atk])
@@ -294,7 +288,7 @@ func test_shield_wall_advance() -> void:
 	check(_spread(fr, func(j): return j.sh.y) <= 0.5, "minimal bob")
 	check(_spread(fr, func(j): return (j.hand_f - j.sh).y) <= 0.3, "shield fixed across the chest")
 	check(fr[0].dir.y < -0.5 and fr[0].dir.x > 0.3, "weapon held up and forward, ready")
-	check(fr[0].hand_n.distance_to(fr[0].sh + Vector2(1.8, -9.5)) > 14.0, "weapon hand well away from the face")
+	check(fr[0].hand_n.distance_to(fr[0].head) > 14.0, "weapon hand well away from the face")
 	check(fr[0].hand_n.y > fr[0].sh.y + 3.0, "shoulder and elbow relaxed: hand below the shoulder")
 
 
@@ -366,7 +360,7 @@ func test_bow_draw_anchor_and_release() -> void:
 	# (With the figure's arm lengths, an elbow straight back at shoulder height puts the hand under the
 	# back of the jawline.)
 	check(wind.hand_n.distance_to(wind.sh + Vector2(0, -5.5)) < 2.0, "full draw: hand anchored under the jawline")
-	check(wind.hand_n.y > wind.sh.y - 10.4 + 3.0, "arrow rests beneath the sighting eye")
+	check(wind.hand_n.y > wind.eye.y + 3.0, "arrow rests beneath the sighting eye")
 	check(wind.elbow_n.x < wind.sh_n.x - 2.0, "full draw: elbow pulled straight back behind the archer")
 	check(absf(wind.elbow_n.y - wind.sh_n.y) < 3.5, "full draw: elbow level with the shoulder")
 	check(absf((wind.hand_n - wind.elbow_n).angle()) < 0.35, "full draw: forearm parallel to the arrow")
@@ -404,7 +398,7 @@ func test_rifle_shouldered_at_eye_height_with_recoil() -> void:
 		var butt: Vector2 = j.hand_n + FkWeapons.GUN_BUTT.rotated(j.dir.angle())
 		check(butt.distance_to(j.sh_n) < 2.5, "butt of the stock rests in the shoulder")
 		var muzzle: Vector2 = butt + Vector2(34, -2).rotated(j.dir.angle())
-		check(absf(muzzle.y - butt.y) < 4.0 and muzzle.y > j.sh.y - 10.4, "gun level, under the sighting eye")
+		check(absf(muzzle.y - butt.y) < 4.0 and muzzle.y > j.eye.y, "gun level, under the sighting eye")
 		check(j.hand_f.distance_to(butt) > 12.0, "support hand out on the forend")
 	check(guard.elbow_f.y > guard.hand_f.y + 2.0, "support elbow tucked beneath the forend")
 	check(guard.lean >= 0.08 and guard.crouch >= 1.5, "aggressive lean, soft knees")
@@ -447,3 +441,105 @@ func test_bow_draw_elbow_travels_level_not_over_the_shoulder() -> void:
 		check(j.elbow_n.y >= j.sh_n.y - 3.5, "elbow never rises over the shoulder (atk %.2f)" % (i / 100.0))
 		check(j.elbow_n.x <= prev_x + 0.05, "elbow moves steadily back (atk %.2f)" % (i / 100.0))
 		prev_x = j.elbow_n.x
+
+
+# --- Body rig (spec 2026-09-27-humanoid-body-rig-design) ---------------------------------------
+
+const DWARF := {"body": Vector2(1.24, 0.76), "head": 1.1}
+const ELF := {"body": Vector2(0.9, 1.1), "head": 0.93}
+const GOLDEN_KEYS := ["hip", "sh", "sh_n", "sh_f", "elbow_n", "elbow_f", "hand_n", "hand_f", "knee_n", "knee_f", "foot_n",
+	"foot_f", "rot_n", "rot_f", "dir", "lean", "lunge", "crouch", "zoom", "el_w"]
+
+
+## Joint-to-joint distance in (x, y, z).
+func _d3(j: Dictionary, a: String, c: String) -> float:
+	var z: Dictionary = j.z
+	return Vector3(j[a].x, j[a].y, z[a]).distance_to(Vector3(j[c].x, j[c].y, z[c]))
+
+
+func test_default_look_matches_the_pre_rig_skeleton() -> void:
+	var rows: Array = str_to_var(FileAccess.get_file_as_string("res://tests/fk_golden.txt"))
+	check_eq(rows.size(), 720, "golden loaded")
+	for row in rows:
+		var j := FkSkeleton.solve(1.1, row.w, row.pose, row.shield, row.seated)
+		for k in GOLDEN_KEYS:
+			# A steered elbow (the bow draw) is now pulled within reach of both bones; its lengths are
+			# checked in 3D instead.
+			if k == "elbow_n" and row.el_w > 0.0:
+				continue
+			var d: float = (j[k] - row[k]).length() if row[k] is Vector2 else absf(j[k] - row[k])
+			if d > 1e-3:
+				check(false, "%s %s seated=%s atk=%.1f: %s moved %.4f" % [row.w, row.shield, row.seated, row.pose.atk, k, d])
+
+
+func test_bones_keep_their_length_in_3d_for_every_race() -> void:
+	var b := 1.16
+	for lk in [{}, DWARF, ELF]:
+		var body: Vector2 = lk.get("body", Vector2.ONE)
+		var hb: float = b * lk.get("head", 1.0)
+		var by: float = b * body.y
+		for w in ["sword", "spear", "musket", "bow", "javelin", "sling", "none"]:
+			for f in FRAMES:
+				var j := FkSkeleton.solve(b, w, {"walk": f[0], "move": f[1], "atk": f[2]}, "", false, lk)
+				var foot := (FkSkeleton.BALL * body * b).length()
+				for bone in [["hip_n", "knee_n", FkSkeleton.THIGH * by], ["knee_n", "foot_n", FkSkeleton.SHIN * by],
+						["hip_f", "knee_f", FkSkeleton.THIGH * by], ["knee_f", "foot_f", FkSkeleton.SHIN * by],
+						["sh_n", "elbow_n", FkSkeleton.UPPER * b], ["elbow_n", "hand_n", FkSkeleton.FORE * b],
+						["sh_f", "elbow_f", FkSkeleton.UPPER * b], ["elbow_f", "hand_f", FkSkeleton.FORE * b],
+						["foot_n", "toe_n", foot], ["foot_f", "toe_f", foot],
+						["hip", "sh", Vector2(1.5, -FkSkeleton.SPINE * body.y).length() * b],
+						["sh", "neck", Vector2(0.8, -3.5).length() * hb], ["neck", "head", Vector2(1.0, -6.0).length() * hb],
+						["hip", "hip_n", j.w], ["hip", "hip_f", j.w]]:
+					check_near(_d3(j, bone[0], bone[1]), bone[2], 0.05, "%s %s %s: %s-%s" % [lk, w, f, bone[0], bone[1]])
+
+
+func test_rider_sits_on_the_saddle_whatever_the_race() -> void:
+	var human := FkSkeleton.solve(1.0, "saber", {"atk": -1.0}, "", true)
+	var dwarf := FkSkeleton.solve(1.0, "saber", {"atk": -1.0}, "", true, DWARF)
+	check_near(dwarf.hip.y, human.hip.y, 1e-4, "seat height is the saddle's, not the race's")
+	check(dwarf.foot_n.y < human.foot_n.y - 2.0, "a dwarf's shorter legs hang higher in the stirrup")
+
+
+func test_race_height_lives_in_the_legs() -> void:
+	var human := FkSkeleton.solve(1.0, "none", {"atk": -1.0})
+	var dwarf := FkSkeleton.solve(1.0, "none", {"atk": -1.0}, "", false, DWARF)
+	check_near(dwarf.hip.y, human.hip.y * 0.76, 0.3, "dwarf hips stand at 0.76 of human height")
+	var sole: float = FkSkeleton.boot(dwarf.foot_n, dwarf.rot_n, 1.0, 0.0, DWARF.body).map(func(q): return q.y).max()
+	check_near(sole, 0.0, 0.05, "boot sole still on the ground")
+
+
+func test_depth_near_side_toward_the_viewer() -> void:
+	var j := FkSkeleton.solve(1.0, "sword", {"atk": -1.0})
+	check(j.z.sh_n > 0.0 and j.z.sh_f < 0.0, "near shoulder toward the viewer, far shoulder away")
+	check(j.z.hip_n > 0.0 and j.z.hip_f < 0.0, "near hip toward the viewer, far hip away")
+	check_eq(j.z.elbow_n, j.z.sh_n, "an unsteered arm stays in its plane")
+	check_eq(j.z.hand_n, j.z.sh_n, "…hand too")
+
+
+func test_bow_elbow_swings_toward_the_viewer_mid_draw() -> void:
+	var peak := 0.0
+	for i in 36:
+		var j := FkSkeleton.solve(1.0, "bow", {"atk": i / 100.0})
+		peak = maxf(peak, j.z.elbow_n - j.z.sh_n)
+	check(peak > 4.0, "mid-draw the upper arm points at the viewer (peak depth %.1f)" % peak)
+
+
+func test_head_rides_the_neck_and_stays_level() -> void:
+	var idle := FkSkeleton.solve(1.0, "none", {"atk": -1.0})
+	check((idle.head - (idle.sh + Vector2(1.8, -9.5))).length() < 1e-3, "upright head where it always was")
+	check((idle.eye - (idle.sh + Vector2(5.2, -10.4))).length() < 1e-3, "upright eye where it always was")
+	for w in ["sword", "axe", "spear", "musket", "bow", "javelin", "sling", "saber"]:
+		for atk in [-1.0, 0.2, 0.34, 0.45, 0.55, 0.8]:
+			var j := FkSkeleton.solve(1.0, w, {"atk": atk}, "round" if w == "sword" else "")
+			check(absf(j.head_tilt) < 0.1, "%s at %s: head level (tilt %.2f)" % [w, atk, j.head_tilt])
+	var hit := FkSkeleton.solve(1.0, "sword", {"atk": 0.55}, "round")
+	check(hit.head.x > hit.sh.x + 1.8, "the head follows a strong lean a little")
+
+
+func test_sockets_sit_on_the_hands_and_back() -> void:
+	var j := FkSkeleton.solve(1.0, "spear", {"atk": 0.5})
+	check_eq(j.sockets.grip_n.p, j.hand_n)
+	check_near(j.sockets.grip_n.a, j.dir.angle(), 1e-5)
+	check_eq(j.sockets.grip_n.z, j.z.hand_n)
+	check_eq(j.sockets.grip_f.p, j.hand_f)
+	check_eq(j.sockets.back.p, j.chest)
