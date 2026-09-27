@@ -12,6 +12,9 @@ const SHOTS := {"sling": "stone", "javelin": "javelin", "throwing_axe": "axe", "
 
 const CHOP := ["club", "sword", "gladius", "shovel", "baton", "saber", "axe", "hammer", "leafblade", "spellsword", "rune_hammer"]
 
+## Weapons held in the far hand (drawn at its depth, under the drawing arm).
+const HELD_FAR := ["bow", "starbow"]
+
 ## Where a figure's shot leaves its weapon (feet origin, facing +x, pre-scale): the muzzle or arrow
 ## at head height, since ranged units now aim and fire from the shoulder and jaw.
 const MUZZLE := {"musket": Vector2(36, -50), "rifle": Vector2(32, -50), "arcane_rifle": Vector2(32, -50),
