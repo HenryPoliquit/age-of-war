@@ -502,11 +502,16 @@ func _units_act(s: SimSide, enemy_front: SimUnit, dt: float) -> void:
 		if not u.alive():
 			continue
 		u.cooldown = maxf(0.0, u.cooldown - dt)
+		var def := u.def
+		# Melee reach is measured between body fronts (footprints), so fighters keep a visible gap;
+		# ranged and siege reach stays centre to centre (B20).
+		var melee := def.range <= rules.melee_range_max and not def.is_ranged_siege()
 		var dist_unit := INF
 		if enemy_front != null and enemy_front.alive():
-			dist_unit = lane - u.progress - enemy_front.progress - u.def.footprint - enemy_front.def.footprint
-		var dist_struct := lane - u.progress - u.def.footprint
-		var def := u.def
+			dist_unit = lane - u.progress - enemy_front.progress
+			if melee:
+				dist_unit -= def.footprint + enemy_front.def.footprint
+		var dist_struct := lane - u.progress - (def.footprint if melee else 0.0)
 		var target_unit: SimUnit = null
 		var target_struct := false
 		if def.is_ranged_siege():
@@ -534,7 +539,6 @@ func _units_act(s: SimSide, enemy_front: SimUnit, dt: float) -> void:
 					_hit_structures(u, enemy)
 		# Melee presses in until its front is melee_contact from the enemy front (so the allies behind it
 		# come into reach); ranged units hold at their range.
-		var melee := def.range <= rules.melee_range_max and not def.is_ranged_siege()
 		if not attacking or melee:
 			# Movement is code-driven; blocked by the ally ahead and the nearest enemy.
 			var limit := lane - rules.melee_contact - def.footprint

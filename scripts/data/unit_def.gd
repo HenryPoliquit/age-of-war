@@ -16,8 +16,9 @@ extends Resource
 @export var range: float = 0.0
 ## Ranged Siege cannot hit anything closer than this (GDD §5.6). 0 = no minimum.
 @export var min_range: float = 0.0
-## Half-depth of the body in px, centre to front edge (weapon excluded). Distances between units and
-## to the enemy gate are measured edge to edge, so bodies never overlap and ranges mean "reach".
+## Half-depth of the body in px, centre to front edge (weapon excluded). Melee measures its reach to
+## enemies and the enemy gate from body fronts, so fighting bodies never overlap; ranged and siege
+## reach stays centre to centre. Movement never lets any unit's front closer than melee_contact.
 @export var footprint: float = 10.0
 @export var speed: float = 0.0
 

@@ -144,3 +144,17 @@ func test_melee_stops_short_of_the_gate() -> void:
 	run_for(sim, 6.0)
 	check_near(sim.rules.lane_length - v.progress - v.def.footprint, sim.rules.melee_contact, 0.1, "front edge stops melee_contact from the gate")
 	check(sim.sides[1].base_hp < sim.sides[1].base_max_hp, "and hits it")
+
+
+func test_ranged_reach_is_centre_to_centre() -> void:
+	# Owner ruling (B20): only melee measures edge to edge; ranged and siege keep their old reach.
+	var sim := new_sim()
+	var r := place(sim, 0, "ranged", 500.0)
+	var far := place(sim, 1, "vanguard", sim.rules.lane_length - 500.0 - r.def.range - 5.0)
+	run_pinned(sim, 0.2, [r, far])
+	check_eq(far.hp, far.max_hp, "5 px beyond range, centre to centre: no shot")
+	var sim2 := new_sim()
+	var r2 := place(sim2, 0, "ranged", 500.0)
+	var near := place(sim2, 1, "vanguard", sim2.rules.lane_length - 500.0 - r2.def.range + 5.0)
+	run_pinned(sim2, 0.2, [r2, near])
+	check(near.hp < near.max_hp, "5 px inside range: hit")
