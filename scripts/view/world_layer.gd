@@ -159,7 +159,7 @@ func _draw_base(s: SimSide, t: float) -> void:
 	var team := view.team_color(s.index)
 	var build := clampf((t - view.base_rebuilt.get(s.index, -10.0)) / 1.1, 0.0, 1.0)
 	var xf := Transform2D(0.0, Vector2(dir, 1), 0.0, Vector2(gate, GROUND_Y + 4))
-	UnitArt.begin(self, xf)
+	FkPaint.begin(self, xf)
 	BaseArt.draw_base(self, s.age, team, s.base_hp / s.base_max_hp, t, build, self, s.race)
 	# Turrets stand on their own towers on the ground in front of the gate (drawn behind the units).
 	# Back-row towers first so the front row overlaps them.
@@ -212,7 +212,7 @@ func _draw_unit(ci: CanvasItem, u: SimUnit, rt: float, t: float) -> void:
 	var pos := unit_pos(u)
 	var dir := 1.0 if u.side == 0 else -1.0
 	var sc := UNIT_SCALE * (1.0 + 0.03 * (u.age - 1))
-	UnitArt.begin(ci, Transform2D(0.0, Vector2(dir * sc, sc), 0.0, pos))
+	FkPaint.begin(ci, Transform2D(0.0, Vector2(dir * sc, sc), 0.0, pos))
 	UnitArt.draw_unit(ci, u.def, view.team_color(u.side), _pose(u, rt, t), u.id, view.race_of(u.side))
 	ci.draw_set_transform(Vector2.ZERO)
 
@@ -272,7 +272,7 @@ func _draw_corpse_node(i: int) -> void:
 	var pos := Vector2(c.x, GROUND_Y + jitter(c.id))
 	var wreck := UnitArt.wreck_kind(UnitArt.style_for(def, race)) != ""
 	var fall := 0.0 if wreck else -dir * ease(clampf(u / 0.25, 0.0, 1.0), 0.5) * PI * 0.5
-	UnitArt.begin(n, Transform2D(fall, Vector2(dir, 1) * UNIT_SCALE, 0.0, pos + Vector2(0, -2)))
+	FkPaint.begin(n, Transform2D(fall, Vector2(dir, 1) * UNIT_SCALE, 0.0, pos + Vector2(0, -2)))
 	var col := view.team_color(c.side).darkened(0.35)
 	UnitArt.draw_unit(n, def, col, {"walk": 0.0, "moving": false, "atk": -1.0, "t": 0.0, "flash": 0.0}, c.id, race)
 	n.draw_set_transform(Vector2.ZERO)

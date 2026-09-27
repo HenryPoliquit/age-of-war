@@ -20,7 +20,7 @@ static func draw(ci: CanvasItem, race: StringName, age: int, h: float, team: Col
 	_dim = dim
 	var glow: Color = RaceLook.look(race).glow
 	var tm := team.darkened(dim)
-	UnitArt._ellipse(ci, Vector2(0, 2), Vector2(26, 5), Color(0, 0, 0, 0.32))
+	FkPaint.ellipse(ci, Vector2(0, 2), Vector2(26, 5), Color(0, 0, 0, 0.32))
 	match race:
 		&"elf":
 			_elf(ci, age, h, tm, glow)
@@ -39,7 +39,7 @@ static func _d(col: Color) -> Color:
 
 ## Shaded polygon with an ink outline.
 static func _shape(ci: CanvasItem, pts: Array, col: Color, ink := 1.1) -> void:
-	UnitArt._shade_poly(ci, pts, _d(col))
+	FkPaint.shade_poly(ci, pts, _d(col))
 	if ink > 0.0:
 		var p := PackedVector2Array(pts)
 		p.append(pts[0])
@@ -51,7 +51,7 @@ static func _rect(r: Rect2) -> Array:
 
 
 static func _oval(ci: CanvasItem, c: Vector2, r: Vector2, col: Color, ink := 1.0, rot := 0.0) -> void:
-	_shape(ci, UnitArt._ellipse_pts(c, r, rot, 12), col, ink)
+	_shape(ci, FkPaint.ellipse_pts(c, r, rot, 12), col, ink)
 
 
 ## Lit edge along the top-left of a form.
@@ -89,7 +89,7 @@ static func _rock(ci: CanvasItem, c: Vector2, r: float, col: Color) -> void:
 
 
 static func _moss(ci: CanvasItem, c: Vector2, r: Vector2, col := Color("5f7f3a")) -> void:
-	UnitArt._ellipse(ci, c, r, _d(col))
+	FkPaint.ellipse(ci, c, r, _d(col))
 	for k in 3:
 		ci.draw_circle(c + Vector2(-r.x * 0.5 + k * r.x * 0.5, -r.y * 0.4), r.y * 0.45, _d(col).lightened(0.12))
 
@@ -222,7 +222,7 @@ static func _human(ci: CanvasItem, age: int, h: float, tm: Color, glow: Color) -
 			_shape(ci, _rect(Rect2(-1.5, -h * 0.72, 3, 9)), Color(0.06, 0.05, 0.05), 0.6)
 			_banner(ci, Vector2(0, -h * 0.55), 6.0, h * 0.35, tm, _d(gold))
 			for k in 6:
-				UnitArt._ellipse(ci, Vector2(-15 + (k % 2) * 3, -4 - k * 5), Vector2(3.5, 2.2), _d(Color("3e6a36")), 0.4)
+				FkPaint.ellipse(ci, Vector2(-15 + (k % 2) * 3, -4 - k * 5), Vector2(3.5, 2.2), _d(Color("3e6a36")), 0.4)
 			_tufts(ci, [-10.0, 20.0], Color("5a7a3a"))
 		5:
 			# Earthwork bastion: sloped earth with stone quoins, brick cap, sandbags, gabions, barrels, lantern.
@@ -302,7 +302,7 @@ static func _elf(ci: CanvasItem, age: int, h: float, tm: Color, glow: Color) -> 
 				vine.append(Vector2(sin(n * 1.1) * 12.0, -8.0 - n * (h - 16) / 12.0))
 			ci.draw_polyline(vine, _d(leaf.darkened(0.2)), 1.6)
 			for n in range(1, 12, 2):
-				UnitArt._ellipse(ci, vine[n] + Vector2(2, 0), Vector2(2.5, 1.4), _d(leaf.lightened(0.1)), 0.6)
+				FkPaint.ellipse(ci, vine[n] + Vector2(2, 0), Vector2(2.5, 1.4), _d(leaf.lightened(0.1)), 0.6)
 			_nest(ci, Vector2(0, -h), 18.0, wicker)
 			ci.draw_line(Vector2(12, -h - 1), Vector2(19, -h - 7), _d(Color("f0ece0")), 1.6)
 			_ferns(ci, [-20.0, 19.0], leaf)
@@ -441,7 +441,7 @@ static func _elf(ci: CanvasItem, age: int, h: float, tm: Color, glow: Color) -> 
 			ci.draw_colored_polygon(PackedVector2Array([Vector2(1, -8), Vector2(1, top + 2), Vector2(12, top), Vector2(8, top + 6), Vector2(10, -8)]), Color(_d(crystal).darkened(0.2), 0.85))
 			ci.draw_rect(Rect2(-2.5, top + 10, 5, -top - 22), Color(glow, 0.35 + 0.35 * k))
 			ci.draw_line(Vector2(-5, -10), Vector2(-5, top + 6), Color(1, 1, 1, 0.55), 1.0)
-			_shape(ci, UnitArt._ellipse_pts(Vector2(0, top), Vector2(12.5, 3.2), 0.0, 12), crystal.lightened(0.2), 0.9)
+			_shape(ci, FkPaint.ellipse_pts(Vector2(0, top), Vector2(12.5, 3.2), 0.0, 12), crystal.lightened(0.2), 0.9)
 			for p in [[-12.0, 26.0, -0.45], [12.0, 22.0, 0.4], [-6.0, 16.0, -0.15], [7.0, 14.0, 0.2]]:
 				var base := Vector2(p[0], -6)
 				var tip := base + Vector2(0, -float(p[1])).rotated(float(p[2]))

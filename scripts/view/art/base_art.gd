@@ -40,10 +40,10 @@ static func draw_base(ci: CanvasItem, age: int, team: Color, hp_frac: float, t: 
 	# `build` 0→1 plays the rebuild after evolving: the new structure rises out of the ground.
 	var rise := (1.0 - ease(build, 0.4)) * 240.0
 	if host != null:
-		UnitArt._push(ci, Transform2D(0.0, Vector2(0, rise)))
+		FkPaint.push(ci, Transform2D(0.0, Vector2(0, rise)))
 		ci.draw_texture(static_texture(age, team, host, race), -TEX_ORIGIN)
-		UnitArt._pop(ci)
-	UnitArt._push(ci, Transform2D(0.0, Vector2(SCALE, SCALE), 0.0, Vector2(0, rise)))
+		FkPaint.pop(ci)
+	FkPaint.push(ci, Transform2D(0.0, Vector2(SCALE, SCALE), 0.0, Vector2(0, rise)))
 	if host == null:
 		dynamic_pass = false
 		_art(ci, race, age, team, t)
@@ -61,7 +61,7 @@ static func draw_base(ci: CanvasItem, age: int, team: Color, hp_frac: float, t: 
 			var fl := 0.6 + 0.4 * sin(t * 13.0 + i * 2.0)
 			ci.draw_circle(c, 9.0 * fl, Color(1.0, 0.55, 0.15, 0.85))
 			ci.draw_circle(c + Vector2(0, -6), 5.0 * fl, Color(1.0, 0.9, 0.4, 0.9))
-	UnitArt._pop(ci)
+	FkPaint.pop(ci)
 
 
 static func _banner(ci: CanvasItem, top: Vector2, team: Color, t: float, h := 26.0) -> void:
@@ -97,7 +97,7 @@ static func static_texture(age: int, team: Color, host: Node, race: StringName =
 	vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 	var n := Node2D.new()
 	n.draw.connect(func():
-		UnitArt.begin(n, Transform2D(0.0, Vector2(SCALE, SCALE), 0.0, TEX_ORIGIN))
+		FkPaint.begin(n, Transform2D(0.0, Vector2(SCALE, SCALE), 0.0, TEX_ORIGIN))
 		dynamic_pass = false
 		_art(n, race, age, team, 0.0)
 		n.draw_set_transform(Vector2.ZERO))
@@ -124,7 +124,7 @@ static func _art(ci: CanvasItem, race: StringName, age: int, team: Color, t: flo
 
 
 static func _sp(ci: CanvasItem, pts: Array, col: Color) -> void:
-	UnitArt._shade_poly(ci, pts, col, Vector2(0.5, -0.8))
+	FkPaint.shade_poly(ci, pts, col, Vector2(0.5, -0.8))
 
 
 static func _rect_pts(r: Rect2) -> Array:
@@ -417,7 +417,7 @@ static func _elf(ci: CanvasItem, age: int, team: Color, t: float) -> void:
 		return
 	# Back canopy.
 	for p in [Vector2(-170, -290), Vector2(-60, -296), Vector2(-110, -320)]:
-		UnitArt._shade_poly(ci, UnitArt._ellipse_pts(p, Vector2(64, 40), 0.0, 14), leaf.darkened(0.25))
+		FkPaint.shade_poly(ci, FkPaint.ellipse_pts(p, Vector2(64, 40), 0.0, 14), leaf.darkened(0.25))
 	# Trunk with root flare and bark grooves.
 	_sp(ci, [Vector2(-196, 0), Vector2(-156, -18), Vector2(-138, -90), Vector2(-134, -262), Vector2(-86, -262), Vector2(-82, -90), Vector2(-62, -18), Vector2(-22, 0)], bark)
 	for k in 5:
@@ -481,7 +481,7 @@ static func _elf(ci: CanvasItem, age: int, team: Color, t: float) -> void:
 	# Front canopy.
 	var canopy := leaf if age != 6 else leaf.lerp(glow, 0.25)
 	for p in [Vector2(-196, -262), Vector2(-40, -272), Vector2(-120, -300), Vector2(-150, -330), Vector2(-80, -330)]:
-		UnitArt._shade_poly(ci, UnitArt._ellipse_pts(p, Vector2(40, 26), 0.2, 12), canopy)
+		FkPaint.shade_poly(ci, FkPaint.ellipse_pts(p, Vector2(40, 26), 0.2, 12), canopy)
 
 
 ## Dwarven hold carved into a mountain: cave → carved door → fortified gate → towered hold → forge-fort
@@ -545,9 +545,9 @@ static func _dwarf(ci: CanvasItem, age: int, team: Color, t: float) -> void:
 			_sp(ci, [Vector2(-60, 0), Vector2(-56, -52), Vector2(-34, -72), Vector2(-10, -54), Vector2(-6, 0)], Color(0.08, 0.06, 0.05))
 			_sp(ci, [Vector2(-56, -48), Vector2(-40, -66), Vector2(-40, 0), Vector2(-56, 0)], Color("8a6440"))
 			for k in 9:
-				UnitArt._shade_poly(ci, UnitArt._ellipse_pts(Vector2(-200 + k * 15, -10 - (k % 2) * 8), Vector2(9, 7), 0.0, 8), stone)
+				FkPaint.shade_poly(ci, FkPaint.ellipse_pts(Vector2(-200 + k * 15, -10 - (k % 2) * 8), Vector2(9, 7), 0.0, 8), stone)
 			for k in 4:
-				UnitArt._shade_poly(ci, UnitArt._ellipse_pts(Vector2(-110, -126 - k * 12), Vector2(12 - k * 2, 6), 0.0, 8), stone.darkened(0.05 * k))
+				FkPaint.shade_poly(ci, FkPaint.ellipse_pts(Vector2(-110, -126 - k * 12), Vector2(12 - k * 2, 6), 0.0, 8), stone.darkened(0.05 * k))
 		_:
 			# Carved facade with a ledge for the turret mounts.
 			_masonry(ci, Rect2(-196, -122, 200, 122), stone, 16, 34)
@@ -570,7 +570,7 @@ static func _dwarf(ci: CanvasItem, age: int, team: Color, t: float) -> void:
 					ci.draw_line(Vector2(-54, -56 + k * 22), Vector2(2, -56 + k * 22), Color("b87a3a"), 3.0)
 			# Guardian faces carved beside the door.
 			for x in [-86.0]:
-				_sp(ci, UnitArt._ellipse_pts(Vector2(x, -84), Vector2(16, 18), 0.0, 12), stone.lightened(0.05))
+				_sp(ci, FkPaint.ellipse_pts(Vector2(x, -84), Vector2(16, 18), 0.0, 12), stone.lightened(0.05))
 				_sp(ci, [Vector2(x - 14, -80), Vector2(x + 14, -80), Vector2(x + 6, -34), Vector2(x, -26), Vector2(x - 6, -34)], stone.darkened(0.08))
 				ci.draw_line(Vector2(x - 8, -90), Vector2(x - 2, -90), Color(0, 0, 0, 0.5), 2.0)
 				ci.draw_line(Vector2(x + 2, -90), Vector2(x + 8, -90), Color(0, 0, 0, 0.5), 2.0)
@@ -671,7 +671,7 @@ static func draw_turret(ci: CanvasItem, def: TurretDef, team: Color, aim: float,
 					# Thorn bramble (Thornbrake / Mistwell sit in a knot of briars).
 					for n in 5:
 						var c := Vector2(-10 + n * 5, -8 - (n % 2) * 6)
-						UnitArt._ellipse(ci, c, Vector2(8, 6), Color("3e5a2e").darkened(dim + 0.05 * (n % 2)))
+						FkPaint.ellipse(ci, c, Vector2(8, 6), Color("3e5a2e").darkened(dim + 0.05 * (n % 2)))
 						ci.draw_line(c, c + Vector2(-4 + n * 2, -9), Color("6e5236").darkened(dim), 1.2)
 					if def.age == 4:
 						for n in 3:
@@ -680,7 +680,7 @@ static func draw_turret(ci: CanvasItem, def: TurretDef, team: Color, aim: float,
 					# A seed-pod of light cupped in petals.
 					for n in 4:
 						var a := PI + (n + 0.5) * PI / 4.0
-						UnitArt._ellipse(ci, Vector2(cos(a), sin(a)) * 8.0 + Vector2(0, -6), Vector2(8, 3.5), Color("e8eef6").darkened(dim), a)
+						FkPaint.ellipse(ci, Vector2(cos(a), sin(a)) * 8.0 + Vector2(0, -6), Vector2(8, 3.5), Color("e8eef6").darkened(dim), a)
 					ci.draw_circle(Vector2(0, -12), 6.0, Color(glow, 0.5 + 0.4 * pulse))
 				return
 			match def.age:
@@ -697,7 +697,7 @@ static func draw_turret(ci: CanvasItem, def: TurretDef, team: Color, aim: float,
 ## An unlocked slot with nothing built: a marked foundation on the ground.
 static func draw_pad(ci: CanvasItem, race: StringName) -> void:
 	var col: Color = {&"elf": Color("6a5a3a"), &"dwarf": Color("6e6a64")}.get(race, Color("7a6a54"))
-	UnitArt._ellipse(ci, Vector2(0, 2), Vector2(22, 5), Color(0, 0, 0, 0.25))
+	FkPaint.ellipse(ci, Vector2(0, 2), Vector2(22, 5), Color(0, 0, 0, 0.25))
 	ci.draw_rect(Rect2(-18, -5, 36, 6), col)
 	ci.draw_line(Vector2(-18, -5), Vector2(18, -5), col.lightened(0.2), 1.2)
 	for x in [-14.0, 14.0]:
@@ -714,9 +714,9 @@ static func draw_tower(ci: CanvasItem, race: StringName, age: int, team: Color, 
 static func _hub(ci: CanvasItem, c: Vector2, team: Color, metal: Color, dim: float) -> void:
 	var body := metal.darkened(0.4 + dim)
 	var drum := [c + Vector2(-7, -1), c + Vector2(7, -1), c + Vector2(7, 5), c + Vector2(-7, 5)]
-	UnitArt._shade_poly(ci, drum, body)
+	FkPaint.shade_poly(ci, drum, body)
 	ci.draw_rect(Rect2(c + Vector2(-7, 1), Vector2(14, 2.5)), team.darkened(dim))
-	UnitArt._shade_poly(ci, UnitArt._ellipse_pts(c + Vector2(0, -1), Vector2(7, 2.4), 0.0, 12), metal.darkened(0.15 + dim))
+	FkPaint.shade_poly(ci, FkPaint.ellipse_pts(c + Vector2(0, -1), Vector2(7, 2.4), 0.0, 12), metal.darkened(0.15 + dim))
 	for x in [-4.0, 0.0, 4.0]:
 		ci.draw_circle(c + Vector2(x, 4.2), 0.6, metal.lightened(0.3).darkened(dim))
 	var ink := PackedVector2Array([c + Vector2(-7, -1), c + Vector2(-7, 5), c + Vector2(7, 5), c + Vector2(7, -1)])

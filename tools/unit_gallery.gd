@@ -58,7 +58,7 @@ func _draw_panel(n: Node2D, mode: int) -> void:
 			if def == null:
 				continue
 			var base := Vector2(94 + c * 152, 56 + age * 160)
-			UnitArt.begin(n, Transform2D(0.0, Vector2(1.15, 1.15), 0.0, base))
+			FkPaint.begin(n, Transform2D(0.0, Vector2(1.15, 1.15), 0.0, base))
 			UnitArt.draw_unit(n, def, MatchView.TEAM[0], {"walk": 0.6, "move": 0.0, "atk": atk, "t": 0.3, "flash": 0.0}, age * 4 + c, r)
 			n.draw_set_transform(Vector2.ZERO)
 			if mode == 0 or race == &"all":

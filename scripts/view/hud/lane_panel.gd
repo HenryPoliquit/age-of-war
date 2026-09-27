@@ -100,7 +100,7 @@ class TrainRow extends Control:
 			if i < me.queue.size():
 				var q := me.queue[i]
 				var sc := 24.0 / UnitArt.height_for(q, race)
-				UnitArt.begin(self, Transform2D(0.0, Vector2(sc, sc), 0.0, r.position + Vector2(15, 28)))
+				FkPaint.begin(self, Transform2D(0.0, Vector2(sc, sc), 0.0, r.position + Vector2(15, 28)))
 				UnitArt.draw_unit(self, q, hud.view.team_color(0), {"t": 0.0}, i, race)
 				draw_set_transform(Vector2.ZERO)
 			draw_rect(r, MatchHud.ACCENT if i == 0 and not me.queue.is_empty() else Color(1, 1, 1, 0.15), false, 1.0)

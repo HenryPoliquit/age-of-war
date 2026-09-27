@@ -285,7 +285,7 @@ func _draw() -> void:
 	var t := now()
 	for d in decals:
 		var a: float = 1.0 - (t - d.born) / d.life
-		UnitArt._ellipse(self, Vector2(d.x, GROUND_Y + 6), Vector2(d.w, 6), Color(0.08, 0.06, 0.05, 0.5 * a))
+		FkPaint.ellipse(self, Vector2(d.x, GROUND_Y + 6), Vector2(d.w, 6), Color(0.08, 0.06, 0.05, 0.5 * a))
 	for a in actors:
 		_draw_actor(a, t)
 	for p in particles:
@@ -338,7 +338,7 @@ func _draw_actor(a: Dictionary, t: float) -> void:
 	match a.kind:
 		"beast":
 			var dir := signf(a.vx)
-			UnitArt.begin(self, Transform2D(0.0, Vector2(dir * 0.9, 0.9), 0.0, Vector2(a.x, a.y)))
+			FkPaint.begin(self, Transform2D(0.0, Vector2(dir * 0.9, 0.9), 0.0, Vector2(a.x, a.y)))
 			UnitArt.quadruped(self, a.get("beast", "boar"), Color("5b4130"), {"moving": true, "walk": t * 26.0 + a.y, "t": t}, 0)
 			draw_set_transform(Vector2.ZERO)
 		"beam":
