@@ -15,7 +15,7 @@ func test_kit_names_no_game_class() -> void:
 	for f in files:
 		var src := FileAccess.get_file_as_string(KIT + f)
 		for name in game:
-			check(RegEx.create_from_string("\b%s\b" % name).search(src) == null, "%s names game class %s" % [f, name])
+			check(RegEx.create_from_string("\\b%s\\b" % name).search(src) == null, "%s names game class %s" % [f, name])
 
 
 func test_race_look_reads_kit_presets() -> void:
