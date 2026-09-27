@@ -165,36 +165,37 @@ const STANCES := {
 
 ## Walk styles. bob = hip drop at each contact (px); stride = foot reach (px); lift = knee lift (px);
 ## heel / toe = foot roll at landing / push-off (rad; a negative heel lands on the ball of the foot);
-## swing = free-arm swing (rad); dust = puffs at heel contact. `carry` is the pose (stance channels)
+## swing = free-arm swing (rad); dust = puffs at heel contact; twist = pelvis yaw at full stride (rad), the
+## chest turning against it at 0.8. `carry` is the pose (stance channels)
 ## the unit blends into as it walks; "free" lets the off hand swing even if the stance holds it.
 const GAITS := {
-	"default": {"bob": 2.2, "stride": 13.0, "lift": 4.5, "heel": 0.35, "toe": 0.5, "swing": 0.5},
+	"default": {"bob": 2.2, "stride": 13.0, "lift": 4.5, "heel": 0.35, "toe": 0.5, "swing": 0.5, "twist": 0.35},
 	# Spear skirmisher: low stealthy glide, torso canted 15°, spear gripped at the hip angled up 30°.
-	"glide": {"bob": 0.6, "stride": 13.0, "lift": 3.5, "heel": 0.35, "toe": 0.5, "swing": 0.55,
+	"glide": {"bob": 0.6, "stride": 13.0, "lift": 3.5, "heel": 0.35, "toe": 0.5, "swing": 0.55, "twist": 0.25,
 		"carry": {"h": Vector2(6, 17), "a": -0.52, "lean": 0.26, "crouch": 3.0, "free": true}},
 	# Axe thrower: heavy heel strikes with dust, upright broad chest, hunched shoulders, axe low at the
 	# hip with the blade down, short tight arm swing, a distinct bob.
-	"heavy": {"bob": 3.0, "stride": 12.0, "lift": 4.0, "heel": 0.45, "toe": 0.45, "swing": 0.3, "dust": true,
+	"heavy": {"bob": 3.0, "stride": 12.0, "lift": 4.0, "heel": 0.45, "toe": 0.45, "swing": 0.3, "dust": true, "twist": 0.25,
 		"carry": {"h": Vector2(5, 18), "a": 1.25, "s": Vector2(1, 0.6), "lean": 0.0, "free": true}},
 	# Slinger: light bouncy scout walk on the balls of the feet, high knee lift, sling draped between
 	# both hands at chest level.
-	"bounce": {"bob": 3.2, "stride": 11.0, "lift": 8.0, "heel": -0.25, "toe": 0.45, "swing": 0.4,
+	"bounce": {"bob": 3.2, "stride": 11.0, "lift": 8.0, "heel": -0.25, "toe": 0.45, "swing": 0.4, "twist": 0.35,
 		"carry": {"h": Vector2(8, 6), "f": Vector2(4, 8), "lean": 0.0}},
 	# Archer: level grouse glide — soft knees, hips and head level. Bow arm low and relaxed (shoulder
 	# pressed down, elbow soft) holding the bow vertically at the flank, a little forward of the legs;
 	# the drawing arm dropped, elbow ~100°, a relaxed hook swinging by the hip with the counter-stride.
-	"track": {"bob": 0.0, "stride": 12.0, "lift": 3.0, "heel": 0.3, "toe": 0.4, "swing": 0.25, "hswing": 4.0,
+	"track": {"bob": 0.0, "stride": 12.0, "lift": 3.0, "heel": 0.3, "toe": 0.4, "swing": 0.25, "hswing": 4.0, "twist": 0.1,
 		"carry": {"h": Vector2(4, 15), "f": Vector2(7, 14), "s": Vector2(0, 1.5), "sf": Vector2(0, 1.5),
 			"lean": 0.08, "crouch": 3.5, "bend": 1.0}},
 	# Rifleman: patrol low-ready — hips low, torso 10° forward, firing hand at the waist, support hand
 	# under the forend, barrel 45° down ahead of the lead knee, locked steady while the legs step.
-	"patrol": {"bob": 0.5, "stride": 11.0, "lift": 3.0, "heel": 0.3, "toe": 0.4, "swing": 0.0,
+	"patrol": {"bob": 0.5, "stride": 11.0, "lift": 3.0, "heel": 0.3, "toe": 0.4, "swing": 0.0, "twist": 0.1,
 		"carry": {"h": Vector2(4, 12), "f": Vector2(10, 13), "s": Vector2.ZERO, "sf": Vector2.ZERO, "a": 0.785, "lean": 0.17,
 			"crouch": 2.5}},
 	# Shield wall: low guarded advance in measured wide steps, shield fixed across the chest (eyes over
 	# the rim), weapon held ready up-and-forward at chest height with the shoulder and elbow relaxed
 	# (clear of the face), minimal bob.
-	"wall": {"bob": 0.4, "stride": 9.0, "lift": 2.0, "heel": 0.2, "toe": 0.3, "swing": 0.0,
+	"wall": {"bob": 0.4, "stride": 9.0, "lift": 2.0, "heel": 0.2, "toe": 0.3, "swing": 0.0, "twist": 0.1,
 		"carry": {"h": Vector2(9, 8), "a": -0.9, "s": Vector2(0, 1), "rim": Vector2(10, -9.5), "lean": 0.08, "crouch": 4.0,
 			"wide": 8.0}},
 }
@@ -330,7 +331,7 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 	if seated:
 		sh.y -= pose.get("ride_bob", 0.0)
 	# Pelvis and chest turn against each other about the vertical axis as the figure walks.
-	var yaw_p := 0.0
+	var yaw_p: float = 0.0 if seated else g.get("twist", 0.0) * sin(walk) * mv
 	var yaw_c := -0.8 * yaw_p
 	var j := {"hip": hip, "sh": sh, "chest": hip.lerp(sh, 0.55), "lean": k.lean, "lunge": lunge, "crouch": k.crouch,
 		"dir": Vector2.from_angle(k.a), "zoom": k.zoom, "gait": gait_for(weapon, shield), "w": w}

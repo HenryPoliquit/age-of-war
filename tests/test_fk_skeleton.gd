@@ -558,3 +558,41 @@ func test_toe_stays_down_as_the_heel_lifts() -> void:
 	for i in 64:
 		var j := FkSkeleton.solve(1.0, "none", {"walk": TAU * i / 64.0, "move": 1.0})
 		check(j.toe_bend_n >= 0.0 and j.toe_bend_n <= maxf(j.rot_n, 0.0) + 1e-5, "bend only while the heel is up (phase %d)" % i)
+
+
+func _corr(a: Array, c: Array) -> float:
+	var ma := 0.0
+	var mc := 0.0
+	for i in a.size():
+		ma += a[i] / a.size()
+		mc += c[i] / c.size()
+	var sab := 0.0
+	var saa := 0.0
+	var scc := 0.0
+	for i in a.size():
+		sab += (a[i] - ma) * (c[i] - mc)
+		saa += (a[i] - ma) * (a[i] - ma)
+		scc += (c[i] - mc) * (c[i] - mc)
+	return sab / sqrt(saa * scc) if saa > 0.0 and scc > 0.0 else 0.0
+
+
+func test_walk_counter_rotates_chest_against_pelvis() -> void:
+	var fr := _walk("none", "", 32)
+	var foot: Array = fr.map(func(j): return j.foot_n.x)
+	check(_corr(fr.map(func(j): return (j.hip_n - j.hip).x), foot) > 0.5, "near hip rides forward with its foot")
+	check(_corr(fr.map(func(j): return (j.sh_n - j.sh).x), foot) < -0.5, "near shoulder swings back against it")
+	check(_spread(fr, func(j): return (j.sh_n - j.sh).x) > 1.5, "the shoulder's travel reads")
+	for g in FkSkeleton.GAITS:
+		check(FkSkeleton.GAITS[g].has("twist"), "%s has a twist" % g)
+
+
+func test_steady_gaits_barely_twist() -> void:
+	for w in ["bow", "musket"]:
+		check(_spread(_walk(w), func(j): return (j.sh_n - j.sh).x) < 1.0, "%s: carriage stays steady" % w)
+	check(_spread(_walk("sword", "round"), func(j): return (j.sh_n - j.sh).x) < 1.0, "shield wall: steady")
+
+
+func test_head_level_while_walking() -> void:
+	for w in ["none", "spear", "throwing_axe", "sling", "bow", "musket", "sword"]:
+		for j in _walk(w, "round" if w == "sword" else ""):
+			check(absf(j.head_tilt) < 0.1, "%s: head level on the march" % w)
