@@ -56,13 +56,14 @@ const FAMILY := {
 ## path: "line" (the near hand travels straight between keys) or "arc" (around the shoulder, overhead chops).
 const STANCES := {
 	"idle": {"guard": {"h": Vector2(3, 16)}, "wind": {"h": Vector2(3, 16)}, "hit": {"h": Vector2(3, 16)}},
-	# One-handed blade: chambered high beside the ear, blade back; a passing step and a steep straight cut
-	# down to mid-height with the wrist snapping the blade level; off hand at the chest, checking to the ribs.
-	"blade": {"path": "line",
+	# One-handed blade: chambered high beside the ear (arm bent), blade back; a passing step and a steep
+	# cut that sweeps the arm out to full, straight extension at shoulder height, the wrist snapping the
+	# blade level; off hand at the chest, checking to the ribs.
+	"blade": {"path": "arc",
 		"guard": {"h": Vector2(13, 3), "a": -0.5, "f": Vector2(4, 6), "crouch": 1.0, "lean": 0.03},
 		"wind": {"h": Vector2(-2, -10), "a": -2.3, "f": Vector2(3, 6), "s": Vector2(-1, -2), "e": Vector2(1, 0.5),
 			"crouch": 2.5, "lean": -0.05, "lunge": -1.0},
-		"hit": {"h": Vector2(15, 3), "a": 0.02, "f": Vector2(-1, 8), "s": Vector2(2, 1), "crouch": 3.0, "lean": 0.18,
+		"hit": {"h": Vector2(22, 5), "a": 0.02, "f": Vector2(-1, 8), "s": Vector2(2, 1), "crouch": 3.0, "lean": 0.18,
 			"lunge": 7.0, "step": 1.0}},
 	"chop": {"path": "arc",
 		"guard": {"h": Vector2(14, 5), "a": -0.33},

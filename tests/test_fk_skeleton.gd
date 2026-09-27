@@ -152,3 +152,14 @@ func test_feet_roll_heel_to_toe() -> void:
 				check((p as Vector2).y <= 0.05, "sole never below ground (phase %.2f)" % ph)
 	check(toe_off > 0.3, "heel lifts at toe-off")
 	check(heel_strike < -0.2, "toes lift at heel strike")
+
+
+func test_blade_arm_straight_at_the_hit() -> void:
+	# Owner: "when you slash downwards, the arm to hand is straight" — full extension at contact.
+	var arm := (FkSkeleton.UPPER + FkSkeleton.FORE)
+	var hit := FkSkeleton.solve(1.0, "sword", {"atk": 0.54})
+	check(hit.sh_n.distance_to(hit.hand_n) > arm * 0.97, "arm locked straight at the hit")
+	var wind := FkSkeleton.solve(1.0, "sword", {"atk": 0.34})
+	check(wind.sh_n.distance_to(wind.hand_n) < arm * 0.8, "arm chambered (bent) at the wind-up")
+	# Full range: the hand travels from above the head down to shoulder height in front.
+	check(wind.hand_n.y < wind.sh.y - 8.0 and hit.hand_n.x > hit.sh.x + 18.0, "full sweep from ear to extended")
