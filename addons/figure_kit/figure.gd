@@ -91,7 +91,8 @@ static func humanoid(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int
 		ci.draw_line(boot[5], boot[4], Color(0.08, 0.06, 0.05), 1.2 * b)
 	# Cape trails behind and lags the body (secondary motion).
 	if st.get("cape", false) or helmet == "greathelm":
-		var flap := sin(t * 3.0 + seed) * 2.0 + mv * 3.0
+		# Riders' cloaks whip in the wind of the gait and harder on the charge.
+		var flap: float = sin(t * 3.0 + seed) * 2.0 + (mv + pose.get("ride_mv", 0.0)) * 3.0 + (4.0 if atk >= 0.3 and atk < 0.75 else 0.0)
 		FkPaint.shade_poly(ci, [sh + Vector2(-6, 0) * b, sh + Vector2(2, 1) * b, hip + Vector2(-2, 8) * b,
 			hip + Vector2(-12 - flap, 10) * b, hip + Vector2(-9 - flap * 0.5, -2) * b], tm.darkened(0.35))
 	FkArmour.pack(ci, st.get("pack", ""), sh, hip, build, pal, tm, pose, t, lk)

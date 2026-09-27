@@ -56,6 +56,7 @@ const FAMILY := {
 ##   lean  torso lean (rad, + forward)      lunge  body shift forward (px)
 ##   crouch  hip drop (px)                  step  passing step (0..1: the back foot swings through to the front)
 ##   wide  extra stance width (px)          zoom  weapon scale (foreshortening as it swings toward the viewer)
+##   rise  a rider standing up in the stirrups (px)
 ##   rim  shield top-rim position (the far hand then grips the shield below it, by the shield's size)
 ## path: "line" (the near hand travels straight between keys) or "arc" (around the shoulder, overhead chops).
 const STANCES := {
@@ -111,6 +112,20 @@ const STANCES := {
 		"hit": {"h": Vector2(15, 0), "f": Vector2(13, 8), "a": -1.2, "lean": 0.12, "lunge": 3.0}},
 	"crew": {"guard": {"h": Vector2(14, 8), "f": Vector2(12, 9)}, "wind": {"h": Vector2(14, 8), "f": Vector2(12, 9)},
 		"hit": {"h": Vector2(15, 8), "f": Vector2(13, 9), "lean": 0.1}},
+	# Mounted sabre: seated deep, reins low over the withers in the off hand, the hilt resting at the
+	# thigh; the strike rises into a half-seat (heels deep, leaning with the stride) and the arm extends
+	# down and forward along the mount's flank, wrist locked, in an angled draw-cut.
+	"ride_blade": {"path": "arc",
+		"guard": {"h": Vector2(6, 14), "a": -1.9, "f": Vector2(8, 16)},
+		"wind": {"h": Vector2(-4, -13), "a": -2.6, "f": Vector2(8, 16), "s": Vector2(-1, -2), "lean": 0.1, "rise": 3.0},
+		"hit": {"h": Vector2(17, 13), "a": 0.7, "f": Vector2(8, 16), "s": Vector2(2, 1), "lean": 0.3, "rise": 4.0,
+			"lock": 1.0, "zoom": 1.1}},
+	# Mounted lance: carried upright at the walk, couched under the arm, then levelled into the charge
+	# at the opponent's chest.
+	"ride_thrust": {
+		"guard": {"h": Vector2(6, 10), "a": -1.35, "f": Vector2(8, 16)},
+		"wind": {"h": Vector2(1, 9), "a": 0.1, "f": Vector2(8, 16), "lean": 0.05, "rise": 2.0},
+		"hit": {"h": Vector2(16, 8), "a": 0.3, "f": Vector2(8, 16), "lean": 0.25, "rise": 3.0}},
 }
 
 ## Walk styles. bob = hip drop at each contact (px); stride = foot reach (px); lift = knee lift (px);
@@ -146,7 +161,7 @@ const GAITS := {
 ## Far-hand shield grip (relative to sh) for shield bearers: holds the shield in front of the chest.
 const SHIELD_GRIP := Vector2(6, 11)
 
-const _FLOATS := {"a": 0.0, "lean": 0.0, "lunge": 0.0, "crouch": 0.0, "step": 0.0, "wide": 0.0, "zoom": 1.0, "lock": 0.0}
+const _FLOATS := {"a": 0.0, "lean": 0.0, "lunge": 0.0, "crouch": 0.0, "step": 0.0, "wide": 0.0, "zoom": 1.0, "lock": 0.0, "rise": 0.0}
 const _VECTORS := {"s": Vector2.ZERO, "sf": Vector2.ZERO}
 
 
@@ -235,7 +250,9 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 	var walk: float = pose.get("walk", 0.0)
 	var t: float = pose.get("t", 0.0)
 	var family: String = FAMILY.get(weapon, "idle")
-	if shield != "" and family in ["blade", "chop"]:
+	if seated:
+		family = "ride_blade" if family in ["blade", "chop"] else ("ride_thrust" if family in ["thrust", "pole"] else family)
+	elif shield != "" and family in ["blade", "chop"]:
 		family = "shield"
 	var g: Dictionary = GAITS[gait_for(weapon, shield)]
 	var k := key(family, pose.get("atk", -1.0), {} if seated else g.get("carry", {}), mv)
@@ -243,7 +260,15 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 	var lunge: float = k.lunge * b * (0.0 if seated else 1.0)
 	var crouch: float = k.crouch * b * (0.0 if seated else 1.0)
 	var hip := Vector2(lunge * 0.6, -HIP_Y * b + bob * 0.5 + crouch)
+	# A rider's feet stay in the stirrups (relative to the saddle) while the hips rise off it; the hips
+	# sway with the mount's gait and the spine absorbs its bob so the head stays level.
+	var saddle_hip := hip
+	if seated:
+		hip.y -= k.rise * b
+		hip.x += sin(pose.get("ride_walk", 0.0) * 2.0) * 0.8 * pose.get("ride_mv", 0.0) * b
 	var sh := hip + Vector2(1.5 * b, -SPINE * b).rotated(k.lean)
+	if seated:
+		sh.y -= pose.get("ride_bob", 0.0)
 	var j := {"hip": hip, "sh": sh, "lean": k.lean, "lunge": lunge, "crouch": k.crouch, "dir": Vector2.from_angle(k.a),
 		"zoom": k.zoom, "gait": gait_for(weapon, shield)}
 	# Legs: feet on the ground line; the gait's stride, lift and heel-to-toe roll while walking, the
@@ -253,8 +278,8 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 		var rot := 0.0
 		var ph := walk + PI * i
 		if seated:
-			foot = hip + Vector2(5.0 - 3.0 * i, 16.0) * b
-			rot = -0.3
+			foot = saddle_hip + Vector2(5.0 - 3.0 * i, 16.0) * b
+			rot = -0.3 - 0.05 * k.rise
 		else:
 			var fx := lerpf(2.8 if i == 0 else -3.6, g.stride * sin(ph), mv)
 			var lift: float = g.lift * maxf(0.0, cos(ph)) * mv

@@ -50,11 +50,12 @@ static func quadruped(ci: CanvasItem, kind: String, team: Color, pose: Dictionar
 			var near := pass_i == 1
 			var ph: float = walk + (0.0 if near else PI) + (PI * 0.5 if front else 0.0)
 			var swing_a := lerpf(0.05, sin(ph) * 0.5, mv)
-			var lift := maxf(0.0, cos(ph)) * 0.8 * mv
+			# Collected four-beat walk: high knee and hock flexion as each hoof swings through.
+			var lift := maxf(0.0, cos(ph)) * (1.5 if front else 1.1) * mv
 			var top := c + Vector2(L * (0.62 if front else -0.62), 5)
 			var lc := col.darkened(0.28 if not near else 0.0)
 			var upper := top + Vector2(0, H * 0.42).rotated(-swing_a)
-			var lower_dir := -swing_a + (lift if front else -lift * 0.6) + (0.0 if front else 0.35)
+			var lower_dir := -swing_a + (lift if front else -lift * 0.7) + (0.0 if front else 0.35)
 			var fet := upper + Vector2(0, H * 0.42).rotated(lower_dir)
 			var hoof := fet + Vector2(1.5, H * 0.14).rotated(lower_dir * 0.5)
 			FkPaint.seg(ci, top, upper, w0, w1, lc)
@@ -64,6 +65,12 @@ static func quadruped(ci: CanvasItem, kind: String, team: Color, pose: Dictionar
 			else:
 				FkPaint.seg(ci, fet, hoof, w1 * 0.66, w1 * 0.72, lc.darkened(0.1))
 				ci.draw_rect(Rect2(hoof + Vector2(-2.5, -1.2), Vector2(5.5, 2.8)), Color(0.12, 0.1, 0.08))
+		if pass_i == 1 and atk >= 0.3 and atk < 0.8:
+			# Dust kicking up from the hooves on the charge.
+			var du := (atk - 0.3) / 0.5
+			for k in 4:
+				var dp := c + Vector2(-L * 0.6 + k * L * 0.45 - du * 10.0, H + 8.0 - du * 6.0 - k % 2 * 3.0)
+				ci.draw_circle(dp, 2.5 + du * 5.0, Color(0.72, 0.64, 0.5, 0.4 * (1.0 - du)))
 		if pass_i == 0:
 			# Tail behind the far legs.
 			match head_kind:
@@ -212,9 +219,16 @@ static func mounted(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int)
 	var pal: Array = st.palette
 	var team: Color = st.team
 	var saddle := quadruped(ci, st.get("beast", "horse"), team, pose, seed, pal[2])
+	# The rider doesn't walk; it rides the mount's gait (hip sway, level head over the bob).
+	var mv := FkPaint.move_amount(pose)
+	var walk: float = pose.get("walk", 0.0)
+	var t: float = pose.get("t", 0.0)
 	var p := pose.duplicate()
 	p["moving"] = false
 	p["move"] = 0.0
+	p["ride_walk"] = walk
+	p["ride_mv"] = mv
+	p["ride_bob"] = lerpf(sin(t * 1.5 + seed) * 0.5, absf(sin(walk * 2.0)) * 2.0, mv)
 	_rider(ci, st, p, seed, saddle)
 
 

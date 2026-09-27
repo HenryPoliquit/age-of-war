@@ -301,6 +301,7 @@ static func golem(ci: CanvasItem, st: Dictionary, pose: Dictionary, _seed: int) 
 	var bob := lerpf(sin(t * 1.3) * 0.8, absf(sin(walk)) * 3.0, mv)
 	var hip := Vector2(0, -40 + bob)
 	FkPaint.shadow(ci, 30)
+	var contacts := []
 	for i in [1, 0]:
 		var ph: float = walk + PI * i
 		var a := lerpf(0.1 if i == 0 else -0.1, sin(ph) * 0.45, mv)
@@ -310,9 +311,19 @@ static func golem(ci: CanvasItem, st: Dictionary, pose: Dictionary, _seed: int) 
 		FkPaint.seg(ci, hip, knee, 13.0, 11.0, c)
 		ci.draw_circle(knee, 5.0, brass.darkened(0.2 if i == 1 else 0.0))
 		FkPaint.seg(ci, knee, ankle, 11.0, 10.0, c)
-		FkPaint.shade_poly(ci, [ankle + Vector2(-10, 4), ankle + Vector2(13, 4), ankle + Vector2(10, -4), ankle + Vector2(-7, -4)], c.darkened(0.15))
-	# Back arm.
-	FkPaint.seg(ci, hip + Vector2(-8, -30), hip + Vector2(-14, -8), 10.0, 9.0, iron.darkened(0.3))
+		# The landing foot crushes flat (squash) as the stride's weight comes down on it.
+		var u := giant_contact(ph) if mv > 0.3 else -1.0
+		var sq := 1.0 - u / 0.35 if u >= 0.0 and u < 0.35 else 0.0
+		var foot := [Vector2(-10, 4), Vector2(13, 4), Vector2(10, -4), Vector2(-7, -4)]
+		FkPaint.shade_poly(ci, foot.map(func(v: Vector2) -> Vector2: return ankle + Vector2(v.x * (1.0 + 0.35 * sq), v.y * (1.0 - 0.4 * sq) + 1.6 * sq)), c.darkened(0.15))
+		if u >= 0.0:
+			contacts.append([ankle + Vector2(1.5, 5), u])
+	# A hunched, heavy torso rocking over the supporting leg.
+	FkPaint.push(ci, Transform2D(sin(walk) * 0.06 * mv + 0.08, hip) * Transform2D(0.0, -hip))
+	# Back arm: a heavy pendulum lagging behind the stride.
+	var drag := sin(walk - 0.9) * 0.35 * mv
+	var back_sh := hip + Vector2(-8, -30)
+	FkPaint.seg(ci, back_sh, back_sh + Vector2(-6, 22).rotated(drag), 10.0, 9.0, iron.darkened(0.3))
 	# Barrel body with a furnace.
 	var body := [hip + Vector2(-20, 2), hip + Vector2(18, 2), hip + Vector2(22, -24), hip + Vector2(14, -40), hip + Vector2(-16, -40), hip + Vector2(-22, -22)]
 	FkPaint.shade_poly(ci, body, iron)
@@ -333,7 +344,7 @@ static func golem(ci: CanvasItem, st: Dictionary, pose: Dictionary, _seed: int) 
 	var u := fmod(t * 0.9, 1.0)
 	ci.draw_circle(hip + Vector2(-16 - u * 10, -54 - u * 20), 3.0 + u * 6.0, Color(0.85, 0.85, 0.82, 0.4 * (1.0 - u)))
 	# Front arm: a piston swing into a hammer fist.
-	var theta := 0.3
+	var theta := 0.3 - drag
 	if atk >= 0.0:
 		theta = lerpf(0.3, 2.4, ease(atk / 0.35, 0.6)) if atk < 0.35 else (lerpf(2.4, 0.9, ease((atk - 0.35) / 0.15, 0.4)) if atk < 0.5 else lerpf(0.9, 0.3, (atk - 0.5) / 0.5))
 	var shp := hip + Vector2(10, -32)
@@ -346,6 +357,9 @@ static func golem(ci: CanvasItem, st: Dictionary, pose: Dictionary, _seed: int) 
 	var fd := (fist - elbow).normalized()
 	FkPaint.shade_poly(ci, [fist - orth * 9 - fd * 3, fist + orth * 9 - fd * 3, fist + orth * 9 + fd * 8, fist - orth * 9 + fd * 8], iron.darkened(0.2))
 	ci.draw_line(fist - orth * 7 + fd * 2.5, fist + orth * 7 + fd * 2.5, Color(g, 0.7), 1.6)
+	FkPaint.pop(ci)
+	for c in contacts:
+		_giant_contact(ci, c[0], c[1])
 
 
 ## Treant: a walking tree — root feet, bark body, branch arms and a leafy crown.
@@ -362,6 +376,7 @@ static func treant(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int) 
 	var bob := lerpf(sin(t * 1.1 + seed) * 0.8, absf(sin(walk)) * 2.5, mv)
 	var hip := Vector2(0, -34 + bob)
 	FkPaint.shadow(ci, 30)
+	var contacts := []
 	for i in [1, 0]:
 		var ph: float = walk + PI * i
 		var a := lerpf(0.1 if i == 0 else -0.1, sin(ph) * 0.45, mv)
@@ -370,11 +385,20 @@ static func treant(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int) 
 		var c := bark.darkened(0.3 if i == 1 else 0.0)
 		FkPaint.seg(ci, hip, knee, 14.0, 11.0, c)
 		FkPaint.seg(ci, knee, foot, 11.0, 9.0, c)
+		# Roots splay flat as the weight crushes down on the landing foot.
+		var u := giant_contact(ph) if mv > 0.3 else -1.0
+		var sq := 1.0 - u / 0.35 if u >= 0.0 and u < 0.35 else 0.0
 		for k in 3:
-			ci.draw_line(foot, foot + Vector2(-8 + k * 9, 3 + (k % 2) * 1.5), c.darkened(0.1), 3.0)
-	# Back branch arm.
+			ci.draw_line(foot, foot + Vector2((-8 + k * 9) * (1.0 + 0.4 * sq), 3 + (k % 2) * 1.5 - 1.5 * sq), c.darkened(0.1), 3.0)
+		if u >= 0.0:
+			contacts.append([foot + Vector2(0, 3), u])
+	# A hunched, heavy trunk rocking over the supporting leg.
+	FkPaint.push(ci, Transform2D(sin(walk) * 0.06 * mv + 0.07, hip) * Transform2D(0.0, -hip))
+	# Back branch arm: a heavy pendulum lagging behind the stride.
 	var sway := sin(t * 1.4 + seed) * 0.08
-	FkPaint.seg(ci, hip + Vector2(-8, -38), hip + Vector2(-22, -14), 8.0, 5.0, bark.darkened(0.3))
+	var drag := sin(walk - 0.9) * 0.35 * mv
+	var back_sh := hip + Vector2(-8, -38)
+	FkPaint.seg(ci, back_sh, back_sh + Vector2(-14, 24).rotated(drag), 8.0, 5.0, bark.darkened(0.3))
 	# Trunk with bark grooves, a knot face with glowing eyes, and a team sash of woven vines.
 	var trunk := [hip + Vector2(-15, 4), hip + Vector2(15, 4), hip + Vector2(13, -30), hip + Vector2(10, -52), hip + Vector2(-10, -54), hip + Vector2(-14, -30)]
 	FkPaint.shade_poly(ci, trunk, bark)
@@ -395,7 +419,7 @@ static func treant(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int) 
 	for k in 5:
 		ci.draw_circle(crown + Vector2(-12 + k * 6, -8 + sin(k * 2.1) * 6), 1.6, Color(g, 0.7))
 	# Front branch arm: a heavy overhead slam.
-	var theta := 0.35
+	var theta := 0.35 - drag
 	if atk >= 0.0:
 		theta = lerpf(0.35, 2.5, ease(atk / 0.35, 0.6)) if atk < 0.35 else (lerpf(2.5, 0.8, ease((atk - 0.35) / 0.15, 0.4)) if atk < 0.5 else lerpf(0.8, 0.35, (atk - 0.5) / 0.5))
 	var shp := hip + Vector2(8, -40)
@@ -406,6 +430,38 @@ static func treant(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int) 
 	for k in 3:
 		ci.draw_line(hand, hand + (hand - elbow).normalized().rotated(-0.6 + k * 0.6) * 9.0, bark.darkened(0.1), 2.6)
 	FkPaint.ellipse(ci, elbow + Vector2(-2, -4), Vector2(5, 3), leaf, 0.6)
+	FkPaint.pop(ci)
+	for c in contacts:
+		_giant_contact(ci, c[0], c[1])
+
+
+## Time since a giant's foot landed, as 0..1 over the moment after contact (stride phase PI/2), else −1.
+static func giant_contact(ph: float) -> float:
+	var d := wrapf(ph - PI / 2, 0.0, TAU)
+	return d / 1.2 if d < 1.2 else -1.0
+
+
+## The earth-shaker's footfall, u = 0..1 after landing: shockwave arcs rolling out along the ground,
+## cracks in the stone, dust plumes and speed lines kicking upward around the planted foot.
+static func _giant_contact(ci: CanvasItem, p: Vector2, u: float) -> void:
+	var a := 1.0 - u
+	for k in 2:
+		var r := (10.0 + u * 34.0) * (1.0 + k * 0.45)
+		var pts := PackedVector2Array()
+		for s in 13:
+			var ang := PI + PI * s / 12.0
+			pts.append(p + Vector2(cos(ang) * r, sin(ang) * r * 0.28))
+		ci.draw_polyline(pts, Color(0.95, 0.9, 0.8, 0.55 * a / (1.0 + k)), 2.0)
+	for k in 4:
+		var side := -1.0 if k < 2 else 1.0
+		var l := (8.0 + k * 3.0) * minf(1.0, u * 4.0)
+		ci.draw_polyline(PackedVector2Array([p, p + Vector2(side * l * 0.5, (k % 2) * 1.5 - 0.5), p + Vector2(side * l, 1.0)]),
+			Color(0.18, 0.14, 0.1, 0.8 * a), 1.2)
+	for k in 4:
+		ci.draw_circle(p + Vector2(-12 + k * 8, -u * (10.0 + k * 4.0)), 3.0 + u * 7.0, Color(0.72, 0.64, 0.5, 0.35 * a))
+	for k in 3:
+		var x := -9.0 + k * 9.0
+		ci.draw_line(p + Vector2(x, -4.0 - u * 6.0), p + Vector2(x * 1.2, -14.0 - u * 16.0), Color(1, 1, 1, 0.5 * a), 1.2)
 
 
 ## Sky Cannon: a long brass barrel on a gilded carriage, ringed with floating arcane circles.

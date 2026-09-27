@@ -287,3 +287,55 @@ func test_shield_wall_advance() -> void:
 	check(_spread(fr, func(j): return j.sh.y) <= 0.5, "minimal bob")
 	check(_spread(fr, func(j): return (j.hand_f - j.sh).y) <= 0.3, "shield fixed across the chest")
 	check(fr[0].dir.y < -0.8, "weapon resting tip-up by the shoulder")
+
+
+# --- Mounted (owner briefs: collected gait, sabre draw-cut, couched lance) ---------------------
+
+## A rider's local y → world y on a standard horse (H 33): the rider is drawn 26 px lower.
+const RIDER_Y := -26.0
+
+
+func _ride(w: String, atk: float, extra := {}) -> Dictionary:
+	return FkSkeleton.solve(1.0, w, {"atk": atk}.merged(extra, true), "", true)
+
+
+func test_rider_head_stays_level_as_the_horse_bobs() -> void:
+	var low := _ride("saber", -1.0, {"ride_bob": 0.0})
+	var high := _ride("saber", -1.0, {"ride_bob": 2.0})
+	check(absf((low.sh.y + 0.0) - (high.sh.y + 2.0)) < 0.3, "spine absorbs the horse's bob")
+
+
+func test_rider_hips_sway_with_the_gait() -> void:
+	var a := _ride("saber", -1.0, {"ride_walk": 0.4, "ride_mv": 1.0})
+	var b := _ride("saber", -1.0, {"ride_walk": 2.0, "ride_mv": 1.0})
+	check(absf(a.hip.x - b.hip.x) > 0.3, "hips sway in sync with the horse")
+
+
+func test_reins_low_over_the_withers() -> void:
+	for w in ["saber", "lance"]:
+		for atk in [-1.0, 0.34, 0.5]:
+			var j := _ride(w, atk)
+			check((j.hand_f - j.sh).distance_to(Vector2(8, 16)) < 2.5, "%s at %s: rein hand low over the withers" % [w, atk])
+
+
+func test_sabre_half_seat_draw_cut() -> void:
+	var guard := _ride("saber", -1.0)
+	var hit := _ride("saber", 0.55)
+	check(guard.hip.y - hit.hip.y >= 3.0, "rises into a half-seat")
+	check(hit.foot_n.distance_to(guard.foot_n) < 0.6, "feet stay in the stirrups")
+	check(hit.rot_n < guard.rot_n - 0.05, "heels pressed deeper")
+	check(hit.lean >= 0.25, "leans forward with the stride")
+	check(hit.sh_n.distance_to(hit.hand_n) > (FkSkeleton.UPPER + FkSkeleton.FORE) * 0.93, "arm extended")
+	check(absf((hit.hand_n - hit.elbow_n).normalized().angle_to(hit.dir)) < 0.15, "wrist locked")
+	check(hit.dir.y > 0.3 and hit.dir.x > 0.3, "blade angled down and forward along the flank")
+	var tip: Vector2 = hit.hand_n + hit.dir * FkWeapons.weapon_length("saber")
+	check(tip.y + RIDER_Y > -60.0 and tip.y + RIDER_Y < -38.0, "cut lands head-to-chest on a foot soldier (y %.1f)" % (tip.y + RIDER_Y))
+
+
+func test_lance_couched_at_chest_height() -> void:
+	var guard := _ride("lance", -1.0)
+	check(guard.dir.y < -0.8, "lance carried upright on the walk")
+	var hit := _ride("lance", 0.55)
+	var tip: Vector2 = hit.hand_n + hit.dir * 36.0
+	check(tip.y + RIDER_Y > -60.0 and tip.y + RIDER_Y < -38.0, "levelled into the head-to-chest band (y %.1f)" % (tip.y + RIDER_Y))
+	check(hit.lean >= 0.2, "leans into the charge")

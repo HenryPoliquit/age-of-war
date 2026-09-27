@@ -44,3 +44,11 @@ func test_depth_per_rig() -> void:
 		"steamtank": 43.0, "golem": 33.0, "treant": 30.0, "skycannon": 50.0, "ballista": 46.0, "obelisk": 36.0}
 	for rig in measured:
 		check_near(FkUnits.depth({"rig": rig}), measured[rig], 1e-4, rig)
+
+
+func test_giant_contact_fires_just_after_landing() -> void:
+	# A giant's foot lands at stride phase PI/2; the crush, shockwave and dust play out right after.
+	check_eq(FkMachines.giant_contact(PI / 2 - 0.1), -1.0, "not before landing")
+	var u := FkMachines.giant_contact(PI / 2 + 0.1)
+	check(u > 0.0 and u < 0.2, "starts on landing")
+	check_eq(FkMachines.giant_contact(PI / 2 + 2.0), -1.0, "over while the foot is planted")
