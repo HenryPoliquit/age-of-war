@@ -207,3 +207,74 @@ Batches go in this order, each shown for all three races and then approved:
   - per-role sheets are approved by the owner;
   - the silhouette gallery is re-checked;
   - an in-game 1600×900 screenshot of a melee clash is taken. The owner reviews locally.
+
+## 6. Motion pass (owner direction, 2026-09-27)
+
+Owner, after watching every unit loop (the animation review page, `tools/unit_anim.gd` + `tools/anim_page.py`):
+- "I want to make the arm move properly so that we actually have shoulder arm and hand movements. for the legs, we have leg knees and feet."
+- "Slashing looks clunky."
+- A written motion brief for each weapon type, summarised in the table below.
+- "to make the game look realistic, let's aim all attacks on the area between head and chests."
+
+### 6.1 New joints and pose channels (FkSkeleton)
+
+**New keyframe channels**, alongside h (near hand), f (far hand), a (weapon angle), lean and lunge:
+
+| Channel | Meaning |
+|---|---|
+| `s` | Shoulder offset (px). The shoulder rises, drops, drives forward or pulls back per pose instead of staying fixed. |
+| `e` | Elbow bend direction. Replaces the single hard-coded down/back side, e.g. a high level elbow on a bow draw, or back-and-up at a 90° axe cock. |
+| `ef` | Elbow bend direction for the far arm. |
+| `w` | Wrist angle (rad): the hand's rotation relative to the forearm. The hand is drawn as an oriented fist, not a circle. The weapon angle `a` stays the absolute blade direction, so a wrist "snap" is `a` changing fast while the forearm moves slowly. |
+| `crouch` | Hip drop (px) for a low, athletic centre of gravity. Knees bend more. |
+| `step` | Passing step. The back foot swings through to land in front during the strike. |
+| `path` | `"line"` or `"arc"` for how the near hand travels between keys. |
+
+**Feet:**
+- The foot becomes its own segment, rotating at the ankle: heel strike (toes up) as the front foot lands, flat while planted, toe-off (heel up) as the back foot leaves. Lunges and steps plant flat.
+- Riders' heels press down in the stirrup.
+
+**Shoulders:**
+- A visible shoulder cap sits on the arm root (pauldron on armoured units), so shoulder motion reads.
+- The far arm also moves: a shield brace, off-hand at the chest or ribs, reins, the bow brace, or a counter-swing while walking.
+
+### 6.2 Attack target zone
+
+Every attack lands between the opponent's head and chest:
+- At contact (atk 0.35–0.55), blade tips, spear points and axe heads are at the target's head-to-chest band.
+- Projectiles and impact sparks aim there too. In the view, the target point moves from mid-body (`height × 0.5`) to about 0.72 of the target's height, for unit shots and turret shots.
+
+### 6.3 Motion per weapon family (keys: guard → wind-up → strike → recover)
+
+| Family (weapons) | Owner's brief → poses |
+|---|---|
+| **Blade, one-handed** (sword, saber, gladius, spellsword, leafblade, baton, shovel, club) | **Wind-up:** hand chambered high beside the ear, blade angled back, low crouch. **Strike:** a passing step forward; the arm drives down in a steep straight (`line`) path; the wrist snaps flat so the blade is level at mid-height, meeting the opponent's head or chest. Off hand rests near the chest, or checks back at the ribs on the strike. Hips square: lean forward into impact. The smear trail follows the downward path. |
+| **Axe / hammer, one-handed** (axe, hammer, rune_hammer) | **Wind-up:** square stance, no body twist, shoulders level (lean ≈ 0); arm cocked back beside the ear with the elbow at 90°. **Strike:** a vertical overhead chop (`arc`) coming down on the head or upper chest, edge leading. Off hand tucked against the chest. |
+| **Bow** (bow, starbow) | Body side-on. The lead (far) arm extends rigidly toward the target as a brace, shoulder pressed low, and the bow stays locked on target throughout. **Draw:** the drawing hand pulls with a high, level elbow and anchors at the jaw under the eye. **Release:** fingers open; the drawing hand snaps back along the neck in follow-through. The arrow flies level at head/chest height. |
+| **Javelin** (javelin, throwing_axe) | **Wind-up:** torso turned away, chest out; lead arm fully extended forward with fingers open; throwing arm straight back behind the shoulder, elbow high by the ear, spear raised; weight on the bent back leg (crouch, lunge back). **Release:** the arm whips forward at head height; weight moves to the front leg; the lead arm tucks. |
+| **Sling** | **Guard (aim):** two-handed: lead hand holds the pouch forward, dominant hand back by the ear. **Wind-up:** overhead circular whip (cords spinning above the head), lead arm pointing downrange. **Release:** the dominant arm snaps forward at peak height; the lead arm tucks hard to the ribs; weight shifts back → front. The smear shows the two cords. |
+| **Guns** (musket, rifle, arcane_rifle, rune_rifle, crossbow) | Aggressive forward lean, soft knees (crouch). Stock seated in the shoulder pocket, cheek on the comb, the barrel level at eye/head height. The support (far) hand cradles the fore-end with the elbow tucked beneath; the trigger hand sits at the grip. **Shot:** muzzle flash (existing FX), then a sharp straight rearward recoil through the shoulder (the gun and shoulder slide back and recover), with the head steady. |
+| **Mounted, sabre** (seated + blade family) | Half-seat: the rider rises (the hip lifts off the saddle) and leans forward; heels down. Off hand holds the reins low over the withers. **Wind-up:** blade high and back. **Strike:** arm extends down and forward along the flank, wrist locked, curved blade in a draw-cut at the opponent's head or chest. Motion smear; dust puffs kick up at the hooves during the strike. |
+| **Mounted, lance** (seated + thrust) | Half-seat and forward lean; the lance couched and levelled at the opponent's chest height on the strike. Reins in the off hand. |
+| **Polearm on foot** (spear, halberd, glaive) | Unchanged in character (upright at guard, levelled thrust), but the point meets the chest band; crouch plus the new shoulder drive. |
+| **Staff, crew** | Unchanged except for the new joints (shoulder, wrist, feet). |
+
+**Out of scope:**
+- Cloth simulation: the existing capes keep their flap.
+- Real motion blur: smear trails stand in for it.
+- The motion lives in the kit (`FkSkeleton` stances + `FkFigure`/`FkWeapons`/`FkMounts` drawing). The view change is only the aim height (§6.2). No sim or balance change.
+
+### 6.4 Verification
+
+- **Skeleton tests, per family:**
+  - the shoulder moves between keys;
+  - the elbow lies on each key's side;
+  - the wrist angle follows the keys;
+  - bow: the draw hand is at the jaw at full draw, and the lead arm is fully extended at every key;
+  - blade: the wind-up hand is above the shoulder and beside the head, and the strike tip is in the target band;
+  - axe: the elbow is ~90° at the wind-up;
+  - the heel lifts on toe-off and the toes lift on heel strike;
+  - no boot sole below the ground at any frame;
+  - bone lengths are fixed.
+- **Target band test:** for every melee family, the weapon's contact point at the strike key lies in the head-to-chest band of a same-size opponent standing at the view gap (§3).
+- **Review:** the animation review page is republished at the same URL, and the owner reviews every unit there.
