@@ -196,3 +196,8 @@ It needs a proper gait on it (four-beat walk now; trot/gallop for charges later)
 - The next session can reproduce, from it alone:
   - the test run (121 passing);
   - one animation page rebuild and republish to the same URL.
+
+## Done (humanoid)
+
+- The humanoid body rig is implemented on `art/readable-arms`. Spec: `docs/superpowers/specs/2026-09-27-humanoid-body-rig-design.md`. Plan: `docs/superpowers/plans/2026-09-27-humanoid-body-rig.md`. Final code commit: `5f451e9`. Tests: 137 passing. Animation page: version 13.
+- Next cycle: the mount rig (brief item 5). It can reuse `FkSkeleton.ik`/`reach` and the sorted-parts pattern in `FkFigure._parts` (a `[depth, rank, name, draw]` list, where ties keep the approved order).
