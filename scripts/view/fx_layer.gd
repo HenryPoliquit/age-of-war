@@ -339,7 +339,7 @@ func _draw_actor(a: Dictionary, t: float) -> void:
 		"beast":
 			var dir := signf(a.vx)
 			FkPaint.begin(self, Transform2D(0.0, Vector2(dir * 0.9, 0.9), 0.0, Vector2(a.x, a.y)))
-			UnitArt.quadruped(self, a.get("beast", "boar"), Color("5b4130"), {"moving": true, "walk": t * 26.0 + a.y, "t": t}, 0)
+			FkMounts.quadruped(self, a.get("beast", "boar"), Color("5b4130"), {"moving": true, "walk": t * 26.0 + a.y, "t": t}, 0)
 			draw_set_transform(Vector2.ZERO)
 		"beam":
 			pass

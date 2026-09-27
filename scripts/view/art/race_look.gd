@@ -80,7 +80,7 @@ const STYLES := {
 		&"gunpowder_ranged": {"rig": "humanoid", "helmet": "dwarf", "weapon": "musket", "pack": "backpack"},
 		&"gunpowder_heavy": {"rig": "mounted", "beast": "warram", "helmet": "horned", "weapon": "axe"},
 		&"gunpowder_siege": {"rig": "cannon", "variant": "flame", "crew": "dwarf", "shot": "orb"},
-		&"arcane_vanguard": {"rig": "humanoid", "helmet": "rune", "weapon": "rune_hammer", "shield": "dwarf"},
+		&"arcane_vanguard": {"rig": "humanoid", "helmet": "rune", "weapon": "rune_hammer", "shield": "dwarf", "runes": true},
 		&"arcane_ranged": {"rig": "humanoid", "helmet": "rune", "weapon": "rune_rifle", "pack": "cell"},
 		&"arcane_heavy": {"rig": "golem"},
 		&"arcane_siege": {"rig": "cannon", "variant": "rune", "crew": "rune", "shot": "bolt"},
