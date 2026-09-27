@@ -39,3 +39,4 @@ After adding a new `class_name` script, run `timeout 100 tools/godot --headless 
 - After any balance change (anything under `data/`, or AI/sim logic), run the harness and include `reports/sim_report.md` in the PR. Record the change and why in `docs/balance_log.md`.
 - `scripts/sim/` is the only place game rules live. The sim may emit presentation records (`sim.fx`, only when `record_fx` is on) but never reads them back. The view (`scripts/view/`) and AI (`scripts/ai/`) act only through `MatchSim` commands. Keep the sim deterministic: no `randf()`/`Time` in sim code; use `sim.rng` or a seeded RNG.
 - Visual and feel work can't be verified in the cloud. Tasks with visual output end with "owner reviews locally".
+- `addons/figure_kit/` is a reusable, game-agnostic unit renderer: it must never reference a game class (enforced by `tests/test_fk_boundary.gd`). Game-specific mapping lives in `scripts/view/art/unit_art.gd`.
