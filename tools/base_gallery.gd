@@ -7,9 +7,14 @@ var out := "reports/base_gallery.png"
 var night := 0.0
 ## --towers: close-up of every race × age turret tower instead of the bases.
 var towers := false
+var vp := SubViewport.new()
 
 
 func _initialize() -> void:
+	# Fixed-size offscreen canvas: the window gets clamped to smaller screens.
+	vp.size = Vector2i(1920, 1080)
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	root.add_child(vp)
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--out="):
 			out = a.get_slice("=", 1)
@@ -20,10 +25,10 @@ func _initialize() -> void:
 	var bg := ColorRect.new()
 	bg.color = Color("9aa4a8")
 	bg.size = Vector2(1920, 1080)
-	root.add_child(bg)
+	vp.add_child(bg)
 	var n := Node2D.new()
 	n.draw.connect(_draw.bind(n))
-	root.add_child(n)
+	vp.add_child(n)
 	_capture.call_deferred()
 
 
@@ -86,6 +91,6 @@ func _capture() -> void:
 	for i in 3:
 		await process_frame
 	await RenderingServer.frame_post_draw
-	root.get_texture().get_image().save_png(out)
+	vp.get_texture().get_image().save_png(out)
 	print("gallery saved: ", out)
 	quit()
