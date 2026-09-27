@@ -244,7 +244,7 @@ class MenuParade extends Node2D:
 			var x := seam_x - dir * (560.0 - lane)
 			var pos := Vector2(x, WorldLayer.GROUND_Y + (i % 3) * 5.0)
 			FkPaint.begin(self, Transform2D(0.0, Vector2(dir, 1) * 1.25, 0.0, pos))
-			UnitArt.draw_unit(self, def, MatchView.TEAM[side], {"walk": lane * 0.14, "moving": true, "atk": -1.0, "t": t + i, "flash": 0.0}, i, races[side])
+			UnitArt.draw_unit(self, def, MatchView.TEAM[side], {"walk": lane * 0.14, "moving": true, "atk": -1.0, "t": t + i, "flash": 0.0, "mirrored": side == 1}, i, races[side])
 			draw_set_transform(Vector2.ZERO)
 
 
