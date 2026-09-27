@@ -161,7 +161,9 @@ static func humanoid(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int
 		ci.draw_line(head + Vector2(-2.2, 1.0) * hb, head + Vector2(-6.8, -4.8) * hb, skin.darkened(0.25), 0.7)
 	# Shield (far arm) under the weapon arm, so the striking hand is always the top layer; then the
 	# near arm and the weapon in its hand.
-	FkArmour.shield(ci, st.get("shield", ""), sh, build, pal, tm, team, pose, t, lk, st.get("runes", false))
+	# The shield rides on the far hand: its drawing is laid out around sh with the grip at SHIELD_GRIP.
+	var shield_at: Vector2 = (jn.hand_f as Vector2) - FkSkeleton.SHIELD_GRIP * b
+	FkArmour.shield(ci, st.get("shield", ""), shield_at, build, pal, tm, team, pose, t, lk, st.get("runes", false))
 	var fam: String = FkSkeleton.FAMILY.get(weapon, "idle")
 	if fam in ["blade", "chop"]:
 		_smear(ci, st, pose, seed, build, weapon, pivot, body, not legs, metal)

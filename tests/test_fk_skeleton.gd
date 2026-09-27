@@ -163,3 +163,36 @@ func test_blade_arm_straight_at_the_hit() -> void:
 	check(wind.sh_n.distance_to(wind.hand_n) < arm * 0.8, "arm chambered (bent) at the wind-up")
 	# Full range: the hand travels from above the head down to shoulder height in front.
 	check(wind.hand_n.y < wind.sh.y - 8.0 and hit.hand_n.x > hit.sh.x + 18.0, "full sweep from ear to extended")
+
+
+# --- Sword / hand axe over a shield (owner brief 2) --------------------------------------------
+
+func test_shield_held_forward_on_the_centre_line() -> void:
+	for w in ["sword", "axe"]:
+		for atk in [-1.0, 0.34, 0.5]:
+			var j := FkSkeleton.solve(1.0, w, {"atk": atk}, true)
+			var tag := "%s %s" % [w, atk]
+			check(j.hand_f.x > j.sh.x + 6.0, tag + ": shield forward")
+			check(j.hand_f.y > j.sh.y - 4.0 and j.hand_f.y < j.sh.y + 8.0, tag + ": shield at chest-to-face height")
+
+
+func test_shield_strike_over_the_rim_into_the_band() -> void:
+	for w in ["sword", "axe"]:
+		var j := FkSkeleton.solve(1.0, w, {"atk": 0.5}, true)
+		# The shield's top rim is ~9 px above its grip; the weapon hand comes down just over it.
+		check(j.hand_n.y < j.hand_f.y - 4.0, "%s: hand over the rim" % w)
+		check(j.hand_n.x > j.hand_f.x, "%s: hand ahead of the shield" % w)
+		var tip := _tip(j, FkWeapons.weapon_length(w), 1.0)
+		check(tip.y > -60.0 and tip.y < -38.0, "%s: tip in the head-to-chest band (y = %.1f)" % [w, tip.y])
+		check(j.dir.y > 0.2, "%s: cleaving downward" % w)
+
+
+func test_shield_stance_is_compact() -> void:
+	for atk in [-1.0, 0.34, 0.5]:
+		var j := FkSkeleton.solve(1.0, "sword", {"atk": atk}, true)
+		if atk == 0.34:
+			# Hand chambered high: the elbow stays forward of the shoulder instead of flaring up and back.
+			check(j.elbow_n.x >= j.sh_n.x - 0.5, "elbow tucked forward at the wind-up")
+		else:
+			check(j.elbow_n.y > j.sh_n.y - 1.0, "elbow tucked, not flared, at %s" % atk)
+		check(j.crouch >= 2.0, "low stance at %s" % atk)

@@ -65,6 +65,15 @@ const STANCES := {
 			"crouch": 2.5, "lean": -0.05, "lunge": -1.0},
 		"hit": {"h": Vector2(22, 5), "a": 0.02, "f": Vector2(-1, 8), "s": Vector2(2, 1), "crouch": 3.0, "lean": 0.18,
 			"lunge": 7.0, "step": 1.0}},
+	# Sword or hand axe over a raised shield: low and compact, the shield forward on the centre line
+	# guarding chest and face (eyes over the rim), the weapon hand chambered high with the elbow tucked,
+	# then a tight steep arc straight over the rim, wrist locked, cleaving down at head/chest height.
+	"shield": {"path": "arc",
+		"guard": {"h": Vector2(10, -3), "a": -1.0, "f": Vector2(9, 3), "crouch": 2.5, "lean": 0.08},
+		"wind": {"h": Vector2(2, -12), "a": -2.2, "f": Vector2(9, 2), "s": Vector2(-0.5, -1.5), "e": Vector2(0.6, 1.0),
+			"crouch": 3.0, "lean": 0.02, "lunge": -1.0},
+		"hit": {"h": Vector2(16, -6), "a": 0.45, "f": Vector2(10, 4), "s": Vector2(2, 0), "crouch": 3.5, "lean": 0.18,
+			"lunge": 5.0}},
 	"chop": {"path": "arc",
 		"guard": {"h": Vector2(14, 5), "a": -0.33},
 		"wind": {"h": Vector2(3.6, -14.5), "a": -2.03, "lean": -0.08, "lunge": -1.5},
@@ -163,7 +172,10 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := false, s
 	var mv: float = pose.get("move", 1.0 if pose.get("moving", false) else 0.0)
 	var walk: float = pose.get("walk", 0.0)
 	var t: float = pose.get("t", 0.0)
-	var k := key(FAMILY.get(weapon, "idle"), pose.get("atk", -1.0))
+	var family: String = FAMILY.get(weapon, "idle")
+	if shield and family in ["blade", "chop"]:
+		family = "shield"
+	var k := key(family, pose.get("atk", -1.0))
 	var bob := lerpf(sin(t * 2.1) * 0.7, absf(sin(walk)) * 2.2, mv)
 	var lunge: float = k.lunge * b * (0.0 if seated else 1.0)
 	var crouch: float = k.crouch * b * (0.0 if seated else 1.0)
@@ -209,10 +221,10 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := false, s
 	j["hand_n"] = hand_n
 	j["elbow_n"] = ik(j.sh_n, hand_n, UPPER * b, FORE * b, k.e)
 	var ft: Vector2
-	if shield:
-		ft = sh + SHIELD_GRIP * b
-	elif k.has("f"):
+	if k.has("f"):
 		ft = sh + (k.f as Vector2) * b
+	elif shield:
+		ft = sh + SHIELD_GRIP * b
 	elif k.two:
 		ft = hand_n - (j.dir as Vector2) * 8.0 * b
 	else:
