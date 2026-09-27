@@ -17,5 +17,4 @@ damage = 21.4
 attack_interval = 1.0
 range = 30.0
 min_range = 0.0
-footprint = 10.0
 speed = 70.0
