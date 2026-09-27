@@ -466,21 +466,27 @@ func _on_turret_shot(f: Dictionary) -> void:
 		if tid >= 0:
 			flash_at[tid] = anim_time
 		if splash:
-			for v in sim.sides[enemy].units:
-				if absf(world.drawn_x(v.def, v.side, sim.to_world(v.side, v.progress)) - to.x) <= radius:
-					flash_at[v.id] = anim_time, splash)
+			_splash_flash(enemy, f.to_x, radius), splash)
 	if kind == "bolt":
 		fx.projectiles[-1]["col"] = col
 
 
+## Flashes the enemy units an artillery splash caught: the sim's victims, so compare sim x (world px).
+func _splash_flash(enemy: int, x: float, radius: float) -> void:
+	for v in sim.sides[enemy].units:
+		if absf(sim.to_world(v.side, v.progress) - x) <= radius:
+			flash_at[v.id] = anim_time
+
+
 func _on_death(f: Dictionary) -> void:
 	var def: UnitDef = f.def
-	world.add_corpse(def, world.drawn_x(def, f.side, f.x), f.side, f.unit_id)
-	audio.play("death", Vector2(f.x, GROUND_Y), -4.0)
+	var x := world.drawn_x(def, f.side, f.x)
+	world.add_corpse(def, x, f.side, f.unit_id)
+	audio.play("death", Vector2(x, GROUND_Y), -4.0)
 	match UnitArt.wreck_kind(UnitArt.style_for(def, race_of(f.side))):
 		"blast":
-			fx.impact("blast", Vector2(f.x, GROUND_Y - 24), true)
+			fx.impact("blast", Vector2(x, GROUND_Y - 24), true)
 		"siege":
-			fx.impact("siege", Vector2(f.x, GROUND_Y - 20))
+			fx.impact("siege", Vector2(x, GROUND_Y - 20))
 		_:
-			fx.burst("smoke", Vector2(f.x, GROUND_Y - 4), 4, Color(0.7, 0.62, 0.5, 0.5), Vector2(10, 40), Vector2(0.4, 0.8), Vector2(6, 12), -10.0)
+			fx.burst("smoke", Vector2(x, GROUND_Y - 4), 4, Color(0.7, 0.62, 0.5, 0.5), Vector2(10, 40), Vector2(0.4, 0.8), Vector2(6, 12), -10.0)

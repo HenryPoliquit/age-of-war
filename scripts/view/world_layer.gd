@@ -77,7 +77,12 @@ func unit_pos(u: SimUnit) -> Vector2:
 ## opposing bodies the sim keeps melee_contact apart (centre to centre) stand that far apart instead
 ## of overlapping. Presentation only — the sim never sees it.
 func drawn_x(def: UnitDef, side: int, sim_x: float) -> float:
-	return sim_x - (1.0 if side == 0 else -1.0) * UnitArt.depth_for(def, view.race_of(side)) * UNIT_SCALE
+	return sim_x - (1.0 if side == 0 else -1.0) * UnitArt.depth_for(def, view.race_of(side)) * draw_scale(def)
+
+
+## Scale a unit is drawn at: later ages are a little bigger.
+static func draw_scale(def: UnitDef) -> float:
+	return UNIT_SCALE * (1.0 + 0.03 * (def.age - 1))
 
 
 func _process(delta: float) -> void:
@@ -218,7 +223,7 @@ func _pose(u: SimUnit, rt: float, t: float) -> Dictionary:
 func _draw_unit(ci: CanvasItem, u: SimUnit, rt: float, t: float) -> void:
 	var pos := unit_pos(u)
 	var dir := 1.0 if u.side == 0 else -1.0
-	var sc := UNIT_SCALE * (1.0 + 0.03 * (u.age - 1))
+	var sc := draw_scale(u.def)
 	FkPaint.begin(ci, Transform2D(0.0, Vector2(dir * sc, sc), 0.0, pos))
 	UnitArt.draw_unit(ci, u.def, view.team_color(u.side), _pose(u, rt, t), u.id, view.race_of(u.side))
 	ci.draw_set_transform(Vector2.ZERO)
