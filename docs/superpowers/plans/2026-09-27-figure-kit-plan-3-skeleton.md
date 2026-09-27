@@ -178,7 +178,10 @@
   			# The knee lies forward (+x) of the hip→foot midpoint.
   			check(j.knee_n.x >= j.hip.lerp(j.foot_n, 0.5).x - 0.01, tag + " near knee forward")
   			check(j.knee_f.x >= j.hip.lerp(j.foot_f, 0.5).x - 0.01, tag + " far knee forward")
-  			check(j.elbow_n.y >= j.sh_n.lerp(j.hand_n, 0.5).y - 0.01, tag + " elbow below the shoulder-hand line")
+  			# The elbow lies on the down/back side of the shoulder→hand line (behind it when the arm is raised).
+  			var d: Vector2 = j.hand_n - j.sh_n
+  			var nrm := d.orthogonal() if d.orthogonal().dot(Vector2(-0.3, 1.0)) >= 0.0 else -d.orthogonal()
+  			check((j.elbow_n - j.sh_n.lerp(j.hand_n, 0.5)).dot(nrm) >= -0.01, tag + " elbow bends down/back")
   			check(j.foot_n.y <= 0.01 and j.foot_f.y <= 0.01, tag + " feet not below ground")
   			check(j.foot_n.y >= -7.0 and j.foot_f.y >= -7.0, tag + " feet lift at most 7 px"))
 
