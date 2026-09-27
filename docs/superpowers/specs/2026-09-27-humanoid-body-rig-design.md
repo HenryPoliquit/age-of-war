@@ -82,7 +82,7 @@ A pose-derived draw order fixes both, which is what this design adds.
 | 9 | shield | `sh_n.z` (in front of the chest and head: eyes over the rim; ties with the near arm, so it stays under it at any yaw) |
 | 10 | smear | `sh_n.z` |
 | 11 | near upper arm | mean(`sh_n`, `elbow_n`) |
-| 12 | near forearm + fist | mean(`elbow_n`, `hand_n`) |
+| 12 | near forearm + fist | max(mean(`elbow_n`, `hand_n`), the upper arm's z): the hand always reads over its own upper arm (owner bug, 2026-09-27: folded back along the neck on a bow release, it vanished under the sleeve) |
 | 13 | shoulder cap | `sh_n.z` |
 | 14 | other weapons | `grip_n.z + 0.01` |
 | 15–16 | impact accents, dust | 100, 101 |
@@ -91,7 +91,7 @@ While the near arm is planar (elbow and hand at the shoulder's depth), the upper
 
 Consequences:
 - **Unchanged at rest.** With yaw 0 and planar elbows the sorted order equals today's order.
-- **Bow fixed.** The bow sorts under the near arm and cap (the string no longer crosses the arm). Whenever the elbow is toward the viewer (mid-draw strongly, full draw slightly), the upper arm sorts over the shoulder cap, so the elbow stays visible. The forearm, running back toward the jaw at full draw, sorts under the cap, which matches its real depth.
+- **Bow fixed.** The bow sorts under the near arm and cap (the string no longer crosses the arm). Whenever the elbow is toward the viewer (mid-draw strongly, full draw slightly), the upper arm sorts over the shoulder cap, so the elbow stays visible. The forearm and fist always draw over their own upper arm, so the drawing hand stays visible through the anchor and the release.
 - **No flicker.** Every z is continuous in the pose. Parts swap only where depths genuinely cross.
 - **Same path everywhere.** Riders, crews and chariot drivers go through `humanoid()` and get the same layering.
 

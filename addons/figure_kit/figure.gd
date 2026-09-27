@@ -247,8 +247,11 @@ static func _parts(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, 
 	var draw_fore := func() -> void:
 		if not planar:
 			forearm(ci, j.elbow_n, j.hand_n, grip, b, skin, bracer, impact)
-	add.call("near upper arm", (z.sh_n + z.elbow_n) / 2.0, draw_upper)
-	add.call("near forearm", (z.elbow_n + z.hand_n) / 2.0, draw_fore)
+	var upper_z: float = (z.sh_n + z.elbow_n) / 2.0
+	add.call("near upper arm", upper_z, draw_upper)
+	# The hand always reads over its own upper arm (folded back along the neck on a bow release it would
+	# otherwise vanish under the sleeve); against every other part the forearm sorts by its own depth.
+	add.call("near forearm", maxf((z.elbow_n + z.hand_n) / 2.0, upper_z), draw_fore)
 	var draw_cap := func() -> void:
 		shoulder_cap(ci, j.sh_n, j.elbow_n, b, metal.lightened(0.05) if armoured else cloth.lightened(0.05))
 	add.call("shoulder cap", z.sh_n, draw_cap)

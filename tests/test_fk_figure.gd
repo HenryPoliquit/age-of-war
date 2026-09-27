@@ -2,9 +2,9 @@ extends TestCase
 ## FkFigure layering: parts drawn back to front by depth, in today's order wherever depths tie.
 
 
-func _spec(weapon: String, shield := "", race := &"human") -> Dictionary:
+func _spec(weapon: String, shield := "", race := &"human", build := 1.0) -> Dictionary:
 	return {"rig": "humanoid", "weapon": weapon, "shield": shield, "look": FkLooks.BODIES[race],
-		"palette": FkLooks.PALETTES[race][2], "team": Color.RED, "build": 1.0}
+		"palette": FkLooks.PALETTES[race][2], "team": Color.RED, "build": build}
 
 
 func test_standing_order_is_the_approved_order() -> void:
@@ -42,3 +42,18 @@ func test_bow_sits_under_the_drawing_arm_and_the_elbow_over_the_cap() -> void:
 			crossed = true
 			check(names.find("near upper arm") > names.find("shoulder cap"), "elbow toward the viewer: upper arm over the cap at atk %.2f" % (i / 100.0))
 	check(crossed, "the drawing elbow swings toward the viewer during the draw")
+
+
+func test_drawing_hand_never_hides_under_its_own_upper_arm() -> void:
+	# Owner: "the elbow and hand disappear when the hand releases the string" — folded back along the
+	# neck, the forearm and fist sat under the upper arm and vanished.
+	for race in [&"human", &"elf", &"dwarf"]:
+		for build in [0.94, 1.0]:
+			for i in 102:
+				var pose := {"atk": -1.0 if i == 101 else i / 100.0}
+				var names := FkFigure.layers(_spec("bow", "", race, build), pose)
+				check(names.find("near forearm") > names.find("near upper arm"), "%s %.2f: hand over its arm at atk %.2f" % [race, build, pose.atk])
+			for m in 10:
+				var walk := {"walk": 0.7, "move": m / 10.0, "atk": -1.0}
+				var names := FkFigure.layers(_spec("bow", "", race, build), walk)
+				check(names.find("near forearm") > names.find("near upper arm"), "%s %.2f: hand over its arm at move %.1f" % [race, build, m / 10.0])
