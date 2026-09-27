@@ -176,6 +176,14 @@ static func humanoid(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int
 	FkWeapons.weapon(ci, weapon, jn, build, FkUnits.swing(atk), atk, pal, tm, skin, pose, t, lk)
 	if fam in ["blade", "chop"] and legs:
 		_impact_accents(ci, jn, j, weapon, build, atk, pivot, body)
+	# Heavy stride: small dust puffs kicked up where a heel lands.
+	for tag in ["n", "f"]:
+		var d: float = j["dust_" + tag]
+		if d > 0.05:
+			var heel: Vector2 = pivot + ((j["foot_" + tag] as Vector2) - pivot) * body + Vector2(-2, 1) * b
+			for i in 3:
+				var r := (1.5 + i * 0.8 + (1.0 - d) * 2.5) * b
+				ci.draw_circle(heel + Vector2(-3.5 + i * 3.5, -r * 0.6), r, Color(0.72, 0.64, 0.5, 0.35 * d))
 
 
 ## Motion smear behind a cutting weapon: the tip's actual path over the last part of the strike,

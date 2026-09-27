@@ -110,16 +110,29 @@ static func weapon(ci: CanvasItem, kind: String, j: Dictionary, b: float, s: flo
 					FkPaint.poly(ci, [hand + Vector2(1, -10) * b, hand + Vector2(7, -13) * b, hand + Vector2(7, -5) * b, hand + Vector2(1, -7) * b], metal)
 				FkFigure.fist(ci, hand, dirv.angle(), b, skin, false)
 		"sling":
-			var spin := t * (22.0 if atk >= 0.0 and atk < 0.4 else 5.0)
-			var stone := hand + Vector2(cos(spin), sin(spin) * 0.5) * 10 * b
-			ci.draw_line(hand, stone, Color("c9b28a"), 1.2)
-			ci.draw_arc(hand, 10 * b, 0, TAU, 16, Color(0.8, 0.75, 0.6, 0.35), 1.5)
-			if atk < 0.4 or atk > 0.9:
-				ci.draw_circle(stone, 2.2 * b, Color("7b7466"))
+			if atk < 0.0:
+				# Carried: the braided cords drape between both hands at chest level, the pouch swinging
+				# with each bounce of the walk.
+				var other: Vector2 = j.hand_f
+				var sway := sin(pose.get("walk", 0.0) * 2.0 + t) * 2.0 * b
+				var pouch := hand.lerp(other, 0.5) + Vector2(sway, 6.0 * b)
+				var cord := Color("c9b28a")
+				ci.draw_polyline(PackedVector2Array([hand, hand.lerp(pouch, 0.5) + Vector2(0, 1.5 * b), pouch]), cord, 1.2)
+				ci.draw_polyline(PackedVector2Array([pouch, other.lerp(pouch, 0.5) + Vector2(0, 1.5 * b), other]), cord, 1.2)
+				FkPaint.ellipse(ci, pouch, Vector2(2.4, 1.8) * b, Color("8a6a45"))
+			else:
+				var spin := t * (22.0 if atk < 0.4 else 5.0)
+				var stone := hand + Vector2(cos(spin), sin(spin) * 0.5) * 10 * b
+				ci.draw_line(hand, stone, Color("c9b28a"), 1.2)
+				ci.draw_arc(hand, 10 * b, 0, TAU, 16, Color(0.8, 0.75, 0.6, 0.35), 1.5)
+				if atk < 0.4 or atk > 0.9:
+					ci.draw_circle(stone, 2.2 * b, Color("7b7466"))
 		"bow", "starbow":
 			# The far hand holds the bow out front; the near hand draws the string back.
 			var grip: Vector2 = j.hand_f
-			var nock := hand
+			# Drawing (attacking): the string comes back to the near hand. Otherwise it runs straight.
+			var drawing := atk >= 0.0
+			var nock := hand if drawing else grip + Vector2(-1.5, 0) * b
 			# Elves carry the tall recurved longbow.
 			var tall := 23.0 if lk.long_hair else 19.0
 			var top := grip + Vector2(-2, -tall) * b
@@ -132,7 +145,7 @@ static func weapon(ci: CanvasItem, kind: String, j: Dictionary, b: float, s: flo
 			var bow_col := wood if kind == "bow" else FkPaint.tint(Color("e8e4d4"), pose)
 			ci.draw_polyline(pts, bow_col, 2.6 * b)
 			ci.draw_polyline(PackedVector2Array([pts[0], nock, pts[pts.size() - 1]]), Color(0.9, 0.88, 0.8, 0.9), 1.0)
-			if atk < 0.35:
+			if drawing and atk < 0.35:
 				var head := Vector2(grip.x + 9 * b, nock.y)
 				if kind == "starbow":
 					ci.draw_line(nock, head, Color(g, 0.9), 2.0)

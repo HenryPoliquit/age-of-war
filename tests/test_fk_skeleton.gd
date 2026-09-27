@@ -6,15 +6,15 @@ func test_ik_keeps_bone_lengths() -> void:
 	var root := Vector2(0, -28)
 	for target in [Vector2(0, 0), Vector2(10, -2), Vector2(-12, 0), Vector2(3, -20), Vector2(40, 0)]:
 		var end := FkSkeleton.reach(root, target, 15.0, 14.0)
-		var j := FkSkeleton.ik(root, end, 15.0, 14.0, Vector2.RIGHT)
+		var j := FkSkeleton.ik(root, end, 15.0, 14.0, FkSkeleton.KNEE)
 		check_near(root.distance_to(j), 15.0, 0.02, "thigh for %s" % target)
 		check_near(j.distance_to(end), 14.0, 0.02, "shin for %s" % target)
 
 
 func test_ik_bend_sides() -> void:
-	var knee := FkSkeleton.ik(Vector2(0, -28), Vector2(0, 0), 15.0, 14.0, Vector2.RIGHT)
+	var knee := FkSkeleton.ik(Vector2(0, -28), Vector2(0, 0), 15.0, 14.0, FkSkeleton.KNEE)
 	check(knee.x > 0.0, "knee bends forward")
-	var elbow := FkSkeleton.ik(Vector2(0, 0), Vector2(14, 0), 9.0, 8.5, Vector2(-0.3, 1.0))
+	var elbow := FkSkeleton.ik(Vector2(0, 0), Vector2(14, 0), 9.0, 8.5, FkSkeleton.ELBOW)
 	check(elbow.y > 0.0, "elbow bends down")
 
 
@@ -54,10 +54,10 @@ func test_knees_forward_elbows_down_feet_grounded() -> void:
 			# The knee lies forward (+x) of the hip→foot midpoint.
 			check(j.knee_n.x >= j.hip.lerp(j.foot_n, 0.5).x - 0.01, tag + " near knee forward")
 			check(j.knee_f.x >= j.hip.lerp(j.foot_f, 0.5).x - 0.01, tag + " far knee forward")
-			# The elbow lies on the down/back side of the shoulder→hand line (behind it when the arm is raised).
+			# The elbow always folds to the same side of the shoulder→hand line: below a forward reach,
+			# in front of an overhead one, behind a hanging one.
 			var d: Vector2 = j.hand_n - j.sh_n
-			var nrm := d.orthogonal() if d.orthogonal().dot(j.e_n) >= 0.0 else -d.orthogonal()
-			check((j.elbow_n - j.sh_n.lerp(j.hand_n, 0.5)).dot(nrm) >= -0.01, tag + " elbow bends to the pose's side")
+			check((j.elbow_n - j.sh_n.lerp(j.hand_n, 0.5)).dot(Vector2(-d.y, d.x)) >= -0.01, tag + " elbow folds the anatomical way")
 			check(j.foot_n.y <= 0.01 and j.foot_f.y <= 0.01, tag + " feet not below ground")
 			check(j.foot_n.y >= -7.0 and j.foot_f.y >= -7.0, tag + " feet lift at most 7 px"))
 
@@ -211,3 +211,79 @@ func test_lockout_arm_straight_wrist_flat_chest_to_waist() -> void:
 		check(j.hand_n.y > j.sh.y + 2.0 and j.hand_n.y < j.sh.y + 16.0, "%s: locks at chest-to-waist height" % w)
 		check(j.lean >= 0.3, "%s: strong diagonal line of action" % w)
 		check(j.zoom > 1.05, "%s: weapon foreshortened larger at the bottom of the cut" % w)
+
+
+# --- Elbow continuity and gaits (owner: "it suddenly broke the elbow"; walk-cycle briefs) -----
+
+func test_elbows_never_snap() -> void:
+	# Between frames 1% of an attack apart, an elbow moves no further than its hand and shoulder do.
+	var weapons := ["sword", "axe", "spear", "halberd", "musket", "bow", "javelin", "sling", "staff", "crew", "none"]
+	for w in weapons:
+		for shield in ["", "round"]:
+			var prev := {}
+			for i in 101:
+				var j := FkSkeleton.solve(1.0, w, {"atk": i / 100.0}, shield)
+				if not prev.is_empty():
+					for tag in ["n", "f"]:
+						var jump: float = (j["elbow_" + tag] - prev["elbow_" + tag]).length() \
+							- (j["hand_" + tag] - prev["hand_" + tag]).length() - (j["sh_" + tag] - prev["sh_" + tag]).length()
+						check(jump < 2.0, "%s %s: %s elbow snaps at atk %.2f (%.1f px)" % [w, shield, tag, i / 100.0, jump])
+				prev = j
+
+
+func _walk(w: String, shield := "", n := 16) -> Array:
+	var out := []
+	for i in n:
+		out.append(FkSkeleton.solve(1.0, w, {"walk": TAU * i / n, "move": 1.0, "t": 0.0}, shield))
+	return out
+
+
+func _spread(frames: Array, f: Callable) -> float:
+	var vals: Array = frames.map(f)
+	return vals.max() - vals.min()
+
+
+func test_archer_head_stays_level() -> void:
+	var fr := _walk("bow")
+	check(_spread(fr, func(j): return j.sh.y) <= 0.6, "no vertical head bob")
+	check(fr[0].crouch >= 3.0, "bent knees, low centre")
+	check(fr[0].hand_f.y > fr[0].sh.y + 10.0, "bow held low at the side")
+
+
+func test_slinger_bounces_on_the_balls_of_the_feet() -> void:
+	var fr := _walk("sling")
+	check(fr[4].rot_n > 0.1, "lands toe-first")
+	check(_spread(fr, func(j): return -j.foot_n.y) >= 6.0, "high knee lift")
+	check(fr[0].hand_n.y < fr[0].sh.y + 10.0 and fr[0].hand_f.y < fr[0].sh.y + 10.0, "sling draped between both hands at chest level")
+
+
+func test_axe_thrower_heavy_stride() -> void:
+	var fr := _walk("throwing_axe")
+	check(_spread(fr, func(j): return j.sh.y) >= 1.2, "distinct vertical bob")
+	check(absf(fr[0].hand_n.y - fr[0].hip.y) < 4.0, "axe carried low at the hip")
+	check(fr.any(func(j): return j.dust_n > 0.5), "dust at heel contact")
+	check(absf(fr[0].lean) < 0.03, "spine upright")
+
+
+func test_spear_skirmisher_glide() -> void:
+	var fr := _walk("spear")
+	check(absf(fr[0].lean - 0.26) < 0.02, "torso canted forward 15 degrees")
+	check(absf(fr[0].dir.angle() + 0.52) < 0.05, "spear angled up and forward 30 degrees")
+	check(absf(fr[0].hand_n.y - fr[0].hip.y) < 4.0, "gripped at hip level")
+	check(_spread(fr, func(j): return j.hand_f.x) >= 3.0, "off hand swings for counterbalance")
+
+
+func test_rifle_patrol_low_ready() -> void:
+	var fr := _walk("musket")
+	check(absf(fr[0].dir.angle() - 0.785) < 0.05, "barrel 45 degrees down")
+	check(_spread(fr, func(j): return (j.hand_n - j.sh).length()) <= 0.3, "rifle locked steady while the legs step")
+	for j in fr:
+		check((j.hand_n + j.dir * 21.0).x > j.knee_n.x, "muzzle ahead of the lead knee")
+
+
+func test_shield_wall_advance() -> void:
+	var fr := _walk("sword", "round")
+	check(fr[0].crouch >= 3.5, "low guarded stance")
+	check(_spread(fr, func(j): return j.sh.y) <= 0.5, "minimal bob")
+	check(_spread(fr, func(j): return (j.hand_f - j.sh).y) <= 0.3, "shield fixed across the chest")
+	check(fr[0].dir.y < -0.8, "weapon resting tip-up by the shoulder")
