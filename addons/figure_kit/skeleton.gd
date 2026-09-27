@@ -11,6 +11,8 @@ const FORE := 8.5
 const SPINE := 20.0
 ## Standing hip height: a little under THIGH + SHIN so knees are soft.
 const HIP_Y := 28.0
+## Ankle height above the ground line (the boot's sole is below it).
+const ANKLE := 1.2
 
 
 ## Middle joint (knee, elbow) of a two-bone limb from `root` to `target`. Of the two solutions it
@@ -85,13 +87,23 @@ const STANCES := {
 const SHIELD_GRIP := Vector2(6, 11)
 
 
-## One frame's keyframe values: guard blended toward wind (s < 0) or hit (s > 0).
+## One frame's keyframe values, on FkUnits.swing's beats: guard → wind (anticipation, 0–0.35),
+## wind → hit (strike, 0.35–0.55; contact), hit → guard (recovery). Idle (atk < 0) is the guard.
 static func key(family: String, atk: float) -> Dictionary:
 	var st: Dictionary = STANCES.get(family, STANCES.idle)
-	var s := FkUnits.swing(atk)
 	var a: Dictionary = st.guard
-	var z: Dictionary = st.wind if s < 0.0 else st.hit
-	var k := absf(s)
+	var z: Dictionary = st.guard
+	var k := 0.0
+	if atk >= 0.0 and atk < 0.35:
+		z = st.wind
+		k = ease(atk / 0.35, 0.6)
+	elif atk >= 0.35 and atk < 0.55:
+		a = st.wind
+		z = st.hit
+		k = ease((atk - 0.35) / 0.2, 0.4)
+	elif atk >= 0.55:
+		a = st.hit
+		k = ease((atk - 0.55) / 0.45, 1.6)
 	var out := {"lean": lerpf(a.get("lean", 0.0), z.get("lean", 0.0), k),
 		"lunge": lerpf(a.get("lunge", 0.0), z.get("lunge", 0.0), k),
 		"a": lerpf(a.get("a", 0.0), z.get("a", 0.0), k), "two": st.get("two", false)}
@@ -126,8 +138,9 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := false, s
 		else:
 			var ph := walk + PI * i
 			var fx := lerpf(2.8 if i == 0 else -3.6, 13.0 * sin(ph), mv) + (lunge * 1.6 / b if i == 0 else 0.0)
-			var lift := 5.0 * maxf(0.0, cos(ph)) * mv
-			foot = Vector2(fx * b, -lift * b)
+			var lift := 4.5 * maxf(0.0, cos(ph)) * mv
+			# The ankle sits ANKLE above the ground so the boot's sole is on it.
+			foot = Vector2(fx * b, -(ANKLE + lift) * b)
 		foot = reach(hip, foot, THIGH * b, SHIN * b)
 		var tag := "n" if i == 0 else "f"
 		j["foot_" + tag] = foot

@@ -219,11 +219,7 @@ static func mounted(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int)
 
 
 static func _rider(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, at: Vector2) -> void:
-	var pal: Array = st.palette
-	var team: Color = st.team
-	# Upper body only, offset to the saddle; legs drawn as a straddling thigh.
-	var cloth: Color = FkPaint.tint(pal[1], pose)
-	ci.draw_line(at + Vector2(0, -2), at + Vector2(8, 10), cloth, 6.0)
+	# Seated on the saddle: the figure draws its near leg with the foot in the stirrup.
 	FkFigure.offset_humanoid(ci, st, pose, seed, at + Vector2(0, 27))
 
 

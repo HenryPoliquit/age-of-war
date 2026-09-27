@@ -4,17 +4,14 @@ extends RefCounted
 ## variants used by riders and machine crews. Local space: feet at y = 0, facing +x, up is −y.
 
 
-## Weapon arm: inked upper arm and bracered forearm, elbow bent down/back, hand — so it reads over the body.
-static func arm(ci: CanvasItem, from: Vector2, hand: Vector2, b: float, sleeve: Color, skin: Color, bracer: Color) -> void:
-	var n := (hand - from).orthogonal().normalized()
-	if n.y < 0.0:
-		n = -n
-	var elbow := (from + hand) * 0.5 + n * 2.5 * b
+## Near (weapon) arm from solved joints: inked upper arm and bracered forearm, then the hand, so it
+## reads over the body.
+static func arm(ci: CanvasItem, shoulder: Vector2, elbow: Vector2, hand: Vector2, b: float, sleeve: Color, skin: Color, bracer: Color) -> void:
 	var ink := Color(0.08, 0.06, 0.05)
-	FkPaint.seg(ci, from, elbow, 7.8 * b, 7.0 * b, ink)
+	FkPaint.seg(ci, shoulder, elbow, 7.8 * b, 7.0 * b, ink)
 	FkPaint.seg(ci, elbow, hand, 7.0 * b, 6.0 * b, ink)
 	ci.draw_circle(hand, 4.4 * b, ink)
-	FkPaint.seg(ci, from, elbow, 5.4 * b, 4.6 * b, sleeve)
+	FkPaint.seg(ci, shoulder, elbow, 5.4 * b, 4.6 * b, sleeve)
 	FkPaint.seg(ci, elbow, hand, 4.6 * b, 3.8 * b, bracer)
 	ci.draw_circle(hand, 3.2 * b, skin)
 
@@ -26,7 +23,6 @@ static func humanoid(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int
 	var body: Vector2 = lk.body
 	var build: float = st.get("build", 1.0) * scale
 	var mv := FkPaint.move_amount(pose)
-	var walk: float = pose.get("walk", 0.0)
 	var t: float = pose.get("t", 0.0)
 	var atk: float = pose.get("atk", -1.0)
 	var skins: Array = lk.skin
@@ -40,49 +36,53 @@ static func humanoid(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int
 	var helmet: String = st.get("helmet", "")
 	var armoured: bool = helmet in ["crest", "kettle", "greathelm", "morion", "visor", "galea", "conical", "leaf", "dwarf", "horned", "rune"]
 	var leather := FkPaint.tint(Color("4a3322"), pose)
-	var bob := lerpf(sin(t * 2.1 + seed) * 0.7, absf(sin(walk)) * 2.2, mv)
-	var hip := Vector2(0, -30 * build + bob * 0.5)
-	var sh := Vector2(1.5, -50 * build + bob)
+	var weapon: String = st.get("weapon", "none")
+	# One skeleton per frame; the idle-breath phase is offset per individual (as the old bob was).
+	var j := FkSkeleton.solve(build, weapon, pose.merged({"t": t + seed / 2.1}, true), st.get("shield", "") != "", not legs)
+	var hip: Vector2 = j.hip
+	var sh: Vector2 = j.sh
 	var b := build
 	# Race proportions scale legs and torso about the feet (or the hip for riders); head and arms
-	# keep their own proportions so a dwarf reads broad, not squashed.
+	# keep their own proportions so a dwarf reads broad, not squashed. Arm joints follow the scaled
+	# shoulder by a plain offset; `unmap` takes them back into the scaled space for the far arm.
 	var pivot := Vector2.ZERO if legs else hip
+	var off: Vector2 = (pivot + (j.sh_n - pivot) * body) - (j.sh_n as Vector2)
+	var jn := j.duplicate()
+	for key in ["sh_n", "sh_f", "elbow_n", "hand_n", "elbow_f", "hand_f"]:
+		jn[key] = (j[key] as Vector2) + off
+	jn["sh"] = pivot + (sh - pivot) * body
+	var unmap := func(p: Vector2) -> Vector2: return pivot + (p - pivot) / body
 	FkPaint.push(ci, Transform2D(0.0, pivot) * Transform2D(0.0, body, 0.0, Vector2.ZERO) * Transform2D(0.0, -pivot))
 	if legs:
 		FkPaint.shadow(ci, 12 * b)
-		for i in [1, 0]:
-			var ph: float = walk + PI * i
-			var thigh := lerpf(0.12 if i == 0 else -0.1, sin(ph) * 0.6, mv)
-			var knee := hip + Vector2(0, 15 * b).rotated(-thigh)
-			var bend := lerpf(0.05, maxf(0.0, cos(ph)) * 0.9, mv)
-			var foot := knee + Vector2(0, 14 * b).rotated(-thigh + bend)
-			var back := 0.22 if i == 1 else 0.0
-			FkPaint.seg(ci, hip, knee, 7.2 * b, 5.4 * b, trim.darkened(back))
-			FkPaint.seg(ci, knee, foot, 5.4 * b, 4.2 * b, trim.darkened(back + 0.08))
-			if armoured:
-				FkPaint.seg(ci, knee.lerp(foot, 0.1), foot + Vector2(0, -2 * b), 5.8 * b, 4.8 * b, metal.darkened(back))
-				ci.draw_circle(knee, 3.2 * b, metal.darkened(back - 0.1))
-			# Boot: heel, sole and toe.
-			FkPaint.shade_poly(ci, [foot + Vector2(-3.2, -6) * b, foot + Vector2(3, -6) * b, foot + Vector2(4.5, -2) * b,
-				foot + Vector2(8.5, -0.5) * b, foot + Vector2(8.5, 1.5) * b, foot + Vector2(-3.5, 1.5) * b], leather.darkened(back))
-			ci.draw_line(foot + Vector2(-3.5, 1.5) * b, foot + Vector2(8.5, 1.5) * b, Color(0.08, 0.06, 0.05), 1.2 * b)
+	# Far leg (darker), then the near one; a rider shows only the near leg, its foot in the stirrup.
+	for i in ([1, 0] if legs else [0]):
+		var tag := "n" if i == 0 else "f"
+		var knee: Vector2 = j["knee_" + tag]
+		var foot: Vector2 = j["foot_" + tag]
+		var back := 0.22 if i == 1 else 0.0
+		FkPaint.seg(ci, hip, knee, 7.2 * b, 5.4 * b, trim.darkened(back))
+		FkPaint.seg(ci, knee, foot, 5.4 * b, 4.2 * b, trim.darkened(back + 0.08))
+		if armoured:
+			FkPaint.seg(ci, knee.lerp(foot, 0.1), foot + Vector2(0, -2 * b), 5.8 * b, 4.8 * b, metal.darkened(back))
+			ci.draw_circle(knee, 3.2 * b, metal.darkened(back - 0.1))
+		# Boot: heel, sole and toe — always pointing forward.
+		FkPaint.shade_poly(ci, [foot + Vector2(-3.2, -6) * b, foot + Vector2(3, -6) * b, foot + Vector2(4.5, -2) * b,
+			foot + Vector2(8.5, -0.5) * b, foot + Vector2(8.5, 1.5) * b, foot + Vector2(-3.5, 1.5) * b], leather.darkened(back))
+		ci.draw_line(foot + Vector2(-3.5, 1.5) * b, foot + Vector2(8.5, 1.5) * b, Color(0.08, 0.06, 0.05), 1.2 * b)
 	# Cape trails behind and lags the body (secondary motion).
 	if st.get("cape", false) or helmet == "greathelm":
 		var flap := sin(t * 3.0 + seed) * 2.0 + mv * 3.0
 		FkPaint.shade_poly(ci, [sh + Vector2(-6, 0) * b, sh + Vector2(2, 1) * b, hip + Vector2(-2, 8) * b,
 			hip + Vector2(-12 - flap, 10) * b, hip + Vector2(-9 - flap * 0.5, -2) * b], tm.darkened(0.35))
 	FkArmour.pack(ci, st.get("pack", ""), sh, hip, build, pal, tm, pose, t, lk)
-	# Back arm swings opposite the front leg: upper arm, forearm, hand.
-	var arm_sw := sin(walk) * 0.5 * mv
-	var elbow := sh + Vector2(-3, 1) * b + Vector2(0, 10 * b).rotated(arm_sw)
-	var back_hand := elbow + Vector2(0, 9 * b).rotated(arm_sw * 0.6 - 0.25)
-	if st.get("shield", "") != "":
-		# The far arm carries the shield forward, leaving the near arm free to strike over it.
-		elbow = sh + Vector2(0, 9) * b
-		back_hand = sh + Vector2(6, 11) * b
-	FkPaint.seg(ci, sh + Vector2(-3, 1) * b, elbow, 5.0 * b, 4.2 * b, cloth.darkened(0.3))
-	FkPaint.seg(ci, elbow, back_hand, 4.2 * b, 3.4 * b, cloth.darkened(0.34))
-	ci.draw_circle(back_hand, 2.1 * b, skin.darkened(0.25))
+	# Far arm, behind the body: counter-swings, carries the shield, or holds the bow / the weapon's haft.
+	var fs: Vector2 = unmap.call(jn.sh_f)
+	var fe: Vector2 = unmap.call(jn.elbow_f)
+	var fh: Vector2 = unmap.call(jn.hand_f)
+	FkPaint.seg(ci, fs, fe, 5.0 * b, 4.2 * b, cloth.darkened(0.3))
+	FkPaint.seg(ci, fe, fh, 4.2 * b, 3.4 * b, cloth.darkened(0.34))
+	ci.draw_circle(fh, 2.1 * b, skin.darkened(0.25))
 	# Torso: hips, waist, chest, shoulders.
 	var torso := [hip + Vector2(-6.5, 3) * b, hip + Vector2(7, 3) * b, hip + Vector2(6, -8) * b, sh + Vector2(8.5, 5) * b,
 		sh + Vector2(7.5, -1.5) * b, sh + Vector2(-7.5, -1.5) * b, sh + Vector2(-8, 5) * b, hip + Vector2(-5.5, -8) * b]
@@ -111,7 +111,7 @@ static func humanoid(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int
 		# Pauldron.
 		FkPaint.shade_poly(ci, FkPaint.ellipse_pts(sh + Vector2(1, 1.5) * b, Vector2(6, 4.2) * b, -0.2), metal.lightened(0.05))
 	FkPaint.pop(ci)
-	sh = pivot + (sh - pivot) * body
+	sh = jn.sh
 	var hb: float = b * lk.head
 	var head := sh + Vector2(1.8, -9.5) * hb
 	# Long hair falls behind the neck (elves), under any open helmet.
@@ -142,10 +142,11 @@ static func humanoid(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int
 	if lk.ears == "pointed" and open_face:
 		FkPaint.poly(ci, [head + Vector2(-0.6, 2.2) * hb, head + Vector2(-2.4, -0.6) * hb, head + Vector2(-8.5, -6.5) * hb, head + Vector2(-2.6, 2.8) * hb], skin.darkened(0.08))
 		ci.draw_line(head + Vector2(-2.2, 1.0) * hb, head + Vector2(-6.8, -4.8) * hb, skin.darkened(0.25), 0.7)
-	# Front arm + weapon.
-	# Shield (far arm) under the weapon arm, so the striking hand is always the top layer.
+	# Shield (far arm) under the weapon arm, so the striking hand is always the top layer; then the
+	# near arm and the weapon in its hand.
 	FkArmour.shield(ci, st.get("shield", ""), sh, build, pal, tm, team, pose, t, lk, st.get("runes", false))
-	FkWeapons.weapon(ci, st.get("weapon", "sword"), sh, build, FkUnits.swing(atk), atk, pal, tm, skin, pose, t, lk, armoured)
+	arm(ci, jn.sh_n, jn.elbow_n, jn.hand_n, b, cloth.lightened(0.12), skin, metal if armoured else leather)
+	FkWeapons.weapon(ci, weapon, jn, build, FkUnits.swing(atk), atk, pal, tm, skin, pose, t, lk)
 
 
 static func _dwarf_beard(ci: CanvasItem, head: Vector2, b: float, hair: Color, t: float, seed: int) -> void:

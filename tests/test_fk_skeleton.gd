@@ -84,3 +84,12 @@ func test_seated_foot_hangs_forward_below_hip() -> void:
 func test_unknown_weapon_idles() -> void:
 	var j := FkSkeleton.solve(1.0, "no_such_weapon", {"atk": 0.45})
 	check_eq(j.lean, 0.0, "no stance, no lean")
+
+
+func test_axe_edge_leads_the_swing() -> void:
+	# The blade's edge faces where the head is travelling at contact (the owner: "pointed end on the correct direction").
+	var before := FkSkeleton.solve(1.0, "axe", {"atk": 0.40})
+	var hit := FkSkeleton.solve(1.0, "axe", {"atk": 0.47})
+	var tip0: Vector2 = before.hand_n + (before.dir as Vector2) * 20.0
+	var tip1: Vector2 = hit.hand_n + (hit.dir as Vector2) * 20.0
+	check(FkWeapons.edge_normal(hit.dir).dot(tip1 - tip0) > 0.0, "edge faces the direction of travel")
