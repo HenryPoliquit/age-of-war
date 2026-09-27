@@ -16,3 +16,9 @@ func test_kit_names_no_game_class() -> void:
 		var src := FileAccess.get_file_as_string(KIT + f)
 		for name in game:
 			check(RegEx.create_from_string("\b%s\b" % name).search(src) == null, "%s names game class %s" % [f, name])
+
+
+func test_race_look_reads_kit_presets() -> void:
+	for race in RaceLook.IDS:
+		check(RaceLook.look(race) == FkLooks.BODIES[race], "%s body from the kit" % race)
+		check(RaceLook.palette(race, 3) == FkLooks.PALETTES[race][2], "%s palette from the kit" % race)

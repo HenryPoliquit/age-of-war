@@ -8,7 +8,7 @@ extends RefCounted
 ##         t: float (seconds, for idle motion), flash: float (0..1 hit flash)}
 
 ## Human palettes, kept for callers that dress non-unit props (base defenders).
-const AGE_CLOTH: Array = RaceLook.CLOTH[&"human"]
+const AGE_CLOTH: Array = FkLooks.PALETTES[&"human"]
 
 ## Per-rig facts the view needs: visual height, projectile, muzzle (local, pre-scale), whether a
 ## death leaves a wreck (no topple) and what it looks like.
@@ -48,7 +48,7 @@ const ENCLOSED := ["greathelm", "visor", "hood", "rune"]
 
 static var _style_cache := {}
 ## Race being drawn (set by draw_unit; rigs that add crew read it).
-static var _look: Dictionary = RaceLook.BODY[&"human"]
+static var _look: Dictionary = FkLooks.BODIES[&"human"]
 
 
 static func style_for(def: UnitDef, race: StringName = &"human") -> Dictionary:
@@ -132,7 +132,7 @@ static func draw_unit(ci: CanvasItem, def: UnitDef, team: Color, pose: Dictionar
 			skycannon(ci, pal, team, pose)
 		"obelisk":
 			obelisk(ci, st, pal, team, pose, seed)
-	_look = RaceLook.BODY[&"human"]
+	_look = FkLooks.BODIES[&"human"]
 
 
 # ---------------------------------------------------------------------------
