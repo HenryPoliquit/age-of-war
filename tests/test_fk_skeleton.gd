@@ -630,11 +630,11 @@ func test_bow_full_draw_has_range() -> void:
 	check(wind.hand_f.x - wind.hand_n.x >= 16.0, "draw length %.1f px" % (wind.hand_f.x - wind.hand_n.x))
 
 
-func test_staff_raised_one_handed_straight_at_45_degrees() -> void:
+func test_staff_raised_one_handed_straight_at_30_degrees() -> void:
 	var hit := FkSkeleton.solve(1.0, "staff", {"atk": 0.55})
 	var arm: Vector2 = hit.hand_n - hit.sh_n
 	check(arm.length() > (FkSkeleton.UPPER + FkSkeleton.FORE) * 0.97, "arm, elbow and hand in one straight line")
-	check(absf(rad_to_deg(arm.angle()) + 45.0) < 8.0, "raised about 45 degrees (got %.0f)" % rad_to_deg(-arm.angle()))
+	check(absf(rad_to_deg(arm.angle()) + 30.0) < 8.0, "raised about 30 degrees (got %.0f)" % rad_to_deg(-arm.angle()))
 	# The staff runs from 22 px behind the hand to its head (FkWeapons "staff").
 	var butt: Vector2 = hit.hand_n - hit.dir * 22.0
 	var near := Geometry2D.get_closest_point_to_segment(hit.hand_f, butt, hit.hand_n)

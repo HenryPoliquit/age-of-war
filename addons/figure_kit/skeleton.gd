@@ -144,12 +144,12 @@ const STANCES := {
 		"wind": {"h": Vector2(2, -16), "f": Vector2(16, -1), "lunge": -2.0},
 		"hit": {"h": Vector2(15, -12), "f": Vector2(-1, 8), "lean": 0.15, "lunge": 6.0}},
 	# Staff (owner brief): held in both hands at guard; the strike raises it confidently in one hand, the
-	# arm straight from shoulder to hand at about 45 degrees up and forward, the staff upright; the other
+	# arm straight from shoulder to hand at about 30 degrees up and forward, the staff upright; the other
 	# hand lets go and settles by the hip.
 	"staff": {
 		"guard": {"h": Vector2(10, 6), "f": Vector2(9, 13), "a": -1.456},
 		"wind": {"h": Vector2(8, 6), "f": Vector2(7, 13), "a": -1.5},
-		"hit": {"h": Vector2(16, -13), "f": Vector2(2, 17), "a": -1.25, "lean": 0.12, "lunge": 3.0}},
+		"hit": {"h": Vector2(19, -9), "f": Vector2(2, 17), "a": -1.25, "lean": 0.12, "lunge": 3.0}},
 	"crew": {"guard": {"h": Vector2(14, 8), "f": Vector2(12, 9)}, "wind": {"h": Vector2(14, 8), "f": Vector2(12, 9)},
 		"hit": {"h": Vector2(15, 8), "f": Vector2(13, 9), "lean": 0.1}},
 	# Mounted sabre: seated deep, reins low over the withers in the off hand, the hilt resting at the

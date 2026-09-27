@@ -88,3 +88,15 @@ func test_mirrored_archer_holds_the_bow_in_front_and_draws_behind_the_head() -> 
 func test_mirrored_rider_shows_its_left_leg() -> void:
 	var names := FkFigure.layers(_spec("saber"), {"atk": -1.0, "mirrored": true}, 0, 1.0, false)
 	check(_before(names, "near upper arm", "torso"), "sabre arm on the far side of the rider")
+
+
+func test_marching_archer_carries_the_bow_on_the_far_side() -> void:
+	# Owner: the bow is in the other (far) hand, so on the march it is behind the body.
+	for i in 8:
+		var walk := {"walk": TAU * i / 8.0, "move": 1.0, "atk": -1.0}
+		var names := FkFigure.layers(_spec("bow"), walk)
+		check(_before(names, "bow", "torso"), "bow behind the body, walk phase %d" % i)
+		names = FkFigure.layers(_spec("bow"), walk.merged({"mirrored": true}))
+		check(_before(names, "torso", "bow"), "turned around, the bow hand is the near one, walk phase %d" % i)
+	for atk in [-1.0, 0.34]:
+		check(_before(FkFigure.layers(_spec("bow"), {"atk": atk}), "head", "bow"), "standing to shoot, the bow is in front (atk %s)" % atk)
