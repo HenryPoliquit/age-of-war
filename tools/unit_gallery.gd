@@ -4,12 +4,14 @@ extends SceneTree
 ## Needs a display (use Xvfb in the cloud):
 ##   xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolution 1920x1080 -s tools/unit_gallery.gd -- --out=reports/unit_gallery.png
 ## `--race=elf` draws that race; `--race=all` draws the three races side by side in colour instead.
+## `--atk=0.45` freezes every unit at that point of its attack (default −1 = idle).
 
 const MODE_SHADER := preload("res://shaders/gallery_mode.gdshader")
 const ROLES := ["vanguard", "ranged", "heavy", "siege"]
 
 var out := "reports/unit_gallery.png"
 var race: StringName = &"human"
+var atk := -1.0
 
 
 func _initialize() -> void:
@@ -18,6 +20,8 @@ func _initialize() -> void:
 			out = a.get_slice("=", 1)
 		elif a.begins_with("--race="):
 			race = StringName(a.get_slice("=", 1))
+		elif a.begins_with("--atk="):
+			atk = a.get_slice("=", 1).to_float()
 	var bg := ColorRect.new()
 	bg.color = Color("c9c3b4")
 	bg.size = Vector2(1920, 1080)
@@ -50,7 +54,7 @@ func _draw_panel(n: Node2D, mode: int) -> void:
 				continue
 			var base := Vector2(94 + c * 152, 56 + age * 160)
 			UnitArt.begin(n, Transform2D(0.0, Vector2(1.15, 1.15), 0.0, base))
-			UnitArt.draw_unit(n, def, MatchView.TEAM[0], {"walk": 0.6, "move": 0.0, "atk": -1.0, "t": 0.3, "flash": 0.0}, age * 4 + c, r)
+			UnitArt.draw_unit(n, def, MatchView.TEAM[0], {"walk": 0.6, "move": 0.0, "atk": atk, "t": 0.3, "flash": 0.0}, age * 4 + c, r)
 			n.draw_set_transform(Vector2.ZERO)
 			if mode == 0 or race == &"all":
 				n.draw_string(f, base + Vector2(-70, 20), rd.unit_name(def), HORIZONTAL_ALIGNMENT_CENTER, 140, 13, Color(0.15, 0.15, 0.15))

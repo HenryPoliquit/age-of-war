@@ -154,6 +154,21 @@ static func _limb(ci: CanvasItem, a: Vector2, b: Vector2, w: float, col: Color) 
 	ci.draw_circle(b, w * 0.5, col)
 
 
+## Weapon arm: inked upper arm and bracered forearm, elbow bent down/back, hand — so it reads over the body.
+static func _arm(ci: CanvasItem, from: Vector2, hand: Vector2, b: float, sleeve: Color, skin: Color, bracer: Color) -> void:
+	var n := (hand - from).orthogonal().normalized()
+	if n.y < 0.0:
+		n = -n
+	var elbow := (from + hand) * 0.5 + n * 2.5 * b
+	var ink := Color(0.08, 0.06, 0.05)
+	_seg(ci, from, elbow, 7.8 * b, 7.0 * b, ink)
+	_seg(ci, elbow, hand, 7.0 * b, 6.0 * b, ink)
+	ci.draw_circle(hand, 4.4 * b, ink)
+	_seg(ci, from, elbow, 5.4 * b, 4.6 * b, sleeve)
+	_seg(ci, elbow, hand, 4.6 * b, 3.8 * b, bracer)
+	ci.draw_circle(hand, 3.2 * b, skin)
+
+
 static func _ellipse(ci: CanvasItem, c: Vector2, r: Vector2, col: Color, rot := 0.0, n := 18) -> void:
 	var pts := PackedVector2Array()
 	for i in n:
@@ -292,6 +307,10 @@ static func humanoid(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, po
 	var arm_sw := sin(walk) * 0.5 * mv
 	var elbow := sh + Vector2(-3, 1) * b + Vector2(0, 10 * b).rotated(arm_sw)
 	var back_hand := elbow + Vector2(0, 9 * b).rotated(arm_sw * 0.6 - 0.25)
+	if st.get("shield", "") != "":
+		# The far arm carries the shield forward, leaving the near arm free to strike over it.
+		elbow = sh + Vector2(0, 9) * b
+		back_hand = sh + Vector2(6, 11) * b
 	_seg(ci, sh + Vector2(-3, 1) * b, elbow, 5.0 * b, 4.2 * b, cloth.darkened(0.3))
 	_seg(ci, elbow, back_hand, 4.2 * b, 3.4 * b, cloth.darkened(0.34))
 	ci.draw_circle(back_hand, 2.1 * b, skin.darkened(0.25))
@@ -355,8 +374,9 @@ static func humanoid(ci: CanvasItem, st: Dictionary, pal: Array, team: Color, po
 		_poly(ci, [head + Vector2(-0.6, 2.2) * hb, head + Vector2(-2.4, -0.6) * hb, head + Vector2(-8.5, -6.5) * hb, head + Vector2(-2.6, 2.8) * hb], skin.darkened(0.08))
 		ci.draw_line(head + Vector2(-2.2, 1.0) * hb, head + Vector2(-6.8, -4.8) * hb, skin.darkened(0.25), 0.7)
 	# Front arm + weapon.
-	_weapon(ci, st.get("weapon", "sword"), sh, build, swing(atk), atk, pal, tm, skin, pose, t)
+	# Shield (far arm) under the weapon arm, so the striking hand is always the top layer.
 	_shield(ci, st.get("shield", ""), sh, build, pal, tm, team, pose, t)
+	_weapon(ci, st.get("weapon", "sword"), sh, build, swing(atk), atk, pal, tm, skin, pose, t, armoured)
 
 
 static func _dwarf_beard(ci: CanvasItem, head: Vector2, b: float, hair: Color, t: float, seed: int) -> void:
@@ -503,28 +523,34 @@ static func _helmet(ci: CanvasItem, kind: String, head: Vector2, b: float, pal: 
 			_ellipse(ci, head + Vector2(0, -6) * b, Vector2(6, 3.5) * b, _c(Color("666a52"), pose))
 
 
-static func _weapon(ci: CanvasItem, kind: String, sh: Vector2, b: float, s: float, atk: float, pal: Array, tm: Color, skin: Color, pose: Dictionary, t: float) -> void:
+static func _weapon(ci: CanvasItem, kind: String, sh: Vector2, b: float, s: float, atk: float, pal: Array, tm: Color, skin: Color, pose: Dictionary, t: float, armoured := false) -> void:
 	var wood := _c(Color("6b4a2b"), pose)
 	var metal: Color = _c(pal[2], pose)
-	var sleeve: Color = _c(pal[0], pose).darkened(0.1)
+	var sleeve: Color = _c(pal[0], pose).lightened(0.12)
+	var bracer: Color = metal if armoured else _c(Color("4a3322"), pose)
 	var g: Color = _look.glow
 	if kind in CHOP:
-		# Overhead chop: arm angle from straight down (0) to overhead (~2.7 rad).
-		var theta := 0.6
+		# Overhead chop: arm angle from straight down (0) to overhead (~2.9 rad). Guard at 1.2 holds
+		# the weapon out in front; the strike ends with the arm fully extended forward.
+		var theta := 1.2
 		if atk >= 0.0:
 			if atk < 0.35:
-				theta = lerpf(0.6, 2.7, ease(atk / 0.35, 0.6))
+				theta = lerpf(1.2, 2.9, ease(atk / 0.35, 0.6))
 			elif atk < 0.5:
-				theta = lerpf(2.7, 1.1, ease((atk - 0.35) / 0.15, 0.4))
+				theta = lerpf(2.9, 0.9, ease((atk - 0.35) / 0.15, 0.4))
 			else:
-				theta = lerpf(1.1, 0.6, (atk - 0.5) / 0.5)
+				theta = lerpf(0.9, 1.2, (atk - 0.5) / 0.5)
+		var length: float = {"club": 20.0, "gladius": 16.0, "axe": 20.0, "hammer": 20.0, "rune_hammer": 21.0, "leafblade": 22.0, "baton": 18.0}.get(kind, 22.0)
 		var hand := sh + Vector2(0, 15 * b).rotated(-theta)
-		_limb(ci, sh + Vector2(2, 1), hand, 4.5 * b, sleeve)
-		ci.draw_circle(hand, 2.6 * b, skin)
 		var dirv := (hand - sh).normalized().rotated(-0.7)
 		var orth := dirv.orthogonal()
-		var length: float = {"club": 20.0, "gladius": 16.0, "axe": 20.0, "hammer": 20.0, "rune_hammer": 21.0, "leafblade": 22.0, "baton": 18.0}.get(kind, 22.0)
 		var tip := hand + dirv * length * b
+		if atk >= 0.35 and atk < 0.55:
+			# Smear along the tip's path from the wind-up, fading out after contact.
+			var h0 := Vector2(0, 15 * b).rotated(-2.9)
+			var t0 := h0 + h0.normalized().rotated(-0.7) * length * b
+			ci.draw_arc(sh, (tip - sh).length(), t0.angle(), (tip - sh).angle(), 12, Color(metal.lightened(0.5), 0.45 * (0.55 - atk) / 0.2), 4.0 * b)
+		_arm(ci, sh + Vector2(2, 1), hand, b, sleeve, skin, bracer)
 		match kind:
 			"club":
 				ci.draw_line(hand, tip, wood, 4.5 * b)
@@ -567,7 +593,7 @@ static func _weapon(ci: CanvasItem, kind: String, sh: Vector2, b: float, s: floa
 		"halberd", "glaive" when atk < 0.0:
 			# At rest the polearm stands upright: a tall vertical line in silhouette.
 			var hand := sh + Vector2(10, 8) * b
-			_limb(ci, sh + Vector2(2, 1), hand, 4.5 * b, sleeve)
+			_arm(ci, sh + Vector2(2, 1), hand, b, sleeve, skin, bracer)
 			ci.draw_line(hand + Vector2(0, 22) * b, hand + Vector2(0, -44) * b, wood, 2.8 * b)
 			var top := hand + Vector2(0, -44) * b
 			if kind == "halberd":
@@ -577,13 +603,12 @@ static func _weapon(ci: CanvasItem, kind: String, sh: Vector2, b: float, s: floa
 				# Glaive: a long curved leaf blade.
 				_shade_poly(ci, [top + Vector2(-1.5, 2), top + Vector2(3.5, -4), top + Vector2(4, -14), top + Vector2(0, -20), top + Vector2(-1.5, -8)], metal.lightened(0.15))
 				ci.draw_line(top + Vector2(-3, 2), top + Vector2(3, 2), _c(Color("d9b25c"), pose), 1.8)
-			ci.draw_circle(hand, 2.6 * b, skin)
+			ci.draw_circle(hand, 3.2 * b, skin)
 		"spear", "halberd", "lance", "glaive":
 			# Thrust: pulled back, then driven forward.
-			var reach := s * 9.0
-			var hand := sh + Vector2(9 + reach, 9) * b
-			_limb(ci, sh + Vector2(2, 1), hand, 4.5 * b, sleeve)
-			ci.draw_circle(hand, 2.6 * b, skin)
+			var reach := s * 13.0
+			var hand := sh + Vector2(12 + reach, 9) * b
+			_arm(ci, sh + Vector2(2, 1), hand, b, sleeve, skin, bracer)
 			var dirv := Vector2(1, -0.12).normalized()
 			var back := hand - dirv * 20 * b
 			var tip := hand + dirv * (26.0 if kind != "lance" else 36.0) * b
@@ -599,8 +624,7 @@ static func _weapon(ci: CanvasItem, kind: String, sh: Vector2, b: float, s: floa
 		"javelin", "throwing_axe":
 			var ang := -0.9 + 1.4 * maxf(0.0, s)
 			var hand := sh + Vector2(-2, -10 * b).rotated(ang) if s < 0.5 else sh + Vector2(10, 2) * b
-			_limb(ci, sh + Vector2(2, 1), hand, 4.5 * b, sleeve)
-			ci.draw_circle(hand, 2.6 * b, skin)
+			_arm(ci, sh + Vector2(2, 1), hand, b, sleeve, skin, bracer)
 			if atk < 0.0 or atk < 0.4 or atk > 0.9:
 				if kind == "javelin":
 					ci.draw_line(hand + Vector2(-14, 4) * b, hand + Vector2(16, -3) * b, wood, 2.2 * b)
@@ -610,8 +634,7 @@ static func _weapon(ci: CanvasItem, kind: String, sh: Vector2, b: float, s: floa
 					_poly(ci, [hand + Vector2(1, -10) * b, hand + Vector2(7, -13) * b, hand + Vector2(7, -5) * b, hand + Vector2(1, -7) * b], metal)
 		"sling":
 			var hand := sh + Vector2(2, -14) * b
-			_limb(ci, sh + Vector2(2, 1), hand, 4.5 * b, sleeve)
-			ci.draw_circle(hand, 2.6 * b, skin)
+			_arm(ci, sh + Vector2(2, 1), hand, b, sleeve, skin, bracer)
 			var spin := t * (22.0 if atk >= 0.0 and atk < 0.4 else 5.0)
 			var stone := hand + Vector2(cos(spin), sin(spin) * 0.5) * 10 * b
 			ci.draw_line(hand, stone, Color("c9b28a"), 1.2)
@@ -621,7 +644,7 @@ static func _weapon(ci: CanvasItem, kind: String, sh: Vector2, b: float, s: floa
 		"bow", "starbow":
 			var draw_back := clampf(-s, 0.0, 1.0) * 9.0
 			var hand := sh + Vector2(15, 1) * b
-			_limb(ci, sh + Vector2(2, 1), hand, 4.5 * b, sleeve)
+			_arm(ci, sh + Vector2(2, 1), hand, b, sleeve, skin, bracer)
 			# Elves carry the tall recurved longbow.
 			var tall := 23.0 if _look.long_hair else 19.0
 			var top := hand + Vector2(-2, -tall) * b
@@ -635,36 +658,35 @@ static func _weapon(ci: CanvasItem, kind: String, sh: Vector2, b: float, s: floa
 			ci.draw_polyline(pts, bow_col, 2.6 * b)
 			var nock := hand + Vector2(-4 - draw_back, 0) * b
 			ci.draw_polyline(PackedVector2Array([pts[0], nock, pts[pts.size() - 1]]), Color(0.9, 0.88, 0.8, 0.9), 1.0)
-			_limb(ci, sh + Vector2(-1, 1), nock, 4.0 * b, sleeve.darkened(0.2))
+			_arm(ci, sh + Vector2(-1, 1), nock, b, sleeve.darkened(0.15), skin, bracer)
 			if atk < 0.35:
 				if kind == "starbow":
 					ci.draw_line(nock, nock + Vector2(24, 0) * b, Color(g, 0.9), 2.0)
 					_halo(ci, nock + Vector2(24, 0) * b, 4.0 * b, g, 0.6)
 				else:
 					ci.draw_line(nock, nock + Vector2(24, 0) * b, wood.lightened(0.3), 1.5)
-			ci.draw_circle(hand, 2.6 * b, skin)
+			ci.draw_circle(hand, 3.2 * b, skin)
 		"staff":
 			# Staff held upright; on the attack it is thrust forward and the head flares.
 			var fw := maxf(0.0, s)
 			var hand := sh + Vector2(10 + fw * 5, 6 - fw * 6) * b
-			_limb(ci, sh + Vector2(2, 1), hand, 4.5 * b, sleeve)
+			_arm(ci, sh + Vector2(2, 1), hand, b, sleeve, skin, bracer)
 			var top := hand + Vector2(4 + fw * 8, -30) * b
 			ci.draw_line(hand + Vector2(-2, 22) * b, top, _c(Color("a88a5a"), pose), 2.4 * b)
 			ci.draw_arc(top + Vector2(0, -3) * b, 4.0 * b, PI * 0.2, PI * 1.8, 10, _c(Color("d9b25c"), pose), 1.2 * b)
 			var k := 0.6 + 0.4 * sin(t * 3.0) + fw
 			_halo(ci, top + Vector2(0, -3) * b, 6.0 * b * (1.0 + fw), g, minf(1.0, k))
 			ci.draw_circle(top + Vector2(0, -3) * b, 2.2 * b, Color(1, 1, 1, 0.95))
-			ci.draw_circle(hand, 2.6 * b, skin)
+			ci.draw_circle(hand, 3.2 * b, skin)
 		"crew":
 			# Hands forward on the engine.
 			var hand := sh + Vector2(14, 8) * b
-			_limb(ci, sh + Vector2(2, 1), hand, 4.5 * b, sleeve)
-			ci.draw_circle(hand, 2.6 * b, skin)
+			_arm(ci, sh + Vector2(2, 1), hand, b, sleeve, skin, bracer)
 		"crossbow":
 			var kick := maxf(0.0, s) * 2.0
-			var hand := sh + Vector2(12 - kick, 4) * b
-			var stock := sh + Vector2(-2 - kick, 3) * b
-			_limb(ci, sh + Vector2(2, 1), hand, 4.5 * b, sleeve)
+			var hand := sh + Vector2(12 - kick, 1) * b
+			var stock := sh + Vector2(-1 - kick, -1) * b
+			_arm(ci, sh + Vector2(2, 1), hand, b, sleeve, skin, bracer)
 			ci.draw_line(stock, stock + Vector2(24, -1.5) * b, wood, 3.6 * b)
 			var prod := stock + Vector2(22, -1.5) * b
 			var bend := 3.0 if atk < 0.0 or atk > 0.45 else 1.0
@@ -673,12 +695,12 @@ static func _weapon(ci: CanvasItem, kind: String, sh: Vector2, b: float, s: floa
 			ci.draw_polyline(PackedVector2Array([prod + Vector2(-bend, -9) * b, nut, prod + Vector2(-bend, 9) * b]), Color(0.9, 0.88, 0.8, 0.8), 0.9)
 			if atk < 0.0 or atk > 0.6:
 				ci.draw_line(nut, prod + Vector2(3, 0) * b, wood.lightened(0.3), 1.4)
-			ci.draw_circle(hand, 2.6 * b, skin)
+			ci.draw_circle(hand, 3.2 * b, skin)
 		"musket", "rifle", "arcane_rifle", "rune_rifle":
 			var kick := maxf(0.0, s) * 4.0
-			var hand := sh + Vector2(12 - kick, 4) * b
-			var stock := sh + Vector2(-2 - kick, 3) * b
-			_limb(ci, sh + Vector2(2, 1), hand, 4.5 * b, sleeve)
+			var hand := sh + Vector2(12 - kick, 1) * b
+			var stock := sh + Vector2(-1 - kick, -1) * b
+			_arm(ci, sh + Vector2(2, 1), hand, b, sleeve, skin, bracer)
 			var length: float = {"musket": 34.0, "rifle": 30.0, "arcane_rifle": 30.0, "rune_rifle": 30.0}[kind]
 			var muzzle := stock + Vector2(length, -2) * b
 			var arcane := kind in ["arcane_rifle", "rune_rifle"]
@@ -690,7 +712,7 @@ static func _weapon(ci: CanvasItem, kind: String, sh: Vector2, b: float, s: floa
 				_ellipse(ci, stock + Vector2(12, 1.5) * b, Vector2(2.4, 2.4) * b, Color(g, 0.9))
 				for i in 3:
 					ci.draw_line(stock + Vector2(16 + i * 4, -2.5) * b, stock + Vector2(16 + i * 4, 0.5) * b, metal.lightened(0.2), 1.0)
-			ci.draw_circle(hand, 2.6 * b, skin)
+			ci.draw_circle(hand, 3.2 * b, skin)
 
 
 static func _shield(ci: CanvasItem, kind: String, sh: Vector2, b: float, pal: Array, tm: Color, team: Color, pose: Dictionary, t: float) -> void:
@@ -698,29 +720,29 @@ static func _shield(ci: CanvasItem, kind: String, sh: Vector2, b: float, pal: Ar
 	var g: Color = _look.glow
 	match kind:
 		"round":
-			var c := sh + Vector2(10, 11) * b
+			var c := sh + Vector2(7, 11) * b
 			ci.draw_circle(c, 10.5 * b, metal.darkened(0.2))
 			ci.draw_circle(c, 9 * b, tm)
 			ci.draw_circle(c, 2.5 * b, metal)
 		"kite":
-			var c := sh + Vector2(10, 9) * b
+			var c := sh + Vector2(7, 9) * b
 			_poly(ci, [c + Vector2(-7, -8), c + Vector2(7, -8), c + Vector2(6, 4), c + Vector2(0, 14), c + Vector2(-6, 4)], metal.darkened(0.3))
 			_poly(ci, [c + Vector2(-5.5, -6.5), c + Vector2(5.5, -6.5), c + Vector2(4.5, 3.5), c + Vector2(0, 11.5), c + Vector2(-4.5, 3.5)], tm)
 		"hide":
-			var c := sh + Vector2(10, 12) * b
+			var c := sh + Vector2(7, 12) * b
 			_ellipse(ci, c, Vector2(8.5, 11) * b, _c(Color("6e4a2c"), pose))
 			_ellipse(ci, c, Vector2(6.5, 9) * b, _c(Color("8d6a45"), pose))
 			ci.draw_line(c + Vector2(-5, -2) * b, c + Vector2(5, -2) * b, tm, 2.5 * b)
 		"scutum":
 			# Tall curved legion shield: team field, metal rim and boss, painted wings.
-			var c := sh + Vector2(11, 10) * b
+			var c := sh + Vector2(8, 10) * b
 			_shade_poly(ci, [c + Vector2(-5, -15) * b, c + Vector2(5, -14) * b, c + Vector2(6, 0) * b, c + Vector2(5, 14) * b, c + Vector2(-5, 15) * b, c + Vector2(-4, 0) * b], metal.darkened(0.25))
 			_shade_poly(ci, [c + Vector2(-3.8, -13.5) * b, c + Vector2(4, -12.5) * b, c + Vector2(4.8, 0) * b, c + Vector2(4, 12.5) * b, c + Vector2(-3.8, 13.5) * b, c + Vector2(-2.8, 0) * b], tm)
 			ci.draw_circle(c + Vector2(0.8, 0) * b, 3.0 * b, metal)
 			ci.draw_line(c + Vector2(0.8, -11) * b, c + Vector2(0.8, 11) * b, Color(_c(Color("d9b25c"), pose), 0.8), 1.2 * b)
 		"leaf":
 			# Elven shield: a tall leaf of lacquered wood with a gilt rib.
-			var c := sh + Vector2(10, 10) * b
+			var c := sh + Vector2(7, 10) * b
 			_shade_poly(ci, [c + Vector2(0, -16) * b, c + Vector2(6.5, -6) * b, c + Vector2(6, 6) * b, c + Vector2(0, 16) * b, c + Vector2(-5.5, 6) * b, c + Vector2(-6, -6) * b], _c(Color("5a6a3a"), pose))
 			_shade_poly(ci, [c + Vector2(0, -13) * b, c + Vector2(4.8, -5) * b, c + Vector2(4.4, 5) * b, c + Vector2(0, 13) * b, c + Vector2(-4, 5) * b, c + Vector2(-4.4, -5) * b], tm)
 			ci.draw_line(c + Vector2(0, -14) * b, c + Vector2(0, 14) * b, _c(Color("d9b25c"), pose), 1.4 * b)
@@ -728,7 +750,7 @@ static func _shield(ci: CanvasItem, kind: String, sh: Vector2, b: float, pal: Ar
 				ci.draw_line(c + Vector2(0, -6 + k * 5) * b, c + Vector2(3.5, -9 + k * 5) * b, _c(Color("d9b25c"), pose), 0.8)
 		"moon":
 			# Moonsilver leaf shield with a glowing rim.
-			var c := sh + Vector2(10, 10) * b
+			var c := sh + Vector2(7, 10) * b
 			var pts := [c + Vector2(0, -16) * b, c + Vector2(6.5, -6) * b, c + Vector2(6, 6) * b, c + Vector2(0, 16) * b, c + Vector2(-5.5, 6) * b, c + Vector2(-6, -6) * b]
 			_shade_poly(ci, pts, metal)
 			var ring := PackedVector2Array(pts)
@@ -737,7 +759,7 @@ static func _shield(ci: CanvasItem, kind: String, sh: Vector2, b: float, pal: Ar
 			ci.draw_arc(c, 5 * b, -2.2, 1.0, 12, tm, 2.4 * b)
 		"dwarf":
 			# Big round dwarf shield: iron rim with rivets, team field, anvil boss.
-			var c := sh + Vector2(9, 11) * b
+			var c := sh + Vector2(6, 11) * b
 			ci.draw_circle(c, 12.5 * b, metal.darkened(0.3))
 			ci.draw_circle(c, 10.5 * b, tm.darkened(0.08))
 			for k in 8:
@@ -748,13 +770,13 @@ static func _shield(ci: CanvasItem, kind: String, sh: Vector2, b: float, pal: Ar
 			if pal == RaceLook.palette(&"dwarf", 6):
 				ci.draw_arc(c, 7.5 * b, 0, TAU, 20, Color(g, 0.6 + 0.3 * sin(t * 3.0)), 1.2 * b)
 		"plate":
-			var c := sh + Vector2(11, 8) * b
+			var c := sh + Vector2(8, 8) * b
 			ci.draw_rect(Rect2(c + Vector2(-6, -11) * b, Vector2(12, 24) * b), metal.darkened(0.35))
 			ci.draw_rect(Rect2(c + Vector2(-2, -6) * b, Vector2(6, 2) * b), Color(0.05, 0.05, 0.05))
 			ci.draw_rect(Rect2(c + Vector2(-6, 6) * b, Vector2(12, 3) * b), tm)
 		"energy":
 			# Arcane ward: a translucent hex pane on a brass bracer.
-			var c := sh + Vector2(13, 10) * b
+			var c := sh + Vector2(10, 10) * b
 			var a := 0.3 + 0.1 * sin(t * 6.0)
 			var hex := []
 			for k in 6:
