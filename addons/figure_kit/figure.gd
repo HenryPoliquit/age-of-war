@@ -93,6 +93,13 @@ static func _parts(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, 
 	# One skeleton per frame, in the race's proportions; the idle-breath phase is offset per individual.
 	var j := FkSkeleton.solve(build, weapon, pose.merged({"t": t + seed / 2.1}, true), shield, not legs, lk)
 	var z: Dictionary = j.z
+	if pose.get("mirrored", false):
+		# Drawn flipped, the figure is the same right-handed body seen from its other side (not a
+		# left-handed one): every depth flips, so the weapon arm goes behind the body and the shield arm,
+		# the left leg and the left side's lighting come to the front.
+		z = z.duplicate()
+		for k in z:
+			z[k] = -z[k]
 	var hip: Vector2 = j.hip
 	var sh: Vector2 = j.sh
 	var b := build
@@ -112,13 +119,13 @@ static func _parts(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, 
 	add.call("shadow", -100.0, draw_shadow)
 	# Far leg (darker), then the near one; a rider shows only the near leg, its foot in the stirrup.
 	var draw_leg := func(i: int) -> void:
-		if i == 1 and not legs:
-			return
 		var tag := "n" if i == 0 else "f"
+		if not legs and z["hip_" + tag] < 0.0:
+			return
 		var root: Vector2 = j["hip_" + tag]
 		var knee: Vector2 = j["knee_" + tag]
 		var foot: Vector2 = j["foot_" + tag]
-		var back := 0.22 if i == 1 else 0.0
+		var back := 0.22 if z["hip_" + tag] < 0.0 else 0.0
 		FkPaint.seg(ci, root, knee, 7.2 * bb.x, 5.4 * bb.x, trim.darkened(back))
 		FkPaint.seg(ci, knee, foot, 5.4 * bb.x, 4.2 * bb.x, trim.darkened(back + 0.08))
 		if armoured:
@@ -128,8 +135,8 @@ static func _parts(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, 
 		var boot := FkSkeleton.boot(foot, j["rot_" + tag], b, j["toe_bend_" + tag], body)
 		FkPaint.shade_poly(ci, boot, leather.darkened(back))
 		ci.draw_line(boot[5], boot[4], Color(0.08, 0.06, 0.05), 1.2 * b)
-	add.call("far leg", -50.0, draw_leg.bind(1))
-	add.call("near leg", -49.0, draw_leg.bind(0))
+	add.call("far leg", -50.0 + 0.5 * signf(z.hip_f), draw_leg.bind(1))
+	add.call("near leg", -50.0 + 0.5 * signf(z.hip_n), draw_leg.bind(0))
 	# Cape trails behind and lags the body (secondary motion).
 	var draw_cape := func() -> void:
 		if st.get("cape", false) or helmet == "greathelm":
@@ -149,9 +156,10 @@ static func _parts(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, 
 		var fs: Vector2 = j.sh_f
 		var fe: Vector2 = j.elbow_f
 		var fh: Vector2 = j.hand_f
-		FkPaint.seg(ci, fs, fe, 5.0 * bb.x, 4.2 * bb.x, cloth.darkened(0.3))
-		FkPaint.seg(ci, fe, fh, 4.2 * bb.x, 3.4 * bb.x, cloth.darkened(0.34))
-		fist(ci, fh, (fh - fe).angle(), b * 0.85, skin.darkened(0.25), false)
+		var shade := 0.3 if z.sh_f < 0.0 else -0.12
+		FkPaint.seg(ci, fs, fe, 5.0 * bb.x, 4.2 * bb.x, cloth.darkened(shade))
+		FkPaint.seg(ci, fe, fh, 4.2 * bb.x, 3.4 * bb.x, cloth.darkened(shade + 0.04))
+		fist(ci, fh, (fh - fe).angle(), b * 0.85, skin.darkened(maxf(shade, 0.0) * 0.8), false)
 	add.call("far arm", (z.sh_f + z.elbow_f + z.hand_f) / 3.0, draw_far_arm)
 	# Torso: hips, waist, chest, shoulders.
 	var draw_torso := func() -> void:
@@ -233,7 +241,7 @@ static func _parts(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, 
 			st.get("runes", false), j.shield_turn, back_view)
 		if back_view and shield not in ["", "energy"]:
 			fist(ci, j.hand_f, 0.0, b * 0.85, skin.darkened(0.25))
-	add.call("shield", z.sh_n, draw_shield)
+	add.call("shield", maxf(z.sh_n, z.sh_f), draw_shield)
 	var draw_smear := func() -> void:
 		if fam in ["blade", "chop"]:
 			_smear(ci, st, pose, seed, build, weapon, not legs, metal)
@@ -242,8 +250,9 @@ static func _parts(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, 
 	# swings toward the viewer, so the upper arm and forearm each sort by their own depth.
 	var grip: float = (j.hand_n - j.elbow_n).angle() if fam in ["idle", "crew", "bow"] else (j.dir as Vector2).angle()
 	var impact := clampf(1.0 - absf(atk - 0.52) / 0.08, 0.0, 1.0) if fam in ["blade", "chop"] else 0.0
-	var sleeve := cloth.lightened(0.12)
-	var bracer := metal if armoured else leather
+	# The weapon arm takes the far side's shadow when it is behind the body.
+	var sleeve := cloth.lightened(0.12) if z.sh_n > 0.0 else cloth.darkened(0.3)
+	var bracer := (metal if armoured else leather).darkened(0.0 if z.sh_n > 0.0 else 0.3)
 	var planar: bool = absf(z.elbow_n - z.sh_n) < 1e-3 and absf(z.hand_n - z.sh_n) < 1e-3
 	var draw_upper := func() -> void:
 		if planar:

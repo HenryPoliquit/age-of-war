@@ -57,3 +57,34 @@ func test_drawing_hand_never_hides_under_its_own_upper_arm() -> void:
 				var walk := {"walk": 0.7, "move": m / 10.0, "atk": -1.0}
 				var names := FkFigure.layers(_spec("bow", "", race, build), walk)
 				check(names.find("near forearm") > names.find("near upper arm"), "%s %.2f: hand over its arm at move %.1f" % [race, build, m / 10.0])
+
+
+# --- The enemy army: the same right-handed body seen from its other side (owner, 2026-09-27) ----
+
+func _before(names: Array, a: String, c: String) -> bool:
+	return names.find(a) < names.find(c)
+
+
+func test_mirrored_figure_is_turned_around_not_left_handed() -> void:
+	for race in [&"human", &"dwarf", &"elf"]:
+		for pose in [{"atk": -1.0}, {"walk": 1.3, "move": 1.0, "atk": -1.0}, {"atk": 0.34}, {"atk": 0.5}]:
+			var tag := "%s %s" % [race, pose]
+			var names := FkFigure.layers(_spec("sword", "round", race), pose.merged({"mirrored": true}))
+			check(_before(names, "near upper arm", "torso") and _before(names, "near forearm", "torso"), tag + ": weapon arm behind the body")
+			check(_before(names, "weapon", "torso"), tag + ": weapon held on the far side")
+			check(_before(names, "head", "shield") and _before(names, "torso", "far arm"), tag + ": shield arm and shield in front")
+			check(_before(names, "near leg", "far leg"), tag + ": the left leg is the near one")
+			# Our own army is unchanged.
+			check_eq(FkFigure.layers(_spec("sword", "round", race), pose), FkFigure.PARTS if pose.atk < 0.0 else FkFigure.layers(_spec("sword", "round", race), pose), tag)
+
+
+func test_mirrored_archer_holds_the_bow_in_front_and_draws_behind_the_head() -> void:
+	for atk in [-1.0, 0.2, 0.34, 0.5]:
+		var names := FkFigure.layers(_spec("bow"), {"atk": atk, "mirrored": true})
+		check(_before(names, "head", "bow") and _before(names, "bow", "far arm"), "bow in the near hand, over the face (atk %s)" % atk)
+		check(_before(names, "near upper arm", "torso"), "drawing arm on the far side (atk %s)" % atk)
+
+
+func test_mirrored_rider_shows_its_left_leg() -> void:
+	var names := FkFigure.layers(_spec("saber"), {"atk": -1.0, "mirrored": true}, 0, 1.0, false)
+	check(_before(names, "near upper arm", "torso"), "sabre arm on the far side of the rider")
