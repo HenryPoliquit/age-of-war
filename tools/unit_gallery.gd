@@ -12,6 +12,7 @@ const ROLES := ["vanguard", "ranged", "heavy", "siege"]
 var out := "reports/unit_gallery.png"
 var race: StringName = &"human"
 var atk := -1.0
+var vp := SubViewport.new()
 
 
 func _initialize() -> void:
@@ -22,10 +23,14 @@ func _initialize() -> void:
 			race = StringName(a.get_slice("=", 1))
 		elif a.begins_with("--atk="):
 			atk = a.get_slice("=", 1).to_float()
+	# Fixed-size offscreen canvas: the window gets clamped to smaller screens.
+	vp.size = Vector2i(1920, 1080)
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	root.add_child(vp)
 	var bg := ColorRect.new()
 	bg.color = Color("c9c3b4")
 	bg.size = Vector2(1920, 1080)
-	root.add_child(bg)
+	vp.add_child(bg)
 	for mode in 3:
 		var n := Node2D.new()
 		n.position = Vector2(mode * 640, 0)
@@ -34,7 +39,7 @@ func _initialize() -> void:
 		m.set_shader_parameter("mode", 0 if race == &"all" else mode)
 		n.material = m
 		n.draw.connect(_draw_panel.bind(n, mode))
-		root.add_child(n)
+		vp.add_child(n)
 	_capture.call_deferred()
 
 
@@ -64,6 +69,6 @@ func _capture() -> void:
 	for i in 3:
 		await process_frame
 	await RenderingServer.frame_post_draw
-	root.get_texture().get_image().save_png(out)
+	vp.get_texture().get_image().save_png(out)
 	print("gallery saved: ", out)
 	quit()
