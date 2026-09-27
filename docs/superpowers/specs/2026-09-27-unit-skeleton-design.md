@@ -31,8 +31,46 @@ What close-up renders show today (`scripts/view/art/unit_art.gd`):
 1. **Skeleton approach** for every humanoid figure: foot soldiers, riders, chariot drivers and siege crews.
 2. **Spacing: "gap + same reach".** Opponents keep a visible gap, and the same number of ranks still fight, so balance should barely move.
 3. **Review loop: batch per role.** For each role (all races × ages), I show a sheet of walk, wind-up and strike frames. The owner approves or flags units before I move to the next role.
+4. **Reusable kit** (owner: "I want to reuse the units in other games"). Everything that draws a unit moves into a self-contained kit: figures, gear, race presets, mounts and machines. The game keeps only a thin adapter.
 
-## 1. Skeleton (`scripts/view/art/skeleton.gd`, pure math)
+## 0. Figure kit (`addons/figure_kit/`)
+
+**Rule:** the kit depends on nothing but Godot built-ins. It never references a game class (`UnitDef`, `GameData`, `RaceLook`, `MatchView`, …). A test enforces this by scanning the kit's source for every game `class_name`. To reuse it, copy the folder into another project.
+
+All kit class names carry the `Fk` prefix, so they can't collide with another project's classes.
+
+| File | Class | Contents |
+|---|---|---|
+| `paint.gd` | `FkPaint` | Canvas primitives used by everything, including this game's bases, towers and FX: `begin`, `push`/`pop`, `seg`, `limb`, `poly`, `shade_poly`, `ellipse`, `ellipse_pts`, `halo`, `wheel`, `shadow` |
+| `skeleton.gd` | `FkSkeleton` | Pure math: joints, bone lengths, IK, locomotion and stance keyframes (§1) |
+| `figure.gd` | `FkFigure` | Human figure: body, head, hair, beards, ears, drawn from the skeleton (§2) |
+| `weapons.gd` | `FkWeapons` | Every hand weapon, grips and leading edges |
+| `armour.gd` | `FkArmour` | Helmets, shields, packs, capes, tabards |
+| `mounts.gd` | `FkMounts` | Horse/boar quadrupeds, seated riders, chariot |
+| `machines.gd` | `FkMachines` | Ram, catapult, ballista, trebuchet, cannon, steam tank, golem, treant, sky cannon, obelisk, and their crews |
+| `looks.gd` | `FkLooks` | Preset library: race bodies (human/elf/dwarf proportions, skin, hair, ears, beards, glow) and era palettes |
+| `units.gd` | `FkUnits` | Entry point: `draw(ci, spec, pose)`, plus `height(spec)`, `muzzle(spec)`, `shot(spec)`, `wreck(spec)` |
+| `README.md` | — | The spec and pose contract, and how to drop the kit into a project |
+
+**Spec contract.** A figure is described by one Dictionary, `spec`. It uses today's style keys:
+- `rig`, `helmet`, `weapon`, `shield`, `pack`, `cape`, `build`, `beast`, `crew`, `variant`, `car`, `shot`;
+- plus explicit `look` (a race body preset), `palette` ([cloth, trim, metal]) and `team` (Color).
+
+The static `_look` global goes away, because the race travels inside the spec. The pose Dictionary contract is unchanged: `walk`, `move`, `atk`, `t`, `flash`.
+
+**What stays in the game:**
+- `scripts/view/art/unit_art.gd` becomes the adapter. It maps `UnitDef` + race to a kit `spec` using the role fallback, role builds and `RaceLook.STYLES`. It keeps its public API (`style_for`, `draw_unit`, `height_for`, `muzzle_for`, `wreck_kind`, `RIGS`), so callers barely change.
+- `RaceLook` keeps this game's unit → gear table (`STYLES`) and race ids. Its `BODY` and `CLOTH` move into `FkLooks`.
+- `base_art`, `tower_art` and `fx_layer` switch from `UnitArt._shade_poly` and friends to `FkPaint`.
+
+**Order of work:**
+1. **Extraction first, with zero visual change.** The unit and base galleries rendered before and after the move must be pixel-identical (automated image diff).
+2. **Spacing (§3).**
+3. **Skeleton (§1–2)**, built inside the kit.
+
+This way the refactor is proven not to change anything before the art starts changing.
+
+## 1. Skeleton (`addons/figure_kit/skeleton.gd`, pure math)
 
 It has no drawing, so it can be unit-tested headless.
 
@@ -83,7 +121,7 @@ It has no drawing, so it can be unit-tested headless.
 - Each weapon is drawn in the hand's frame, using the pose's weapon angle and a per-weapon grip offset.
 - Bladed heads (axe, halberd, glaive, hammer face) declare a **leading edge**: the side facing the strike's direction of travel. That fixes the axe.
 
-## 2. Renderer (`humanoid()` rewritten on the skeleton)
+## 2. Renderer (`FkFigure`, rewritten on the skeleton)
 
 - **Layer order is fixed:**
   1. far leg
@@ -143,7 +181,9 @@ Batches go in this order, each shown for all three races and then approved:
 
 ## 5. Testing
 
-- **Skeleton** (`tests/test_skeleton.gd`, headless):
+- **Kit boundary** (`tests/test_fk_boundary.gd`): no file under `addons/figure_kit/` names a game `class_name`.
+- **Extraction:** the unit gallery (all 3 races, plus `--atk` frames) and the base gallery are pixel-identical before and after the move.
+- **Skeleton** (`tests/test_fk_skeleton.gd`, headless):
   - bone lengths are constant across walk and attack frames;
   - the knee is in front of the hip-ankle line and the elbow is below/behind the shoulder-hand line;
   - toes are ahead of ankles;
