@@ -14,9 +14,12 @@ const CHOP := ["club", "sword", "gladius", "shovel", "baton", "saber", "axe", "h
 
 ## Where a figure's shot leaves its weapon (feet origin, facing +x, pre-scale): the muzzle or arrow
 ## at head height, since ranged units now aim and fire from the shoulder and jaw.
-const MUZZLE := {"musket": Vector2(34, -52), "rifle": Vector2(30, -52), "arcane_rifle": Vector2(30, -52),
-	"rune_rifle": Vector2(30, -52), "crossbow": Vector2(26, -52), "bow": Vector2(22, -53), "starbow": Vector2(22, -53),
+const MUZZLE := {"musket": Vector2(36, -50), "rifle": Vector2(32, -50), "arcane_rifle": Vector2(32, -50),
+	"rune_rifle": Vector2(32, -50), "crossbow": Vector2(27, -50), "bow": Vector2(22, -53), "starbow": Vector2(22, -53),
 	"javelin": Vector2(20, -56), "throwing_axe": Vector2(20, -56), "sling": Vector2(18, -60)}
+
+## A long gun's butt relative to the trigger hand (× build, along the gun): it sits in the shoulder.
+const GUN_BUTT := Vector2(-6, -1)
 
 ## Hand-weapon lengths from the grip to the tip, px × build.
 const LENGTH := {"club": 20.0, "gladius": 16.0, "axe": 20.0, "hammer": 20.0, "rune_hammer": 21.0, "leafblade": 22.0, "baton": 18.0}
@@ -200,7 +203,7 @@ static func weapon(ci: CanvasItem, kind: String, j: Dictionary, b: float, s: flo
 		"crossbow", "musket", "rifle", "arcane_rifle", "rune_rifle":
 			# Stock at the shoulder, both hands on the gun; the stance's recoil moves and tilts it.
 			var rot := dirv.angle()
-			var stock := hand + Vector2(-13, -2).rotated(rot) * b
+			var stock := hand + GUN_BUTT.rotated(rot) * b
 			var at := func(x: float, y: float) -> Vector2: return stock + Vector2(x, y).rotated(rot) * b
 			if kind == "crossbow":
 				ci.draw_line(stock, at.call(24.0, -1.5), wood, 3.6 * b)
