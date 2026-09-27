@@ -115,7 +115,8 @@ const STANCES := {
 		"hit": {"h": Vector2(5.5, -1), "f": Vector2(15, -2.5), "s": Vector2(-3, -3), "sf": Vector2(2, -1), "a": -0.04,
 			"lean": 0.04, "crouch": 2.0}},
 	# Archer, side-on (owner brief): the bow arm a rigid strut toward the target with its shoulder locked
-	# down. The drawing elbow swings back around the side — in profile it travels straight back at
+	# down. A heavy draw (owner: "the pull lacks weight"): the drawing shoulder retracts hard and the hand
+	# anchors at the back of the jaw. The drawing elbow swings back around the side — in profile it travels straight back at
 	# shoulder height, the upper arm foreshortening as it points at the viewer mid-draw (`el` steers it),
 	# never rising over the shoulder. Pre-draw: hand hooked on the string, elbow out in front. Full draw:
 	# shoulder blade retracted, elbow straight back level with the shoulder, forearm along the arrow, hand
@@ -123,10 +124,10 @@ const STANCES := {
 	# hand glides back along the neck while the bow arm stays locked.
 	"bow": {
 		"guard": {"h": Vector2(15, -3), "el": Vector2(9, -1), "f": Vector2(18, -4), "sf": Vector2(0, 1), "a": 0.0},
-		"wind": {"h": Vector2(0, -5.5), "el": Vector2(-8.5, -5), "f": Vector2(18, -4), "sf": Vector2(0, 1), "s": Vector2(-2, -3),
+		"wind": {"h": Vector2(-2.5, -5), "el": Vector2(-11.5, -2.5), "f": Vector2(18, -4), "sf": Vector2(0, 1), "s": Vector2(-3.5, -3),
 			"a": 0.0, "lean": -0.05},
-		"hit": {"h": Vector2(-3.5, -5), "el": Vector2(-10.4, -1.5), "f": Vector2(18, -4), "sf": Vector2(0, 1),
-			"s": Vector2(-3.5, -3), "a": 0.0, "lean": -0.05}},
+		"hit": {"h": Vector2(-6, -5), "el": Vector2(-12.5, -1.5), "f": Vector2(18, -4), "sf": Vector2(0, 1),
+			"s": Vector2(-4.5, -3), "a": 0.0, "lean": -0.05}},
 	# Javelin: torso turned away, lead arm fully extended forward, throwing arm straight back behind the
 	# shoulder with the elbow high, weight on the bent back leg; then the arm whips over and forward at
 	# head height, finishing fully extended (shoulder, elbow and hand in one straight line), as the weight
@@ -142,10 +143,13 @@ const STANCES := {
 		"guard": {"h": Vector2(-1, -9), "f": Vector2(15, -1)},
 		"wind": {"h": Vector2(2, -16), "f": Vector2(16, -1), "lunge": -2.0},
 		"hit": {"h": Vector2(15, -12), "f": Vector2(-1, 8), "lean": 0.15, "lunge": 6.0}},
+	# Staff (owner brief): held in both hands at guard; the strike raises it confidently in one hand, the
+	# arm straight from shoulder to hand at about 45 degrees up and forward, the staff upright; the other
+	# hand lets go and settles by the hip.
 	"staff": {
 		"guard": {"h": Vector2(10, 6), "f": Vector2(9, 13), "a": -1.456},
 		"wind": {"h": Vector2(8, 6), "f": Vector2(7, 13), "a": -1.5},
-		"hit": {"h": Vector2(15, 0), "f": Vector2(13, 8), "a": -1.2, "lean": 0.12, "lunge": 3.0}},
+		"hit": {"h": Vector2(16, -13), "f": Vector2(2, 17), "a": -1.25, "lean": 0.12, "lunge": 3.0}},
 	"crew": {"guard": {"h": Vector2(14, 8), "f": Vector2(12, 9)}, "wind": {"h": Vector2(14, 8), "f": Vector2(12, 9)},
 		"hit": {"h": Vector2(15, 8), "f": Vector2(13, 9), "lean": 0.1}},
 	# Mounted sabre: seated deep, reins low over the withers in the off hand, the hilt resting at the
@@ -156,12 +160,12 @@ const STANCES := {
 		"wind": {"h": Vector2(-4, -13), "a": -2.6, "f": Vector2(8, 16), "s": Vector2(-1, -2), "lean": 0.1, "rise": 3.0},
 		"hit": {"h": Vector2(17, 13), "a": 0.7, "f": Vector2(8, 16), "s": Vector2(2, 1), "lean": 0.3, "rise": 4.0,
 			"lock": 1.0, "zoom": 1.1}},
-	# Mounted lance: carried upright at the walk, couched under the arm, then levelled into the charge
-	# at the opponent's chest.
+	# Mounted lance: carried upright at the walk, couched under the arm, then driven into the charge at the
+	# opponent's chest with the arm locked straight (owner: full range of motion on the thrust).
 	"ride_thrust": {
 		"guard": {"h": Vector2(6, 10), "a": -1.35, "f": Vector2(8, 16)},
 		"wind": {"h": Vector2(1, 9), "a": 0.1, "f": Vector2(8, 16), "lean": 0.05, "rise": 2.0},
-		"hit": {"h": Vector2(16, 8), "a": 0.3, "f": Vector2(8, 16), "lean": 0.25, "rise": 3.0}},
+		"hit": {"h": Vector2(24, 11), "a": 0.4, "f": Vector2(8, 16), "lean": 0.25, "rise": 3.0}},
 }
 
 ## Walk styles. bob = hip drop at each contact (px); stride = foot reach (px); lift = knee lift (px);

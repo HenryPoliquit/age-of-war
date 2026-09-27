@@ -150,16 +150,22 @@ static func weapon(ci: CanvasItem, kind: String, j: Dictionary, b: float, s: flo
 			# On the release the bow leaps forward in the loose palm and tips over on its upper limb.
 			var rel := clampf((atk - 0.35) / 0.45, 0.0, 1.0) if atk >= 0.35 else 0.0
 			var tilt := sin(rel * PI) * 0.25
+			# Carried on the march the bow leans forward — top limb ahead of the face, bottom limb trailing.
+			if atk < 0.0:
+				tilt += 0.5 * FkPaint.move_amount(pose)
 			var leap := Vector2(sin(rel * PI) * 1.5, 0) * b
+			# Tension: the further the string is drawn, the deeper the limbs bend and the more their tips pull
+			# in toward the archer; loosed, they spring back.
+			var pull := clampf((grip.x - nock.x) / (20.0 * b), 0.0, 1.0) if drawing else 0.0
 			# Elves carry the tall recurved longbow.
-			var tall := 23.0 if lk.long_hair else 19.0
-			var top := grip + Vector2(-2, -tall) * b
-			var bot := grip + Vector2(-2, tall) * b
+			var tall: float = (23.0 if lk.long_hair else 19.0) * (1.0 - 0.07 * pull)
+			var top := grip + Vector2(-2 - 4 * pull, -tall) * b
+			var bot := grip + Vector2(-2 - 4 * pull, tall) * b
 			var pts := PackedVector2Array()
 			for i in 11:
 				var u := i / 10.0
 				var curl := (-2.5 if u < 0.08 or u > 0.92 else 0.0) if lk.long_hair else 0.0
-				var q := top.lerp(bot, u) + Vector2((sin(u * PI) * 7 + curl) * b, 0)
+				var q := top.lerp(bot, u) + Vector2((sin(u * PI) * (7 + 3 * pull) + curl) * b, 0)
 				pts.append(grip + leap + (q - grip).rotated(tilt))
 			var bow_col := wood if kind == "bow" else FkPaint.tint(Color("e8e4d4"), pose)
 			ci.draw_polyline(pts, bow_col, 2.6 * b)

@@ -359,7 +359,7 @@ func test_bow_draw_anchor_and_release() -> void:
 	check(pre.elbow_n.x > pre.sh_n.x + 3.0 and absf(pre.elbow_n.y - pre.sh_n.y) < 3.5, "pre-draw: elbow in front at shoulder height")
 	# (With the figure's arm lengths, an elbow straight back at shoulder height puts the hand under the
 	# back of the jawline.)
-	check(wind.hand_n.distance_to(wind.sh + Vector2(0, -5.5)) < 2.0, "full draw: hand anchored under the jawline")
+	check(wind.hand_n.distance_to(wind.sh + Vector2(-2.5, -5.5)) < 2.0, "full draw: hand anchored at the back of the jaw")
 	check(wind.hand_n.y > wind.eye.y + 3.0, "arrow rests beneath the sighting eye")
 	check(wind.elbow_n.x < wind.sh_n.x - 2.0, "full draw: elbow pulled straight back behind the archer")
 	check(absf(wind.elbow_n.y - wind.sh_n.y) < 3.5, "full draw: elbow level with the shoulder")
@@ -615,3 +615,27 @@ func test_shield_braced_on_the_march_and_for_spears() -> void:
 		check_near(j.shield_turn, 0.5, 1e-4, "shield wall march")
 	for atk in [-1.0, 0.34, 0.5]:
 		check_near(FkSkeleton.solve(1.0, "spear", {"atk": atk}, "round").shield_turn, 0.5, 1e-4, "spear and shield at %s" % atk)
+
+
+# --- Refinements (owner, 2026-09-28) ------------------------------------------------------------
+
+func test_lance_arm_locks_straight_on_the_thrust() -> void:
+	var hit := _ride("lance", 0.55)
+	check(hit.sh_n.distance_to(hit.hand_n) > (FkSkeleton.UPPER + FkSkeleton.FORE) * 0.97, "full extension at the end of the thrust")
+
+
+func test_bow_full_draw_has_range() -> void:
+	# Owner: "the pull lacks weight" — at least 2 px longer than the old anchor under the jaw (13.8 px).
+	var wind := FkSkeleton.solve(1.0, "bow", {"atk": 0.34})
+	check(wind.hand_f.x - wind.hand_n.x >= 16.0, "draw length %.1f px" % (wind.hand_f.x - wind.hand_n.x))
+
+
+func test_staff_raised_one_handed_straight_at_45_degrees() -> void:
+	var hit := FkSkeleton.solve(1.0, "staff", {"atk": 0.55})
+	var arm: Vector2 = hit.hand_n - hit.sh_n
+	check(arm.length() > (FkSkeleton.UPPER + FkSkeleton.FORE) * 0.97, "arm, elbow and hand in one straight line")
+	check(absf(rad_to_deg(arm.angle()) + 45.0) < 8.0, "raised about 45 degrees (got %.0f)" % rad_to_deg(-arm.angle()))
+	# The staff runs from 22 px behind the hand to its head (FkWeapons "staff").
+	var butt: Vector2 = hit.hand_n - hit.dir * 22.0
+	var near := Geometry2D.get_closest_point_to_segment(hit.hand_f, butt, hit.hand_n)
+	check(near.distance_to(hit.hand_f) > 6.0, "the other hand has let go of the staff")
