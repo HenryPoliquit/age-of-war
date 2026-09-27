@@ -144,27 +144,33 @@ It has no drawing, so it can be unit-tested headless.
 
   They have no human limbs. If a sheet shows a problem with them, it gets flagged separately.
 
-## 3. Melee spacing (sim: `scripts/sim/`, data: `data/`)
+## 3. Melee spacing (view only — revised 2026-09-27)
 
-- **New data stat:** `UnitDef.footprint`, in px. It is the half-depth from the unit's centre to its front edge, body only (not the weapon). Races are cosmetic and share one `UnitDef`, so each value is the largest across the three races' art.
+**Revision (owner decision, after harness evidence).** Keeping the gap *in the sim* moved balance no matter how reach was measured. At 60 matches per test:
+- **Edge distances for all units:** Ranged spam 48% → 73%.
+- **Edge distances for melee only:** Vanguard spam 22% → 50%, Siege spam 15% → 35%, Tactician mirror 11:25 → 15:45.
 
-  | Units | Footprint (px) |
+Moving fighters apart moves everything positioned relative to them. So the sim is unchanged: `melee_contact` stays 8 px centre to centre, and there are no footprints in data.
+
+**The gap is presentation.**
+- `FkUnits.depth(spec)`: body half-depth in local px, centre to front edge, weapon excluded. The values were measured from renders with weapons removed:
+
+  | Rig | Depth (px) |
   |---|---|
-  | foot units | ~10 |
-  | heavies (mounts, chariots, steam tank, golem, treant) | ~26 |
-  | siege machines | ~22 |
+  | humanoid | 10 (+8 with a shield) |
+  | mounted, chariot, sky cannon | 50 |
+  | cannon | 48 |
+  | ballista | 46 |
+  | ram | 45 |
+  | steam tank | 43 |
+  | obelisk | 36 |
+  | catapult, trebuchet | 34 |
+  | golem | 33 |
+  | treant | 30 |
 
-  Final values come from measuring the gallery.
-- **Unit-vs-unit distances become edge-to-edge.** Every unit-to-unit distance in the sim (targeting and the melee press-in limit) is `centre distance − attacker.footprint − target.footprint`.
-- **`melee_contact` now means the visible gap between fronts.** It stays 8 px, and ranges stay unchanged.
-
-  In edge terms, nothing about who can reach whom changes. Four ranks of Vanguards still attack, exactly as today, but the bodies now stand 8 px apart instead of overlapping. The strike pose reaches across that gap, so the swing still visibly "hits".
-- **Structures:** a unit's own footprint is subtracted from its distance to the enemy gate, so it stops in front of the gate rather than inside it.
-- **Allied stacking (`unit_spacing`) is unchanged.**
-- **Balance:**
-  - Ranged units now measure to the enemy's front edge, so they fire slightly sooner.
-  - Run the harness before and after.
-  - Record the change in `docs/balance_log.md` and attach `reports/sim_report.md`, per project rules.
+- `WorldLayer.drawn_x(def, side, sim_x)` draws each unit that far back toward its own base (× `UNIT_SCALE`). Two bodies the sim keeps 8 px apart centre to centre are then drawn with their fronts 8 px apart.
+- Shot origins and targets, turret targets, splash flashes, HP bars and corpses all use the drawn x.
+- **Cost:** a unit is drawn up to 62 world px behind its sim spot, so a skill-zone edge can look about one body off. Cavalry with short weapons (sabre) may swing short of an opposing horse. The skeleton pass (§1) adds a lunge on the strike.
 
 ## 4. Review tooling
 
@@ -190,7 +196,8 @@ Batches go in this order, each shown for all three races and then approved:
   - out-of-reach targets clamp;
   - the strike hand is ahead of the guard hand for chop and thrust;
   - the axe's leading edge faces the swing direction at contact.
-- **Sim** (`tests/test_combat.gd`):
+- **Presentation depth** (`tests/test_fk_units.gd::test_depth_per_rig`): per-rig depths as measured; +8 for shield bearers. (The original sim tests below were dropped with the sim approach.)
+- ~~**Sim**~~ (`tests/test_combat.gd`, dropped):
   - two melee fronts stop with an 8 px gap between their edges;
   - cavalry against cavalry doesn't overlap;
   - the number of Vanguard ranks in reach of the enemy front is the same as before (4);

@@ -70,7 +70,14 @@ func unit_pos(u: SimUnit) -> Vector2:
 	var sim := view.sim
 	var p: float = view.prev_progress.get(u.id, u.progress)
 	var prog := lerpf(p, u.progress, view.alpha)
-	return Vector2(sim.to_world(u.side, prog), GROUND_Y + jitter(u.id))
+	return Vector2(drawn_x(u.def, u.side, sim.to_world(u.side, prog)), GROUND_Y + jitter(u.id))
+
+
+## Where a unit at sim x is drawn: shifted back toward its own base by its body half-depth, so two
+## opposing bodies the sim keeps melee_contact apart (centre to centre) stand that far apart instead
+## of overlapping. Presentation only — the sim never sees it.
+func drawn_x(def: UnitDef, side: int, sim_x: float) -> float:
+	return sim_x - (1.0 if side == 0 else -1.0) * UnitArt.depth_for(def, view.race_of(side)) * UNIT_SCALE
 
 
 func _process(delta: float) -> void:

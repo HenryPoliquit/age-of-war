@@ -32,3 +32,15 @@ func test_kit_has_no_hidden_draw_state() -> void:
 	check(not src.contains("static var look"), "the race look is passed in the spec, not held in a static")
 	var figure := FileAccess.get_file_as_string("res://addons/figure_kit/figure.gd")
 	check(figure.contains("static func dress("), "crews inherit the parent's look through dress()")
+
+
+func test_depth_per_rig() -> void:
+	# Half-depth of the body (centre to front edge, weapon excluded), measured from the renders: the view
+	# draws each unit this far back toward its own base, so opposing bodies stand apart while the sim
+	# measures centre to centre.
+	check_near(FkUnits.depth({"rig": "humanoid"}), 10.0, 1e-4, "foot")
+	check_near(FkUnits.depth({"rig": "humanoid", "shield": "kite"}), 18.0, 1e-4, "shield bearer")
+	var measured := {"mounted": 50.0, "chariot": 50.0, "ram": 45.0, "catapult": 34.0, "trebuchet": 34.0, "cannon": 48.0,
+		"steamtank": 43.0, "golem": 33.0, "treant": 30.0, "skycannon": 50.0, "ballista": 46.0, "obelisk": 36.0}
+	for rig in measured:
+		check_near(FkUnits.depth({"rig": rig}), measured[rig], 1e-4, rig)

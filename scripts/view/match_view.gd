@@ -392,10 +392,10 @@ func _on_shot(f: Dictionary) -> void:
 	var dir := 1.0 if f.side == 0 else -1.0
 	var L := WorldLayer.anim_len(def)
 	var target: SimUnit = f.target
-	var origin := Vector2(f.from_x, GROUND_Y + WorldLayer.jitter(u.id))
+	var origin := Vector2(world.drawn_x(def, f.side, f.from_x), GROUND_Y + WorldLayer.jitter(u.id))
 	var to: Vector2
 	if target != null:
-		to = Vector2(f.to_x, GROUND_Y + WorldLayer.jitter(target.id) - UnitArt.height_for(target.def, race_of(target.side)) * WorldLayer.UNIT_SCALE * 0.5)
+		to = Vector2(world.drawn_x(target.def, target.side, f.to_x), GROUND_Y + WorldLayer.jitter(target.id) - UnitArt.height_for(target.def, race_of(target.side)) * WorldLayer.UNIT_SCALE * 0.5)
 	else:
 		to = Vector2(f.to_x + dir * 40.0, GROUND_Y - 70.0)
 	var dtype: String = def.damage_type
@@ -450,7 +450,8 @@ func _on_turret_shot(f: Dictionary) -> void:
 	var sp := BaseArt.mount_pos(f.slot, race_of(side), def.age)
 	var from := Vector2(gate + dir * sp.x, GROUND_Y + 4 + sp.y - 8)
 	var target: SimUnit = f.target
-	var to := Vector2(f.to_x, GROUND_Y - (UnitArt.height_for(target.def, race_of(target.side)) * 0.5 if target != null else 6.0))
+	var to_x: float = world.drawn_x(target.def, target.side, f.to_x) if target != null else f.to_x
+	var to := Vector2(to_x, GROUND_Y - (UnitArt.height_for(target.def, race_of(target.side)) * 0.5 if target != null else 6.0))
 	var kind: String = TURRET_KIND.get(def.kind, ["stone"])[clampi(def.age - 1, 0, 5)]
 	var tid := target.id if target != null else -1
 	var splash := def.kind == "artillery"
@@ -466,7 +467,7 @@ func _on_turret_shot(f: Dictionary) -> void:
 			flash_at[tid] = anim_time
 		if splash:
 			for v in sim.sides[enemy].units:
-				if absf(sim.to_world(v.side, v.progress) - to.x) <= radius:
+				if absf(world.drawn_x(v.def, v.side, sim.to_world(v.side, v.progress)) - to.x) <= radius:
 					flash_at[v.id] = anim_time, splash)
 	if kind == "bolt":
 		fx.projectiles[-1]["col"] = col
@@ -474,7 +475,7 @@ func _on_turret_shot(f: Dictionary) -> void:
 
 func _on_death(f: Dictionary) -> void:
 	var def: UnitDef = f.def
-	world.add_corpse(def, f.x, f.side, f.unit_id)
+	world.add_corpse(def, world.drawn_x(def, f.side, f.x), f.side, f.unit_id)
 	audio.play("death", Vector2(f.x, GROUND_Y), -4.0)
 	match UnitArt.wreck_kind(UnitArt.style_for(def, race_of(f.side))):
 		"blast":

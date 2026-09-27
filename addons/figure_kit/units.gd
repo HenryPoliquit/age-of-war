@@ -4,22 +4,23 @@ extends RefCounted
 ## team) drawn with a `pose` Dictionary {walk, move, atk, t, flash}; see README.md.
 
 
-## Per-rig facts the view needs: visual height, projectile, muzzle (local, pre-scale), whether a
-## death leaves a wreck (no topple) and what it looks like.
+## Per-rig facts the view needs: body half-depth (centre to front edge, weapon excluded), visual
+## height, projectile, muzzle (local, pre-scale), whether a death leaves a wreck (no topple) and what
+## it looks like.
 const RIGS := {
-	"humanoid": {"h": 66.0},
-	"mounted": {"h": 82.0},
-	"chariot": {"h": 82.0, "wreck": "siege"},
-	"ram": {"h": 56.0, "wreck": "siege"},
-	"catapult": {"h": 76.0, "wreck": "siege", "shot": "shell", "muzzle": Vector2(8, -80)},
-	"ballista": {"h": 60.0, "wreck": "siege", "shot": "javelin", "muzzle": Vector2(38, -40)},
-	"trebuchet": {"h": 96.0, "wreck": "siege", "shot": "shell", "muzzle": Vector2(32, -88)},
-	"cannon": {"h": 56.0, "wreck": "blast", "shot": "ball", "muzzle": Vector2(46, -34), "gun": true},
-	"steamtank": {"h": 72.0, "wreck": "blast", "shot": "bolt", "muzzle": Vector2(42, -46), "gun": true},
-	"golem": {"h": 90.0, "wreck": "blast"},
-	"treant": {"h": 104.0},
-	"skycannon": {"h": 70.0, "wreck": "blast", "shot": "bolt", "muzzle": Vector2(52, -60), "gun": true},
-	"obelisk": {"h": 100.0, "wreck": "siege", "shot": "bolt", "muzzle": Vector2(4, -80), "gun": true},
+	"humanoid": {"depth": 10.0, "h": 66.0},
+	"mounted": {"depth": 50.0, "h": 82.0},
+	"chariot": {"depth": 50.0, "h": 82.0, "wreck": "siege"},
+	"ram": {"depth": 45.0, "h": 56.0, "wreck": "siege"},
+	"catapult": {"depth": 34.0, "h": 76.0, "wreck": "siege", "shot": "shell", "muzzle": Vector2(8, -80)},
+	"ballista": {"depth": 46.0, "h": 60.0, "wreck": "siege", "shot": "javelin", "muzzle": Vector2(38, -40)},
+	"trebuchet": {"depth": 34.0, "h": 96.0, "wreck": "siege", "shot": "shell", "muzzle": Vector2(32, -88)},
+	"cannon": {"depth": 48.0, "h": 56.0, "wreck": "blast", "shot": "ball", "muzzle": Vector2(46, -34), "gun": true},
+	"steamtank": {"depth": 43.0, "h": 72.0, "wreck": "blast", "shot": "bolt", "muzzle": Vector2(42, -46), "gun": true},
+	"golem": {"depth": 33.0, "h": 90.0, "wreck": "blast"},
+	"treant": {"depth": 30.0, "h": 104.0},
+	"skycannon": {"depth": 50.0, "h": 70.0, "wreck": "blast", "shot": "bolt", "muzzle": Vector2(52, -60), "gun": true},
+	"obelisk": {"depth": 36.0, "h": 100.0, "wreck": "siege", "shot": "bolt", "muzzle": Vector2(4, -80), "gun": true},
 }
 
 
@@ -92,3 +93,11 @@ static func shot(spec: Dictionary) -> String:
 		return spec.shot
 	var info: Dictionary = RIGS.get(spec.rig, {})
 	return FkWeapons.SHOTS.get(spec.get("weapon", ""), info.get("shot", "")) if spec.rig == "humanoid" else info.get("shot", "")
+
+
+## Half-depth of the body in px, centre to front edge (weapon excluded). Draw a unit this far back
+## toward its own side and two opposing bodies whose centres touch stand apart instead of overlapping.
+static func depth(spec: Dictionary) -> float:
+	var d: float = RIGS.get(spec.rig, {}).get("depth", 10.0)
+	# A carried shield stands proud of a foot soldier's chest.
+	return d + (8.0 if spec.rig == "humanoid" and spec.get("shield", "") != "" else 0.0)

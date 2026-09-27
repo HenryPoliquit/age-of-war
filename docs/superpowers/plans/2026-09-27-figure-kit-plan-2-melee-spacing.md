@@ -1,5 +1,7 @@
 # Figure Kit — Plan 2: Melee Spacing Implementation Plan
 
+> **Superseded during execution (2026-09-27).** Task 1 shipped and was then reverted. The harness showed the sim gap moves balance (see the spec §3 revision). The owner chose a view-only offset instead: `FkUnits.depth` + `WorldLayer.drawn_x`. The ledger records the evidence and rulings. The tasks below are kept as the record of what was tried.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Opposing units stop with a visible gap between their bodies, while the same number of ranks still fight (owner's choice: "gap + same reach").

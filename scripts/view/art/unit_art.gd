@@ -48,6 +48,12 @@ static func height_for(def: UnitDef, race: StringName = &"human") -> float:
 	return FkUnits.height(style_for(def, race).merged({"look": RaceLook.look(race)}))
 
 
+## Body half-depth in local px (centre to front edge): the view draws units this far back so opposing
+## bodies don't overlap.
+static func depth_for(def: UnitDef, race: StringName = &"human") -> float:
+	return FkUnits.depth(style_for(def, race))
+
+
 ## Muzzle in unit-local space (feet origin, facing +x).
 static func muzzle_for(st: Dictionary) -> Vector2:
 	return FkUnits.muzzle(st)
