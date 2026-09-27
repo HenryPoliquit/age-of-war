@@ -11,8 +11,10 @@ const FORE := 8.5
 const SPINE := 20.0
 ## Standing hip height: a little under THIGH + SHIN so knees are soft.
 const HIP_Y := 28.0
-## Ankle height above the ground line (the boot's sole is below it).
-const ANKLE := 1.2
+## Boot outline around the ankle (× build): heel, instep, toe, sole. solve() keeps its lowest point on the ground.
+const BOOT := [Vector2(-3.2, -6), Vector2(3, -6), Vector2(4.5, -2), Vector2(8.5, -0.5), Vector2(8.5, 1.5), Vector2(-3.5, 1.5)]
+## Default elbow bend side: down and a little back.
+const ELBOW := Vector2(-0.3, 1.0)
 
 
 ## Middle joint (knee, elbow) of a two-bone limb from `root` to `target`. Of the two solutions it
@@ -36,21 +38,33 @@ static func reach(root: Vector2, target: Vector2, l1: float, l2: float) -> Vecto
 
 ## Weapon kind → stance family.
 const FAMILY := {
-	"club": "chop", "sword": "chop", "saber": "chop", "gladius": "chop", "axe": "chop", "hammer": "chop",
-	"rune_hammer": "chop", "leafblade": "chop", "spellsword": "chop", "baton": "chop", "shovel": "chop",
+	"club": "blade", "sword": "blade", "saber": "blade", "gladius": "blade", "leafblade": "blade",
+	"spellsword": "blade", "baton": "blade", "shovel": "blade",
+	"axe": "chop", "hammer": "chop", "rune_hammer": "chop",
 	"spear": "thrust", "lance": "thrust", "halberd": "pole", "glaive": "pole",
 	"musket": "aim", "rifle": "aim", "arcane_rifle": "aim", "rune_rifle": "aim", "crossbow": "aim",
 	"bow": "bow", "starbow": "bow", "javelin": "throw", "throwing_axe": "throw", "sling": "sling",
 	"staff": "staff", "crew": "crew",
 }
 
-## Keyframes guard / wind / hit, relative to the shoulder line `sh`, in px × build:
-## h = near-hand target, f = far-hand target (absent = hangs and counter-swings), a = weapon angle
-## (rad; 0 = forward, −PI/2 = up), lean = torso lean (rad, + forward), lunge = body shift forward (px).
-## arc = the near hand travels around the shoulder (overhead chops) instead of in a straight line.
+## Keyframes guard / wind / hit, relative to the shoulder line `sh`, in px × build. Channels:
+##   h  near-hand target        f   far-hand target (absent = hangs and counter-swings)
+##   a  weapon angle (rad; 0 = forward, −PI/2 = up) — a fast change against the forearm is a wrist snap
+##   s / sf  near / far shoulder offset     e / ef  near / far elbow bend side
+##   lean  torso lean (rad, + forward)      lunge  body shift forward (px)
+##   crouch  hip drop (px)                  step  passing step (0..1: the back foot swings through to the front)
+## path: "line" (the near hand travels straight between keys) or "arc" (around the shoulder, overhead chops).
 const STANCES := {
 	"idle": {"guard": {"h": Vector2(3, 16)}, "wind": {"h": Vector2(3, 16)}, "hit": {"h": Vector2(3, 16)}},
-	"chop": {"arc": true,
+	# One-handed blade: chambered high beside the ear, blade back; a passing step and a steep straight cut
+	# down to mid-height with the wrist snapping the blade level; off hand at the chest, checking to the ribs.
+	"blade": {"path": "line",
+		"guard": {"h": Vector2(13, 3), "a": -0.5, "f": Vector2(4, 6), "crouch": 1.0, "lean": 0.03},
+		"wind": {"h": Vector2(-2, -10), "a": -2.3, "f": Vector2(3, 6), "s": Vector2(-1, -2), "e": Vector2(1, 0.5),
+			"crouch": 2.5, "lean": -0.05, "lunge": -1.0},
+		"hit": {"h": Vector2(15, 3), "a": 0.02, "f": Vector2(-1, 8), "s": Vector2(2, 1), "crouch": 3.0, "lean": 0.18,
+			"lunge": 7.0, "step": 1.0}},
+	"chop": {"path": "arc",
 		"guard": {"h": Vector2(14, 5), "a": -0.33},
 		"wind": {"h": Vector2(3.6, -14.5), "a": -2.03, "lean": -0.08, "lunge": -1.5},
 		"hit": {"h": Vector2(13, 9), "a": 0.1, "lean": 0.2, "lunge": 6.0}},
@@ -70,7 +84,7 @@ const STANCES := {
 		"guard": {"h": Vector2(11, 1), "f": Vector2(15, 1), "a": 0.0},
 		"wind": {"h": Vector2(3, -3), "f": Vector2(16, 0), "a": 0.0, "lean": -0.03},
 		"hit": {"h": Vector2(11, 1), "f": Vector2(15, 1), "a": 0.0}},
-	"throw": {"arc": true,
+	"throw": {"path": "arc",
 		"guard": {"h": Vector2(4, -9), "a": -0.23},
 		"wind": {"h": Vector2(-7, -10), "a": -0.35, "lean": -0.1, "lunge": -1.5},
 		"hit": {"h": Vector2(15, 0), "a": 0.1, "lean": 0.2, "lunge": 6.0}},
@@ -85,6 +99,9 @@ const STANCES := {
 
 ## Far-hand shield grip (relative to sh) for shield bearers: holds the shield in front of the chest.
 const SHIELD_GRIP := Vector2(6, 11)
+
+const _FLOATS := ["a", "lean", "lunge", "crouch", "step"]
+const _VECTORS := {"s": Vector2.ZERO, "sf": Vector2.ZERO, "e": ELBOW, "ef": ELBOW}
 
 
 ## One frame's keyframe values, on FkUnits.swing's beats: guard → wind (anticipation, 0–0.35),
@@ -104,21 +121,42 @@ static func key(family: String, atk: float) -> Dictionary:
 	elif atk >= 0.55:
 		a = st.hit
 		k = ease((atk - 0.55) / 0.45, 1.6)
-	var out := {"lean": lerpf(a.get("lean", 0.0), z.get("lean", 0.0), k),
-		"lunge": lerpf(a.get("lunge", 0.0), z.get("lunge", 0.0), k),
-		"a": lerpf(a.get("a", 0.0), z.get("a", 0.0), k), "two": st.get("two", false)}
+	var out := {"two": st.get("two", false)}
+	for c in _FLOATS:
+		out[c] = lerpf(a.get(c, 0.0), z.get(c, 0.0), k)
+	for c in _VECTORS:
+		out[c] = (a.get(c, _VECTORS[c]) as Vector2).lerp(z.get(c, _VECTORS[c]), k)
 	var h0: Vector2 = a.h
 	var h1: Vector2 = z.h
-	if st.get("arc", false):
+	if st.get("path", "line") == "arc":
 		out["h"] = Vector2.from_angle(lerpf(h0.angle(), h1.angle(), k)) * lerpf(h0.length(), h1.length(), k)
 	else:
 		out["h"] = h0.lerp(h1, k)
 	if a.has("f"):
 		out["f"] = (a.f as Vector2).lerp(z.f, k)
+	# The swinging foot of a passing step lifts mid-way through it.
+	out["step_lift"] = sin(k * PI) if a.get("step", 0.0) != z.get("step", 0.0) else 0.0
 	return out
 
 
-## All joints for one frame. b = build; pose = {walk, move, atk}; shield = far hand holds a shield;
+## Boot outline points for an ankle at `foot`, rotated by `rot` (rad; − = toes up, + = heel up).
+static func boot(foot: Vector2, rot: float, b: float) -> Array:
+	return BOOT.map(func(p: Vector2) -> Vector2: return foot + (p * b).rotated(rot))
+
+
+## Heel-to-toe roll over a stride: toes up as the foot lands in front (phase PI/2), heel up as it
+## pushes off behind (3·PI/2), flat in between.
+static func _roll(ph: float) -> float:
+	return -0.35 * _bell(ph - PI / 2) + 0.5 * _bell(ph - 3 * PI / 2)
+
+
+## A single bump of width PI/2 centred on d = 0 (one stride is TAU).
+static func _bell(d: float) -> float:
+	var w := wrapf(d, -PI, PI)
+	return cos(2.0 * w) if absf(w) < PI / 4 else 0.0
+
+
+## All joints for one frame. b = build; pose = {walk, move, atk, t}; shield = far hand holds a shield;
 ## seated = rider (one leg in a stirrup, no walk cycle).
 static func solve(b: float, weapon: String, pose: Dictionary, shield := false, seated := false) -> Dictionary:
 	var mv: float = pose.get("move", 1.0 if pose.get("moving", false) else 0.0)
@@ -127,32 +165,48 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := false, s
 	var k := key(FAMILY.get(weapon, "idle"), pose.get("atk", -1.0))
 	var bob := lerpf(sin(t * 2.1) * 0.7, absf(sin(walk)) * 2.2, mv)
 	var lunge: float = k.lunge * b * (0.0 if seated else 1.0)
-	var hip := Vector2(lunge * 0.6, -HIP_Y * b + bob * 0.5)
+	var crouch: float = k.crouch * b * (0.0 if seated else 1.0)
+	var hip := Vector2(lunge * 0.6, -HIP_Y * b + bob * 0.5 + crouch)
 	var sh := hip + Vector2(1.5 * b, -SPINE * b).rotated(k.lean)
-	var j := {"hip": hip, "sh": sh, "lean": k.lean, "lunge": lunge, "dir": Vector2.from_angle(k.a)}
-	# Legs: feet on the ground line; a stride with lift while walking, the front foot planted forward on a lunge.
+	var j := {"hip": hip, "sh": sh, "lean": k.lean, "lunge": lunge, "crouch": k.crouch, "dir": Vector2.from_angle(k.a),
+		"e_n": k.e, "e_f": k.ef}
+	# Legs: feet on the ground line; a stride with lift and heel-to-toe roll while walking, the front
+	# foot planted forward on a lunge, the back foot swinging through on a passing step.
 	for i in 2:
 		var foot: Vector2
+		var rot := 0.0
 		if seated:
 			foot = hip + Vector2(5.0 - 3.0 * i, 16.0) * b
+			rot = -0.3
 		else:
 			var ph := walk + PI * i
-			var fx := lerpf(2.8 if i == 0 else -3.6, 13.0 * sin(ph), mv) + (lunge * 1.6 / b if i == 0 else 0.0)
+			var fx := lerpf(2.8 if i == 0 else -3.6, 13.0 * sin(ph), mv)
 			var lift := 4.5 * maxf(0.0, cos(ph)) * mv
-			# The ankle sits ANKLE above the ground so the boot's sole is on it.
-			foot = Vector2(fx * b, -(ANKLE + lift) * b)
+			rot = _roll(ph) * mv
+			if i == 0:
+				fx += lunge * 1.6 / b * (1.0 - k.step)
+			else:
+				fx = lerpf(fx, 2.8 + lunge * 1.6 / b, k.step)
+				lift += 4.0 * k.step_lift
+				rot -= 0.2 * k.step_lift
+			foot = Vector2(fx * b, -lift * b)
+			# Keep the boot's lowest point on (never under) the ground.
+			var low := 0.0
+			for p in BOOT:
+				low = maxf(low, ((p as Vector2) * b).rotated(rot).y)
+			foot.y = minf(foot.y, -low)
 		foot = reach(hip, foot, THIGH * b, SHIN * b)
 		var tag := "n" if i == 0 else "f"
 		j["foot_" + tag] = foot
+		j["rot_" + tag] = rot
 		j["knee_" + tag] = ik(hip, foot, THIGH * b, SHIN * b, Vector2.RIGHT)
-	# Arms: near arm to the stance's hand target; far arm to the shield grip, the weapon (two-handed),
-	# the stance's far target, or hanging with a counter-swing.
-	j["sh_n"] = sh + Vector2(2, 1) * b
-	j["sh_f"] = sh + Vector2(-3, 1) * b
-	var elbow_side := Vector2(-0.3, 1.0)
+	# Arms: shoulders move with the pose; near arm to the stance's hand target; far arm to the shield
+	# grip, the stance's far target, the weapon (two-handed), or hanging with a counter-swing.
+	j["sh_n"] = sh + Vector2(2, 1) * b + (k.s as Vector2) * b
+	j["sh_f"] = sh + Vector2(-3, 1) * b + (k.sf as Vector2) * b
 	var hand_n := reach(j.sh_n, sh + (k.h as Vector2) * b, UPPER * b, FORE * b)
 	j["hand_n"] = hand_n
-	j["elbow_n"] = ik(j.sh_n, hand_n, UPPER * b, FORE * b, elbow_side)
+	j["elbow_n"] = ik(j.sh_n, hand_n, UPPER * b, FORE * b, k.e)
 	var ft: Vector2
 	if shield:
 		ft = sh + SHIELD_GRIP * b
@@ -164,5 +218,5 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := false, s
 		ft = j.sh_f + Vector2(0, 16.5 * b).rotated(sin(walk) * 0.5 * mv - 0.1)
 	var hand_f := reach(j.sh_f, ft, UPPER * b, FORE * b)
 	j["hand_f"] = hand_f
-	j["elbow_f"] = ik(j.sh_f, hand_f, UPPER * b, FORE * b, elbow_side)
+	j["elbow_f"] = ik(j.sh_f, hand_f, UPPER * b, FORE * b, k.ef)
 	return j

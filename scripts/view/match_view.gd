@@ -395,7 +395,7 @@ func _on_shot(f: Dictionary) -> void:
 	var origin := Vector2(world.drawn_x(def, f.side, f.from_x), GROUND_Y + WorldLayer.jitter(u.id))
 	var to: Vector2
 	if target != null:
-		to = Vector2(world.drawn_x(target.def, target.side, f.to_x), GROUND_Y + WorldLayer.jitter(target.id) - UnitArt.height_for(target.def, race_of(target.side)) * WorldLayer.UNIT_SCALE * 0.5)
+		to = Vector2(world.drawn_x(target.def, target.side, f.to_x), GROUND_Y + WorldLayer.jitter(target.id) - UnitArt.height_for(target.def, race_of(target.side)) * WorldLayer.UNIT_SCALE * AIM)
 	else:
 		to = Vector2(f.to_x + dir * 40.0, GROUND_Y - 70.0)
 	var dtype: String = def.damage_type
@@ -436,6 +436,9 @@ func _on_shot(f: Dictionary) -> void:
 			fx.projectiles[-1]["col"] = col)
 
 
+## Attacks land between the target's head and chest: this fraction of its drawn height.
+const AIM := 0.72
+
 const TURRET_KIND := {
 	"sentry": ["stone", "arrow", "javelin", "bullet", "tracer", "bolt"],
 	"artillery": ["shell", "shell", "shell", "ball", "shell", "bolt"],
@@ -451,7 +454,7 @@ func _on_turret_shot(f: Dictionary) -> void:
 	var from := Vector2(gate + dir * sp.x, GROUND_Y + 4 + sp.y - 8)
 	var target: SimUnit = f.target
 	var to_x: float = world.drawn_x(target.def, target.side, f.to_x) if target != null else f.to_x
-	var to := Vector2(to_x, GROUND_Y - (UnitArt.height_for(target.def, race_of(target.side)) * 0.5 if target != null else 6.0))
+	var to := Vector2(to_x, GROUND_Y - (UnitArt.height_for(target.def, race_of(target.side)) * WorldLayer.UNIT_SCALE * AIM if target != null else 6.0))
 	var kind: String = TURRET_KIND.get(def.kind, ["stone"])[clampi(def.age - 1, 0, 5)]
 	var tid := target.id if target != null else -1
 	var splash := def.kind == "artillery"

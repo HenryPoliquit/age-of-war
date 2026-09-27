@@ -12,6 +12,13 @@ const SHOTS := {"sling": "stone", "javelin": "javelin", "throwing_axe": "axe", "
 
 const CHOP := ["club", "sword", "gladius", "shovel", "baton", "saber", "axe", "hammer", "leafblade", "spellsword", "rune_hammer"]
 
+## Hand-weapon lengths from the grip to the tip, px × build.
+const LENGTH := {"club": 20.0, "gladius": 16.0, "axe": 20.0, "hammer": 20.0, "rune_hammer": 21.0, "leafblade": 22.0, "baton": 18.0}
+
+
+static func weapon_length(kind: String) -> float:
+	return LENGTH.get(kind, 22.0)
+
 
 ## Side a bladed head's edge faces: the leading side of the figure's forward/downward strike.
 static func edge_normal(dir: Vector2) -> Vector2:
@@ -27,15 +34,9 @@ static func weapon(ci: CanvasItem, kind: String, j: Dictionary, b: float, s: flo
 	var dirv: Vector2 = j.dir
 	var en := edge_normal(dirv)
 	if kind in CHOP:
-		var length: float = {"club": 20.0, "gladius": 16.0, "axe": 20.0, "hammer": 20.0, "rune_hammer": 21.0, "leafblade": 22.0, "baton": 18.0}.get(kind, 22.0)
+		var length := weapon_length(kind)
 		var orth := dirv.orthogonal()
 		var tip := hand + dirv * length * b
-		var sh: Vector2 = j.sh
-		if atk >= 0.35 and atk < 0.55:
-			# Smear along the tip's path from the wind-up, fading out after contact.
-			var w := FkSkeleton.key("chop", 0.349)
-			var t0 := (w.h as Vector2) * b + Vector2.from_angle(w.a) * length * b
-			ci.draw_arc(sh, (tip - sh).length(), t0.angle(), (tip - sh).angle(), 12, Color(metal.lightened(0.5), 0.45 * (0.55 - atk) / 0.2), 4.0 * b)
 		match kind:
 			"club":
 				ci.draw_line(hand, tip, wood, 4.5 * b)
@@ -95,7 +96,7 @@ static func weapon(ci: CanvasItem, kind: String, j: Dictionary, b: float, s: flo
 					FkPaint.poly(ci, [at.call(0.0, -2.6), at.call(8.0, 0.0), at.call(0.0, 2.6)], metal.lightened(0.2))
 			if kind == "lance":
 				ci.draw_line(back + dirv * 8, back + dirv * 14, tm, 4.0 * b)
-			ci.draw_circle(hand, 3.2 * b, skin)
+			FkFigure.fist(ci, hand, dirv.angle(), b, skin, false)
 		"javelin", "throwing_axe":
 			if atk < 0.0 or atk < 0.4 or atk > 0.9:
 				if kind == "javelin":
@@ -105,7 +106,7 @@ static func weapon(ci: CanvasItem, kind: String, j: Dictionary, b: float, s: flo
 				else:
 					ci.draw_line(hand + Vector2(-2, 6) * b, hand + Vector2(1, -10) * b, wood, 2.2 * b)
 					FkPaint.poly(ci, [hand + Vector2(1, -10) * b, hand + Vector2(7, -13) * b, hand + Vector2(7, -5) * b, hand + Vector2(1, -7) * b], metal)
-				ci.draw_circle(hand, 3.2 * b, skin)
+				FkFigure.fist(ci, hand, dirv.angle(), b, skin, false)
 		"sling":
 			var spin := t * (22.0 if atk >= 0.0 and atk < 0.4 else 5.0)
 			var stone := hand + Vector2(cos(spin), sin(spin) * 0.5) * 10 * b
@@ -136,8 +137,7 @@ static func weapon(ci: CanvasItem, kind: String, j: Dictionary, b: float, s: flo
 					FkPaint.halo(ci, head, 4.0 * b, g, 0.6)
 				else:
 					ci.draw_line(nock, head, wood.lightened(0.3), 1.5)
-			ci.draw_circle(grip, 3.2 * b, skin)
-			ci.draw_circle(nock, 3.2 * b, skin)
+			FkFigure.fist(ci, grip, -PI / 2, b, skin, false)
 		"staff":
 			# Staff held in both hands; on the attack it is thrust forward and the head flares.
 			var fw := maxf(0.0, s)
@@ -147,7 +147,7 @@ static func weapon(ci: CanvasItem, kind: String, j: Dictionary, b: float, s: flo
 			var k := 0.6 + 0.4 * sin(t * 3.0) + fw
 			FkPaint.halo(ci, top + Vector2(0, -3) * b, 6.0 * b * (1.0 + fw), g, minf(1.0, k))
 			ci.draw_circle(top + Vector2(0, -3) * b, 2.2 * b, Color(1, 1, 1, 0.95))
-			ci.draw_circle(hand, 3.2 * b, skin)
+			FkFigure.fist(ci, hand, dirv.angle(), b, skin, false)
 		"crossbow", "musket", "rifle", "arcane_rifle", "rune_rifle":
 			# Stock at the shoulder, both hands on the gun; the stance's recoil moves and tilts it.
 			var rot := dirv.angle()
@@ -175,4 +175,4 @@ static func weapon(ci: CanvasItem, kind: String, j: Dictionary, b: float, s: flo
 					FkPaint.ellipse(ci, at.call(12.0, 1.5), Vector2(2.4, 2.4) * b, Color(g, 0.9))
 					for i in 3:
 						ci.draw_line(at.call(16.0 + i * 4, -2.5), at.call(16.0 + i * 4, 0.5), metal.lightened(0.2), 1.0)
-			ci.draw_circle(hand, 3.2 * b, skin)
+			FkFigure.fist(ci, hand, dirv.angle(), b, skin, false)

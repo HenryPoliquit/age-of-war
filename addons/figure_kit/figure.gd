@@ -6,14 +6,31 @@ extends RefCounted
 
 ## Near (weapon) arm from solved joints: inked upper arm and bracered forearm, then the hand, so it
 ## reads over the body.
-static func arm(ci: CanvasItem, shoulder: Vector2, elbow: Vector2, hand: Vector2, b: float, sleeve: Color, skin: Color, bracer: Color) -> void:
+static func arm(ci: CanvasItem, shoulder: Vector2, elbow: Vector2, hand: Vector2, hand_angle: float, b: float, sleeve: Color, skin: Color, bracer: Color) -> void:
 	var ink := Color(0.08, 0.06, 0.05)
 	FkPaint.seg(ci, shoulder, elbow, 7.8 * b, 7.0 * b, ink)
 	FkPaint.seg(ci, elbow, hand, 7.0 * b, 6.0 * b, ink)
-	ci.draw_circle(hand, 4.4 * b, ink)
 	FkPaint.seg(ci, shoulder, elbow, 5.4 * b, 4.6 * b, sleeve)
 	FkPaint.seg(ci, elbow, hand, 4.6 * b, 3.8 * b, bracer)
-	ci.draw_circle(hand, 3.2 * b, skin)
+	fist(ci, hand, hand_angle, b, skin)
+
+
+## A closed hand turned to `angle` (the grip's direction): knuckles lead, so wrist turns read.
+## Without ink it is the fingers drawn back over a haft the hand holds.
+static func fist(ci: CanvasItem, p: Vector2, angle: float, b: float, skin: Color, ink := true) -> void:
+	if ink:
+		FkPaint.ellipse(ci, p, Vector2(4.0, 3.3) * b, Color(0.08, 0.06, 0.05), angle, 12)
+	FkPaint.ellipse(ci, p, Vector2(3.2, 2.5) * b, skin, angle, 12)
+	var fwd := Vector2.from_angle(angle)
+	ci.draw_line(p + fwd * 1.6 * b - fwd.orthogonal() * 1.8 * b, p + fwd * 1.6 * b + fwd.orthogonal() * 1.8 * b, skin.darkened(0.3), 0.8 * b)
+
+
+## Shoulder cap over the arm's root, turned with the upper arm, so the shoulder's own motion reads.
+static func shoulder_cap(ci: CanvasItem, shoulder: Vector2, elbow: Vector2, b: float, col: Color) -> void:
+	var ang := (elbow - shoulder).angle()
+	var c := shoulder + Vector2.from_angle(ang) * 1.5 * b
+	FkPaint.ellipse(ci, c, Vector2(4.2, 3.3) * b, col.darkened(0.4), ang, 12)
+	FkPaint.ellipse(ci, c + Vector2(0, -0.4) * b, Vector2(3.5, 2.6) * b, col, ang, 12)
 
 
 static func humanoid(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, scale := 1.0, legs := true) -> void:
@@ -66,10 +83,10 @@ static func humanoid(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int
 		if armoured:
 			FkPaint.seg(ci, knee.lerp(foot, 0.1), foot + Vector2(0, -2 * b), 5.8 * b, 4.8 * b, metal.darkened(back))
 			ci.draw_circle(knee, 3.2 * b, metal.darkened(back - 0.1))
-		# Boot: heel, sole and toe — always pointing forward.
-		FkPaint.shade_poly(ci, [foot + Vector2(-3.2, -6) * b, foot + Vector2(3, -6) * b, foot + Vector2(4.5, -2) * b,
-			foot + Vector2(8.5, -0.5) * b, foot + Vector2(8.5, 1.5) * b, foot + Vector2(-3.5, 1.5) * b], leather.darkened(back))
-		ci.draw_line(foot + Vector2(-3.5, 1.5) * b, foot + Vector2(8.5, 1.5) * b, Color(0.08, 0.06, 0.05), 1.2 * b)
+		# Boot: heel, sole and toe — pointing forward, rolling heel to toe with the stride.
+		var boot := FkSkeleton.boot(foot, j["rot_" + tag], b)
+		FkPaint.shade_poly(ci, boot, leather.darkened(back))
+		ci.draw_line(boot[5], boot[4], Color(0.08, 0.06, 0.05), 1.2 * b)
 	# Cape trails behind and lags the body (secondary motion).
 	if st.get("cape", false) or helmet == "greathelm":
 		var flap := sin(t * 3.0 + seed) * 2.0 + mv * 3.0
@@ -82,7 +99,7 @@ static func humanoid(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int
 	var fh: Vector2 = unmap.call(jn.hand_f)
 	FkPaint.seg(ci, fs, fe, 5.0 * b, 4.2 * b, cloth.darkened(0.3))
 	FkPaint.seg(ci, fe, fh, 4.2 * b, 3.4 * b, cloth.darkened(0.34))
-	ci.draw_circle(fh, 2.1 * b, skin.darkened(0.25))
+	fist(ci, fh, (fh - fe).angle(), b * 0.85, skin.darkened(0.25), false)
 	# Torso: hips, waist, chest, shoulders.
 	var torso := [hip + Vector2(-6.5, 3) * b, hip + Vector2(7, 3) * b, hip + Vector2(6, -8) * b, sh + Vector2(8.5, 5) * b,
 		sh + Vector2(7.5, -1.5) * b, sh + Vector2(-7.5, -1.5) * b, sh + Vector2(-8, 5) * b, hip + Vector2(-5.5, -8) * b]
@@ -145,8 +162,33 @@ static func humanoid(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int
 	# Shield (far arm) under the weapon arm, so the striking hand is always the top layer; then the
 	# near arm and the weapon in its hand.
 	FkArmour.shield(ci, st.get("shield", ""), sh, build, pal, tm, team, pose, t, lk, st.get("runes", false))
-	arm(ci, jn.sh_n, jn.elbow_n, jn.hand_n, b, cloth.lightened(0.12), skin, metal if armoured else leather)
+	var fam: String = FkSkeleton.FAMILY.get(weapon, "idle")
+	if fam in ["blade", "chop"]:
+		_smear(ci, st, pose, seed, build, weapon, pivot, body, not legs, metal)
+	var grip: float = (jn.hand_n - jn.elbow_n).angle() if fam in ["idle", "crew", "bow"] else (jn.dir as Vector2).angle()
+	arm(ci, jn.sh_n, jn.elbow_n, jn.hand_n, grip, b, cloth.lightened(0.12), skin, metal if armoured else leather)
+	shoulder_cap(ci, jn.sh_n, jn.elbow_n, b, metal.lightened(0.05) if armoured else cloth.lightened(0.05))
 	FkWeapons.weapon(ci, weapon, jn, build, FkUnits.swing(atk), atk, pal, tm, skin, pose, t, lk)
+
+
+## Motion smear behind a cutting weapon: the tip's actual path over the last part of the strike,
+## sampled from the skeleton, fading in toward the blade.
+static func _smear(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, b: float, weapon: String, pivot: Vector2, body: Vector2, seated: bool, metal: Color) -> void:
+	var atk: float = pose.get("atk", -1.0)
+	if atk < 0.35 or atk >= 0.62:
+		return
+	var fade := clampf((0.62 - atk) / 0.07, 0.0, 1.0)
+	var length := FkWeapons.weapon_length(weapon) * b
+	var shield: bool = st.get("shield", "") != ""
+	var pts := PackedVector2Array()
+	for i in 9:
+		var p := pose.merged({"atk": lerpf(0.33, minf(atk, 0.55), i / 8.0), "t": pose.get("t", 0.0) + seed / 2.1}, true)
+		var s := FkSkeleton.solve(b, weapon, p, shield, seated)
+		var off: Vector2 = (pivot + (s.sh_n - pivot) * body) - (s.sh_n as Vector2)
+		pts.append((s.hand_n as Vector2) + off + (s.dir as Vector2) * length)
+	for i in pts.size() - 1:
+		var u := float(i + 1) / (pts.size() - 1)
+		ci.draw_line(pts[i], pts[i + 1], Color(metal.lightened(0.55), 0.5 * u * fade), (1.5 + 4.0 * u) * b)
 
 
 static func _dwarf_beard(ci: CanvasItem, head: Vector2, b: float, hair: Color, t: float, seed: int) -> void:
