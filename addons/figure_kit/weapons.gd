@@ -12,6 +12,12 @@ const SHOTS := {"sling": "stone", "javelin": "javelin", "throwing_axe": "axe", "
 
 const CHOP := ["club", "sword", "gladius", "shovel", "baton", "saber", "axe", "hammer", "leafblade", "spellsword", "rune_hammer"]
 
+## Where a figure's shot leaves its weapon (feet origin, facing +x, pre-scale): the muzzle or arrow
+## at head height, since ranged units now aim and fire from the shoulder and jaw.
+const MUZZLE := {"musket": Vector2(34, -52), "rifle": Vector2(30, -52), "arcane_rifle": Vector2(30, -52),
+	"rune_rifle": Vector2(30, -52), "crossbow": Vector2(26, -52), "bow": Vector2(22, -53), "starbow": Vector2(22, -53),
+	"javelin": Vector2(20, -56), "throwing_axe": Vector2(20, -56), "sling": Vector2(18, -60)}
+
 ## Hand-weapon lengths from the grip to the tip, px × build.
 const LENGTH := {"club": 20.0, "gladius": 16.0, "axe": 20.0, "hammer": 20.0, "rune_hammer": 21.0, "leafblade": 22.0, "baton": 18.0}
 
@@ -131,7 +137,7 @@ static func weapon(ci: CanvasItem, kind: String, j: Dictionary, b: float, s: flo
 			# The far hand holds the bow out front; the near hand draws the string back.
 			var grip: Vector2 = j.hand_f
 			# Drawing (attacking): the string comes back to the near hand. Otherwise it runs straight.
-			var drawing := atk >= 0.0
+			var drawing := atk >= 0.0 and atk < 0.35
 			var nock := hand if drawing else grip + Vector2(-1.5, 0) * b
 			# Elves carry the tall recurved longbow.
 			var tall := 23.0 if lk.long_hair else 19.0

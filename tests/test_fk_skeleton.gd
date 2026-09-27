@@ -57,7 +57,9 @@ func test_knees_forward_elbows_down_feet_grounded() -> void:
 			# The elbow always folds to the same side of the shoulder→hand line: below a forward reach,
 			# in front of an overhead one, behind a hanging one.
 			var d: Vector2 = j.hand_n - j.sh_n
-			check((j.elbow_n - j.sh_n.lerp(j.hand_n, 0.5)).dot(Vector2(-d.y, d.x)) >= -0.01, tag + " elbow folds the anatomical way")
+			# (A stance may declare the other bend for its draw arm — the bow — and keeps it throughout.)
+			var bend: float = FkSkeleton.STANCES.get(FkSkeleton.FAMILY.get(w, "idle"), {}).get("bend", 1.0)
+			check((j.elbow_n - j.sh_n.lerp(j.hand_n, 0.5)).dot(Vector2(-d.y, d.x)) * bend >= -0.01, tag + " elbow folds the stance's way")
 			check(j.foot_n.y <= 0.01 and j.foot_f.y <= 0.01, tag + " feet not below ground")
 			check(j.foot_n.y >= -7.0 and j.foot_f.y >= -7.0, tag + " feet lift at most 7 px"))
 
@@ -339,3 +341,54 @@ func test_lance_couched_at_chest_height() -> void:
 	var tip: Vector2 = hit.hand_n + hit.dir * 36.0
 	check(tip.y + RIDER_Y > -60.0 and tip.y + RIDER_Y < -38.0, "levelled into the head-to-chest band (y %.1f)" % (tip.y + RIDER_Y))
 	check(hit.lean >= 0.2, "leans into the charge")
+
+
+# --- Ranged attacks (owner briefs: bow, javelin, sling, rifle) --------------------------------
+
+func _straight(j: Dictionary, tag: String) -> bool:
+	return (j["sh_" + tag] as Vector2).distance_to(j["hand_" + tag]) > (FkSkeleton.UPPER + FkSkeleton.FORE) * 0.95
+
+
+func test_bow_draw_anchor_and_release() -> void:
+	var wind := FkSkeleton.solve(1.0, "bow", {"atk": 0.34})
+	var hit := FkSkeleton.solve(1.0, "bow", {"atk": 0.54})
+	check(_straight(wind, "f") and _straight(hit, "f"), "lead arm locked straight as a brace")
+	check(wind.hand_n.distance_to(wind.sh + Vector2(4, -5.5)) < 2.5, "draw hand anchored at the jaw")
+	check(wind.elbow_n.x < wind.hand_n.x - 4.0 and wind.elbow_n.y <= wind.sh_n.y + 1.5, "high, level draw elbow behind the hand")
+	check(hit.hand_n.x < wind.hand_n.x - 3.0, "release: the hand snaps back along the neck")
+	check(hit.hand_f.distance_to(wind.hand_f) < 0.6, "bow stays locked on target")
+
+
+func test_javelin_wind_up_and_release() -> void:
+	var wind := FkSkeleton.solve(1.0, "javelin", {"atk": 0.34})
+	check(wind.hand_n.x < wind.sh.x - 8.0, "throwing arm drawn back behind the shoulder")
+	check(wind.elbow_n.y < wind.sh_n.y, "elbow high")
+	check(wind.hand_f.x > wind.sh.x + 12.0 and _straight(wind, "f"), "lead arm fully extended forward")
+	check(wind.lunge < 0.0 and wind.crouch >= 2.0, "weight loaded on the bent back leg")
+	var hit := FkSkeleton.solve(1.0, "javelin", {"atk": 0.5})
+	check(hit.hand_n.x > hit.sh.x + 12.0 and hit.hand_n.y < hit.sh.y, "whips forward at head height")
+
+
+func test_sling_aim_whip_release() -> void:
+	var guard := FkSkeleton.solve(1.0, "sling", {"atk": -1.0})
+	check(guard.hand_f.x > guard.sh.x + 12.0, "lead hand holds the pouch forward")
+	check(guard.hand_n.distance_to(guard.sh + Vector2(-1, -9)) < 3.0, "dominant hand back by the ear")
+	var wind := FkSkeleton.solve(1.0, "sling", {"atk": 0.3})
+	check(wind.hand_n.y < wind.sh.y - 13.0, "overhead whip")
+	var hit := FkSkeleton.solve(1.0, "sling", {"atk": 0.5})
+	check(hit.hand_n.x > hit.sh.x + 10.0 and hit.hand_n.y < hit.sh.y - 6.0, "snaps forward at peak height")
+	check(hit.hand_f.x < hit.sh.x + 3.0, "lead arm tucks to the ribs")
+
+
+func test_rifle_shouldered_at_eye_height_with_recoil() -> void:
+	var guard := FkSkeleton.solve(1.0, "musket", {"atk": -1.0})
+	var stock: Vector2 = guard.hand_n + Vector2(-13, -2).rotated(guard.dir.angle())
+	var muzzle: Vector2 = stock + Vector2(34, -2).rotated(guard.dir.angle())
+	for p in [stock, muzzle]:
+		check(p.y > guard.sh.y - 9.5 and p.y < guard.sh.y - 1.5, "gun level between cheek and eye")
+	check(guard.elbow_f.y > guard.hand_f.y + 2.0, "support elbow tucked beneath the forend")
+	check(guard.lean >= 0.08 and guard.crouch >= 1.5, "aggressive lean, soft knees")
+	var kick := FkSkeleton.solve(1.0, "musket", {"atk": 0.5})
+	check(guard.hand_n.x - kick.hand_n.x >= 2.0, "straight rearward recoil")
+	var settle := FkSkeleton.solve(1.0, "musket", {"atk": 0.95})
+	check(settle.hand_n.distance_to(guard.hand_n) < 1.0, "recovers onto the aim")

@@ -79,7 +79,8 @@ static func height(spec: Dictionary) -> float:
 
 ## Muzzle in unit-local space (feet origin, facing +x).
 static func muzzle(spec: Dictionary) -> Vector2:
-	return spec.get("muzzle", RIGS.get(spec.rig, {}).get("muzzle", Vector2(22, -34)))
+	var hand: Vector2 = FkWeapons.MUZZLE.get(spec.get("weapon", ""), Vector2(22, -34)) if spec.rig == "humanoid" else Vector2(22, -34)
+	return spec.get("muzzle", RIGS.get(spec.rig, {}).get("muzzle", hand))
 
 
 ## "blast", "siege" or "" (a body that falls over).
