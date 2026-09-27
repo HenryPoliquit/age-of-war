@@ -134,11 +134,17 @@ static func weapon(ci: CanvasItem, kind: String, j: Dictionary, b: float, s: flo
 				if atk < 0.4 or atk > 0.9:
 					ci.draw_circle(stone, 2.2 * b, Color("7b7466"))
 		"bow", "starbow":
-			# The far hand holds the bow out front; the near hand draws the string back.
+			# The far hand holds the bow at the throat; the near hand hooks and draws the string.
 			var grip: Vector2 = j.hand_f
-			# Drawing (attacking): the string comes back to the near hand. Otherwise it runs straight.
-			var drawing := atk >= 0.0 and atk < 0.35
+			# Hooked while standing ready and through the draw; after the release, or on the march, the
+			# string runs straight between the limb tips.
+			var standing: bool = pose.get("move", 1.0 if pose.get("moving", false) else 0.0) < 0.5
+			var drawing := (atk >= 0.0 and atk < 0.35) or (atk < 0.0 and standing)
 			var nock := hand if drawing else grip + Vector2(-1.5, 0) * b
+			# On the release the bow leaps forward in the loose palm and tips over on its upper limb.
+			var rel := clampf((atk - 0.35) / 0.45, 0.0, 1.0) if atk >= 0.35 else 0.0
+			var tilt := sin(rel * PI) * 0.25
+			var leap := Vector2(sin(rel * PI) * 1.5, 0) * b
 			# Elves carry the tall recurved longbow.
 			var tall := 23.0 if lk.long_hair else 19.0
 			var top := grip + Vector2(-2, -tall) * b
@@ -147,18 +153,40 @@ static func weapon(ci: CanvasItem, kind: String, j: Dictionary, b: float, s: flo
 			for i in 11:
 				var u := i / 10.0
 				var curl := (-2.5 if u < 0.08 or u > 0.92 else 0.0) if lk.long_hair else 0.0
-				pts.append(top.lerp(bot, u) + Vector2((sin(u * PI) * 7 + curl) * b, 0))
+				var q := top.lerp(bot, u) + Vector2((sin(u * PI) * 7 + curl) * b, 0)
+				pts.append(grip + leap + (q - grip).rotated(tilt))
 			var bow_col := wood if kind == "bow" else FkPaint.tint(Color("e8e4d4"), pose)
 			ci.draw_polyline(pts, bow_col, 2.6 * b)
+			if not drawing:
+				nock = grip + leap + (nock - grip).rotated(tilt)
 			ci.draw_polyline(PackedVector2Array([pts[0], nock, pts[pts.size() - 1]]), Color(0.9, 0.88, 0.8, 0.9), 1.0)
-			if drawing and atk < 0.35:
+			if drawing:
 				var head := Vector2(grip.x + 9 * b, nock.y)
 				if kind == "starbow":
 					ci.draw_line(nock, head, Color(g, 0.9), 2.0)
 					FkPaint.halo(ci, head, 4.0 * b, g, 0.6)
 				else:
 					ci.draw_line(nock, head, wood.lightened(0.3), 1.5)
-			FkFigure.fist(ci, grip, -PI / 2, b, skin, false)
+			if atk >= 0.35 and atk < 0.7:
+				var u := (atk - 0.35) / 0.35
+				# The string shivers between the limb tips.
+				for k in 2:
+					var off := sin(u * 40.0 + k * 2.0) * (1.0 - u) * 1.6 * b
+					ci.draw_line(pts[0] + Vector2(off, 0), pts[pts.size() - 1] + Vector2(off, 0), Color(0.9, 0.88, 0.8, 0.35 * (1.0 - u)), 1.0)
+				if u < 0.5:
+					# The arrow's flight streaks away level from the bow.
+					var y := grip.y - 1.5 * b
+					for k in 3:
+						var x0 := grip.x + (6.0 + u * 30.0) * b
+						ci.draw_line(Vector2(x0, y + (k - 1) * 1.2 * b), Vector2(x0 + (14.0 + k * 6.0) * b, y + (k - 1) * 1.2 * b),
+							Color(1, 1, 0.95, 0.6 * (1.0 - u * 2.0)), 1.0)
+				if u < 0.6:
+					# Release lines framing the drawing hand's snap back along the neck.
+					for k in 3:
+						var d := Vector2(-1, 0).rotated((k - 1) * 0.5)
+						ci.draw_line(hand + d * (3.5 + u * 4.0) * b, hand + d * (6.5 + u * 8.0) * b, Color(1, 1, 0.95, 0.7 * (1.0 - u / 0.6)), 1.0)
+			# A relaxed hold on the riser, knuckles at 45 degrees.
+			FkFigure.fist(ci, grip + leap, -PI / 4, b, skin, false)
 		"staff":
 			# Staff held in both hands; on the attack it is thrust forward and the head flares.
 			var fw := maxf(0.0, s)

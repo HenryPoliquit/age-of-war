@@ -57,9 +57,8 @@ func test_knees_forward_elbows_down_feet_grounded() -> void:
 			# The elbow always folds to the same side of the shoulder→hand line: below a forward reach,
 			# in front of an overhead one, behind a hanging one.
 			var d: Vector2 = j.hand_n - j.sh_n
-			# (A stance may declare the other bend for its draw arm — the bow — and keeps it throughout.)
-			var bend: float = FkSkeleton.STANCES.get(FkSkeleton.FAMILY.get(w, "idle"), {}).get("bend", 1.0)
-			check((j.elbow_n - j.sh_n.lerp(j.hand_n, 0.5)).dot(Vector2(-d.y, d.x)) * bend >= -0.01, tag + " elbow folds the stance's way")
+			# (The bow's drawing arm folds the other way while drawing; bend_n says which way this frame used.)
+			check((j.elbow_n - j.sh_n.lerp(j.hand_n, 0.5)).dot(Vector2(-d.y, d.x)) * j.bend_n >= -0.01, tag + " elbow folds the pose's way")
 			check(j.foot_n.y <= 0.01 and j.foot_f.y <= 0.01, tag + " feet not below ground")
 			check(j.foot_n.y >= -7.0 and j.foot_f.y >= -7.0, tag + " feet lift at most 7 px"))
 
@@ -288,7 +287,9 @@ func test_shield_wall_advance() -> void:
 	check(fr[0].crouch >= 3.5, "low guarded stance")
 	check(_spread(fr, func(j): return j.sh.y) <= 0.5, "minimal bob")
 	check(_spread(fr, func(j): return (j.hand_f - j.sh).y) <= 0.3, "shield fixed across the chest")
-	check(fr[0].dir.y < -0.8, "weapon resting tip-up by the shoulder")
+	check(fr[0].dir.y < -0.5 and fr[0].dir.x > 0.3, "weapon held up and forward, ready")
+	check(fr[0].hand_n.distance_to(fr[0].sh + Vector2(1.8, -9.5)) > 14.0, "weapon hand well away from the face")
+	check(fr[0].hand_n.y > fr[0].sh.y + 3.0, "shoulder and elbow relaxed: hand below the shoulder")
 
 
 # --- Mounted (owner briefs: collected gait, sabre draw-cut, couched lance) ---------------------
@@ -350,13 +351,22 @@ func _straight(j: Dictionary, tag: String) -> bool:
 
 
 func test_bow_draw_anchor_and_release() -> void:
+	var pre := FkSkeleton.solve(1.0, "bow", {"atk": -1.0})
 	var wind := FkSkeleton.solve(1.0, "bow", {"atk": 0.34})
 	var hit := FkSkeleton.solve(1.0, "bow", {"atk": 0.54})
-	check(_straight(wind, "f") and _straight(hit, "f"), "lead arm locked straight as a brace")
-	check(wind.hand_n.distance_to(wind.sh + Vector2(4, -5.5)) < 2.5, "draw hand anchored at the jaw")
-	check(wind.elbow_n.x < wind.hand_n.x - 4.0 and wind.elbow_n.y <= wind.sh_n.y + 1.5, "high, level draw elbow behind the hand")
-	check(hit.hand_n.x < wind.hand_n.x - 3.0, "release: the hand snaps back along the neck")
-	check(hit.hand_f.distance_to(wind.hand_f) < 0.6, "bow stays locked on target")
+	for j in [pre, wind, hit]:
+		check(_straight(j, "f"), "bow arm a rigid strut toward the target")
+	check(pre.elbow_n.y < pre.sh_n.y, "pre-draw: drawing elbow high")
+	# (With the figure's arm lengths, an elbow straight back at shoulder height puts the hand under the
+	# back of the jawline.)
+	check(wind.hand_n.distance_to(wind.sh + Vector2(0, -5.5)) < 2.0, "full draw: hand anchored under the jawline")
+	check(wind.hand_n.y > wind.sh.y - 10.4 + 3.0, "arrow rests beneath the sighting eye")
+	check(wind.elbow_n.x < wind.sh_n.x - 2.0, "full draw: elbow pulled straight back behind the archer")
+	check(absf(wind.elbow_n.y - wind.sh_n.y) < 3.5, "full draw: elbow level with the shoulder")
+	check(absf((wind.hand_n - wind.elbow_n).angle()) < 0.35, "full draw: forearm parallel to the arrow")
+	check(hit.hand_n.x < wind.hand_n.x - 3.0, "release: the hand glides back along the neck")
+	check(hit.elbow_n.x < wind.elbow_n.x - 0.5, "release: the elbow snaps further back")
+	check(hit.hand_f.distance_to(wind.hand_f) < 0.6, "bow arm stays locked on target")
 
 
 func test_javelin_wind_up_and_release() -> void:
@@ -392,3 +402,28 @@ func test_rifle_shouldered_at_eye_height_with_recoil() -> void:
 	check(guard.hand_n.x - kick.hand_n.x >= 2.0, "straight rearward recoil")
 	var settle := FkSkeleton.solve(1.0, "musket", {"atk": 0.95})
 	check(settle.hand_n.distance_to(guard.hand_n) < 1.0, "recovers onto the aim")
+
+
+func test_archer_walk_relaxed_carriage() -> void:
+	var fr := _walk("bow")
+	var reach := FkSkeleton.UPPER + FkSkeleton.FORE
+	for j in fr:
+		var bow_arm: float = j.sh_f.distance_to(j.hand_f)
+		check(bow_arm < reach * 0.95 and bow_arm > reach * 0.75, "bow arm's elbow soft, not locked or cramped")
+		var u: Vector2 = j.sh_n - j.elbow_n
+		var f: Vector2 = j.hand_n - j.elbow_n
+		var ang := rad_to_deg(absf(u.angle_to(f)))
+		check(ang > 80.0 and ang < 125.0, "drawing arm bent comfortably, ~100 degrees (got %.0f)" % ang)
+	check(_spread(fr, func(j): return j.hand_n.x) >= 3.0, "drawing arm swings with the counter-stride")
+
+
+func test_archer_elbow_switch_is_continuous() -> void:
+	# Walking (elbow folds back) → standing at the pre-draw (elbow up and behind): the arm straightens
+	# through the switch instead of snapping across.
+	var prev := {}
+	for i in 51:
+		var j := FkSkeleton.solve(1.0, "bow", {"walk": 0.7, "move": 1.0 - i / 50.0})
+		if not prev.is_empty():
+			var jump: float = (j.elbow_n - prev.elbow_n).length() - (j.hand_n - prev.hand_n).length() - (j.sh_n - prev.sh_n).length()
+			check(jump < 2.0, "no elbow snap at move %.2f (%.1f px)" % [1.0 - i / 50.0, jump])
+		prev = j

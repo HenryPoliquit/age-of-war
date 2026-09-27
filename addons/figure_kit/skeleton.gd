@@ -24,6 +24,7 @@ const KNEE := -1.0
 ## Middle joint (knee, elbow) of a two-bone limb from `root` to `target`, bent to `bend`'s side
 ## (ELBOW or KNEE). Call with a reachable target (see reach()).
 static func ik(root: Vector2, target: Vector2, l1: float, l2: float, bend: float) -> Vector2:
+	# (bend 0 = on the line: only for a fully extended limb, where both solutions meet.)
 	var v := target - root
 	var d := clampf(v.length(), absf(l1 - l2) + 0.01, l1 + l2 - 0.01)
 	var dir := v.normalized() if v.length() > 1e-4 else Vector2.DOWN
@@ -57,6 +58,8 @@ const FAMILY := {
 ##   crouch  hip drop (px)                  step  passing step (0..1: the back foot swings through to the front)
 ##   wide  extra stance width (px)          zoom  weapon scale (foreshortening as it swings toward the viewer)
 ##   rise  a rider standing up in the stirrups (px)
+##   bend  which way the near elbow folds (+1 the ordinary way, −1 up-and-behind as in a bow draw); the
+##         arm straightens through a change of sign, so the elbow crosses over without snapping
 ##   rim  shield top-rim position (the far hand then grips the shield below it, by the shield's size)
 ## path: "line" (the near hand travels straight between keys) or "arc" (around the shoulder, overhead chops).
 const STANCES := {
@@ -101,14 +104,18 @@ const STANCES := {
 		"wind": {"h": Vector2(7, -4), "f": Vector2(16, -3), "a": 0.0, "lean": 0.1, "crouch": 2.0},
 		"hit": {"h": Vector2(4, -4), "f": Vector2(13, -2.5), "a": -0.06, "s": Vector2(-2, 0), "sf": Vector2(-2, 0),
 			"lean": 0.04, "crouch": 2.0}},
-	# Archer, side-on: the lead (far) arm locked straight toward the target, shoulder pressed low; the
-	# draw pulls with a high, level elbow (shoulder blade retracted) to an anchor at the jaw; on release
-	# the hand snaps back along the neck while the bow stays locked. The draw arm's elbow sits behind
-	# its hand throughout, so this stance bends it the other way (never mid-motion: no snap).
-	"bow": {"bend": -1.0,
-		"guard": {"h": Vector2(10, -1), "f": Vector2(15, -1), "a": 0.0},
-		"wind": {"h": Vector2(4, -5.5), "f": Vector2(18, -3), "sf": Vector2(0, 1), "s": Vector2(-4, -1.5), "a": 0.0, "lean": -0.03},
-		"hit": {"h": Vector2(-2, -7), "f": Vector2(18, -3), "sf": Vector2(0, 1), "s": Vector2(-5, -1.5), "a": 0.0, "lean": -0.03}},
+	# Archer, side-on (owner brief): the bow arm a rigid strut toward the target with its shoulder locked
+	# down. Pre-draw: the drawing hand hooks the string, elbow high at mouth level. Full draw: the drawing
+	# shoulder blade retracts, the elbow pulls straight back level with the shoulder, the forearm parallel
+	# to the arrow, the hand anchored under the back of the jawline (arrow under the eye), chest open. Release: the elbow
+	# snaps back and the hand glides back along the neck while the bow arm stays locked. The drawing
+	# elbow folds up-and-behind here (bend −1); walking it folds the ordinary way.
+	"bow": {
+		"guard": {"h": Vector2(14, -4), "f": Vector2(18, -4), "sf": Vector2(0, 1), "a": 0.0, "bend": -1.0},
+		"wind": {"h": Vector2(0, -5.5), "f": Vector2(18, -4), "sf": Vector2(0, 1), "s": Vector2(-2, -3), "a": 0.0,
+			"lean": -0.05, "bend": -1.0},
+		"hit": {"h": Vector2(-3.5, -5), "f": Vector2(18, -4), "sf": Vector2(0, 1), "s": Vector2(-3.5, -3), "a": 0.0,
+			"lean": -0.05, "bend": -1.0}},
 	# Javelin: torso turned away, lead arm fully extended forward, throwing arm straight back behind the
 	# shoulder with the elbow high, weight on the bent back leg; then the arm whips over and forward at
 	# head height as the weight moves onto the front leg and the lead arm tucks.
@@ -162,23 +169,28 @@ const GAITS := {
 	# both hands at chest level.
 	"bounce": {"bob": 3.2, "stride": 11.0, "lift": 8.0, "heel": -0.25, "toe": 0.45, "swing": 0.4,
 		"carry": {"h": Vector2(8, 6), "f": Vector2(4, 8), "lean": 0.0}},
-	# Archer: level stepper's glide — bent knees, no head bob — bow held vertically at the side.
-	"track": {"bob": 0.0, "stride": 12.0, "lift": 3.0, "heel": 0.3, "toe": 0.4, "swing": 0.25,
-		"carry": {"h": Vector2(1, 17.3), "f": Vector2(5, 15), "lean": 0.08, "crouch": 3.5}},
+	# Archer: level grouse glide — soft knees, hips and head level. Bow arm low and relaxed (shoulder
+	# pressed down, elbow soft) holding the bow vertically at the flank, a little forward of the legs;
+	# the drawing arm dropped, elbow ~100°, a relaxed hook swinging by the hip with the counter-stride.
+	"track": {"bob": 0.0, "stride": 12.0, "lift": 3.0, "heel": 0.3, "toe": 0.4, "swing": 0.25, "hswing": 4.0,
+		"carry": {"h": Vector2(4, 15), "f": Vector2(7, 14), "s": Vector2(0, 1.5), "sf": Vector2(0, 1.5),
+			"lean": 0.08, "crouch": 3.5, "bend": 1.0}},
 	# Rifleman: patrol low-ready — hips low, torso 10° forward, firing hand at the waist, support hand
 	# under the forend, barrel 45° down ahead of the lead knee, locked steady while the legs step.
 	"patrol": {"bob": 0.5, "stride": 11.0, "lift": 3.0, "heel": 0.3, "toe": 0.4, "swing": 0.0,
 		"carry": {"h": Vector2(4, 12), "f": Vector2(10, 13), "a": 0.785, "lean": 0.17, "crouch": 2.5}},
 	# Shield wall: low guarded advance in measured wide steps, shield fixed across the chest (eyes over
-	# the rim), weapon resting tip-up by the shoulder behind it, minimal bob.
+	# the rim), weapon held ready up-and-forward at chest height with the shoulder and elbow relaxed
+	# (clear of the face), minimal bob.
 	"wall": {"bob": 0.4, "stride": 9.0, "lift": 2.0, "heel": 0.2, "toe": 0.3, "swing": 0.0,
-		"carry": {"h": Vector2(5, 2), "a": -1.4, "rim": Vector2(10, -9.5), "lean": 0.08, "crouch": 4.0, "wide": 8.0}},
+		"carry": {"h": Vector2(9, 8), "a": -0.9, "s": Vector2(0, 1), "rim": Vector2(10, -9.5), "lean": 0.08, "crouch": 4.0,
+			"wide": 8.0}},
 }
 
 ## Far-hand shield grip (relative to sh) for shield bearers: holds the shield in front of the chest.
 const SHIELD_GRIP := Vector2(6, 11)
 
-const _FLOATS := {"a": 0.0, "lean": 0.0, "lunge": 0.0, "crouch": 0.0, "step": 0.0, "wide": 0.0, "zoom": 1.0, "lock": 0.0, "rise": 0.0}
+const _FLOATS := {"a": 0.0, "lean": 0.0, "lunge": 0.0, "crouch": 0.0, "step": 0.0, "wide": 0.0, "zoom": 1.0, "lock": 0.0, "rise": 0.0, "bend": 1.0}
 const _VECTORS := {"s": Vector2.ZERO, "sf": Vector2.ZERO}
 
 
@@ -324,9 +336,18 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 	# (by its rim), the stance's far target, the weapon (two-handed), or swinging with the gait.
 	j["sh_n"] = sh + Vector2(2, 1) * b + (k.s as Vector2) * b
 	j["sh_f"] = sh + Vector2(-3, 1) * b + (k.sf as Vector2) * b
-	var hand_n := reach(j.sh_n, sh + (k.h as Vector2) * b, UPPER * b, FORE * b)
+	var target_n := sh + (k.h as Vector2) * b
+	if pose.get("atk", -1.0) < 0.0:
+		target_n.x -= sin(walk) * g.get("hswing", 0.0) * mv * b
+	var hand_n := reach(j.sh_n, target_n, UPPER * b, FORE * b)
+	var bend: float = k.bend
+	if absf(bend) < 1.0:
+		# Changing which way the elbow folds: the arm straightens through the change, so it never snaps.
+		var v := hand_n - (j.sh_n as Vector2)
+		hand_n = j.sh_n + v.normalized() * lerpf((UPPER + FORE) * b - 0.01, v.length(), absf(bend))
 	j["hand_n"] = hand_n
-	j["elbow_n"] = ik(j.sh_n, hand_n, UPPER * b, FORE * b, STANCES.get(family, {}).get("bend", ELBOW))
+	j["bend_n"] = 1.0 if bend >= 0.0 else -1.0
+	j["elbow_n"] = ik(j.sh_n, hand_n, UPPER * b, FORE * b, j.bend_n if absf(bend) > 1e-3 else 0.0)
 	if k.lock > 0.0:
 		j["dir"] = (j.dir as Vector2).slerp((hand_n - (j.elbow_n as Vector2)).normalized(), k.lock)
 	var ft: Vector2
