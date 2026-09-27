@@ -149,7 +149,7 @@ func test_feet_roll_heel_to_toe() -> void:
 		toe_off = maxf(toe_off, j.rot_n)
 		heel_strike = minf(heel_strike, j.rot_n)
 		for tag in ["n", "f"]:
-			for p in FkSkeleton.boot(j["foot_" + tag], j["rot_" + tag], 1.0):
+			for p in FkSkeleton.boot(j["foot_" + tag], j["rot_" + tag], 1.0, j["toe_bend_" + tag]):
 				check((p as Vector2).y <= 0.05, "sole never below ground (phase %.2f)" % ph)
 	check(toe_off > 0.3, "heel lifts at toe-off")
 	check(heel_strike < -0.2, "toes lift at heel strike")
@@ -543,3 +543,18 @@ func test_sockets_sit_on_the_hands_and_back() -> void:
 	check_eq(j.sockets.grip_n.z, j.z.hand_n)
 	check_eq(j.sockets.grip_f.p, j.hand_f)
 	check_eq(j.sockets.back.p, j.chest)
+
+
+func test_toe_stays_down_as_the_heel_lifts() -> void:
+	var best := {}
+	for i in 64:
+		var j := FkSkeleton.solve(1.0, "none", {"walk": TAU * i / 64.0, "move": 1.0})
+		if best.is_empty() or j.rot_n > best.rot_n:
+			best = j
+	var pts := FkSkeleton.boot(best.foot_n, best.rot_n, 1.0, best.toe_bend_n)
+	check_near(best.toe_bend_n, best.rot_n, 0.02, "toe cap lies flat at push-off")
+	check(absf((pts[4] as Vector2).y) < 0.1, "toe tip on the ground (y %.2f)" % (pts[4] as Vector2).y)
+	check((pts[5] as Vector2).y < -2.0, "heel lifted (y %.2f)" % (pts[5] as Vector2).y)
+	for i in 64:
+		var j := FkSkeleton.solve(1.0, "none", {"walk": TAU * i / 64.0, "move": 1.0})
+		check(j.toe_bend_n >= 0.0 and j.toe_bend_n <= maxf(j.rot_n, 0.0) + 1e-5, "bend only while the heel is up (phase %d)" % i)

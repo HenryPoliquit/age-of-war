@@ -367,6 +367,9 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 				fx = lerpf(fx, 2.8 + lunge * 1.6 / b, k.step)
 				lift += 4.0 * k.step_lift
 				rot -= 0.2 * k.step_lift
+			# At push-off the heel lifts while the toe cap stays flat on the ground: the foot bends at the
+			# ball, straightening again as it lifts into the swing.
+			flex = clampf(maxf(rot, 0.0) * (1.0 - lift / 1.5), 0.0, maxf(rot, 0.0))
 			foot = Vector2(fx, -lift) * by
 			# Keep the boot's lowest point on (never under) the ground.
 			var low := 0.0
