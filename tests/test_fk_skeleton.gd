@@ -596,3 +596,22 @@ func test_head_level_while_walking() -> void:
 	for w in ["none", "spear", "throwing_axe", "sling", "bow", "musket", "sword"]:
 		for j in _walk(w, "round" if w == "sword" else ""):
 			check(absf(j.head_tilt) < 0.1, "%s: head level on the march" % w)
+
+
+# --- Shield turn (owner: shields face the camera while the body is side-on) --------------------
+
+func test_shield_turns_open_on_the_strike() -> void:
+	var turn := func(atk: float) -> float: return FkSkeleton.solve(1.0, "sword", {"atk": atk}, "round").shield_turn
+	check_near(turn.call(-1.0), 0.5, 1e-4, "braced at a three-quarter turn on guard")
+	check_near(turn.call(0.34), 0.5, 0.02, "still braced through the coil")
+	check(turn.call(0.55) > 0.7, "swings open as the cut comes over the rim (%.2f)" % turn.call(0.55))
+	check(absf(turn.call(0.99) - 0.5) < 0.05, "back to the brace by the end of the recovery")
+	for i in 100:
+		check(absf(turn.call((i + 1) / 100.0) - turn.call(i / 100.0)) < 0.1, "no snap at atk %.2f" % (i / 100.0))
+
+
+func test_shield_braced_on_the_march_and_for_spears() -> void:
+	for j in _walk("sword", "round"):
+		check_near(j.shield_turn, 0.5, 1e-4, "shield wall march")
+	for atk in [-1.0, 0.34, 0.5]:
+		check_near(FkSkeleton.solve(1.0, "spear", {"atk": atk}, "round").shield_turn, 0.5, 1e-4, "spear and shield at %s" % atk)

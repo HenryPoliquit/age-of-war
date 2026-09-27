@@ -45,11 +45,11 @@ h2 small { font: 500 0.85rem "Alegreya Sans", system-ui, sans-serif; color: var(
 .filters button[aria-pressed="true"] { background: var(--chip-on); color: var(--chip-on-ink); border-color: var(--chip-on); }
 .filters button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 section { display: grid; gap: 14px; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; }
 figure { margin: 0; display: grid; gap: 6px; }
 .well { background: var(--well); border-radius: 6px; padding: 6px; display: grid; gap: 4px; }
 .well img { display: block; width: 100%; height: auto; border-radius: 3px; image-rendering: auto; }
-.legs { display: grid; grid-template-columns: 1fr 1fr; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); text-align: center; }
+.legs { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); text-align: center; }
 figcaption { display: flex; justify-content: space-between; gap: 8px; font-size: 0.95rem; }
 figcaption b { font-weight: 700; }
 figcaption em { font-style: normal; color: var(--muted); white-space: nowrap; }
@@ -59,7 +59,7 @@ figcaption em { font-style: normal; color: var(--muted); white-space: nowrap; }
 <div class="wrap">
   <header>
     <h1>Timefront Unit Motion</h1>
-    <p class="lede">Every unit in the game, looping. Left half: walking. Right half: one full attack (wind-up, strike, recover) followed by a moment at guard. Units of the same age sit side by side so the three races compare directly.</p>
+    <p class="lede">Every unit in the game, looping. Left: walking. Middle: one full attack (wind-up, strike, recover) followed by a moment at guard. Right: the same attack as the enemy army is drawn (mirrored, facing left). Units of the same age sit side by side so the three races compare directly.</p>
     <p class="build"><!--BUILD--></p>
   </header>
   <nav class="filters" aria-label="Filter by race">

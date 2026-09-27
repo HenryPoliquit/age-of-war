@@ -67,6 +67,7 @@ const FAMILY := {
 ##   bend  which way the near elbow folds (+1 the ordinary way, −1 up-and-behind as in a bow draw); the
 ##         arm straightens through a change of sign, so the elbow crosses over without snapping
 ##   rim  shield top-rim position (the far hand then grips the shield below it, by the shield's size)
+##   turn  how open the shield face is to the camera (its drawn width, 0..1; 0.5 = braced toward the enemy)
 ## path: "line" (the near hand travels straight between keys) or "arc" (around the shoulder, overhead chops).
 const STANCES := {
 	"idle": {"guard": {"h": Vector2(3, 16)}, "wind": {"h": Vector2(3, 16)}, "hit": {"h": Vector2(3, 16)}},
@@ -89,7 +90,7 @@ const STANCES := {
 		"wind": {"h": Vector2(-7, -15), "a": -2.7, "rim": Vector2(10, -9.5), "s": Vector2(-1.5, -2),
 			"crouch": 5.0, "wide": 12.0, "lean": -0.05, "lunge": -1.0},
 		"hit": {"h": Vector2(20, 10), "a": 0.49, "rim": Vector2(11, -9.5), "s": Vector2(3, 1), "crouch": 5.5,
-			"wide": 14.0, "lean": 0.35, "lunge": 8.0, "zoom": 1.12, "lock": 1.0}},
+			"wide": 14.0, "lean": 0.35, "lunge": 8.0, "zoom": 1.12, "lock": 1.0, "turn": 0.8}},
 	"chop": {"path": "arc",
 		"guard": {"h": Vector2(14, 5), "a": -0.33},
 		"wind": {"h": Vector2(3.6, -14.5), "a": -2.03, "lean": -0.08, "lunge": -1.5},
@@ -203,7 +204,7 @@ const GAITS := {
 ## Far-hand shield grip (relative to sh) for shield bearers: holds the shield in front of the chest.
 const SHIELD_GRIP := Vector2(6, 11)
 
-const _FLOATS := {"a": 0.0, "lean": 0.0, "lunge": 0.0, "crouch": 0.0, "step": 0.0, "wide": 0.0, "zoom": 1.0, "lock": 0.0, "rise": 0.0, "bend": 1.0}
+const _FLOATS := {"a": 0.0, "lean": 0.0, "lunge": 0.0, "crouch": 0.0, "step": 0.0, "wide": 0.0, "zoom": 1.0, "lock": 0.0, "rise": 0.0, "bend": 1.0, "turn": 0.5}
 const _VECTORS := {"s": Vector2.ZERO, "sf": Vector2.ZERO}
 
 
@@ -334,7 +335,7 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 	var yaw_p: float = 0.0 if seated else g.get("twist", 0.0) * sin(walk) * mv
 	var yaw_c := -0.8 * yaw_p
 	var j := {"hip": hip, "sh": sh, "chest": hip.lerp(sh, 0.55), "lean": k.lean, "lunge": lunge, "crouch": k.crouch,
-		"dir": Vector2.from_angle(k.a), "zoom": k.zoom, "gait": gait_for(weapon, shield), "w": w}
+		"dir": Vector2.from_angle(k.a), "zoom": k.zoom, "gait": gait_for(weapon, shield), "w": w, "shield_turn": k.turn}
 	var z := {"hip": 0.0, "chest": 0.0, "sh": 0.0, "neck": 0.0, "head": 0.0, "eye": 0.0}
 	# Neck and head: the neck follows half the spine's lean and the head a quarter, so the gaze stays level.
 	j["head_tilt"] = k.lean * 0.25

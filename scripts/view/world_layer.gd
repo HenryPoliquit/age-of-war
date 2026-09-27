@@ -217,7 +217,9 @@ func _pose(u: SimUnit, rt: float, t: float) -> Dictionary:
 	if since >= 0.0 and since < L:
 		atk = since / L
 	var fl := clampf(1.0 - (t - view.flash_at.get(u.id, -10.0)) / 0.09, 0.0, 1.0) * view.fx.flash_scale
-	return {"walk": prog * STRIDE.get(rig, 0.1), "move": move_amt.get(u.id, 1.0 if u.state == &"walk" else 0.0), "atk": atk, "t": t + u.id * 0.37, "flash": fl}
+	# The right-hand army is drawn mirrored (see _draw_unit): its shields show their painted face.
+	return {"walk": prog * STRIDE.get(rig, 0.1), "move": move_amt.get(u.id, 1.0 if u.state == &"walk" else 0.0), "atk": atk, "t": t + u.id * 0.37, "flash": fl,
+		"mirrored": u.side == 1}
 
 
 func _draw_unit(ci: CanvasItem, u: SimUnit, rt: float, t: float) -> void:

@@ -141,7 +141,47 @@ static func helmet(ci: CanvasItem, kind: String, head: Vector2, b: float, pal: A
 			FkPaint.ellipse(ci, head + Vector2(0, -6) * b, Vector2(6, 3.5) * b, FkPaint.tint(Color("666a52"), pose))
 
 
-static func shield(ci: CanvasItem, kind: String, sh: Vector2, b: float, pal: Array, tm: Color, team: Color, pose: Dictionary, t: float, lk: Dictionary, runes := false) -> void:
+## A shield held at the grip (`sh` + SHIELD_GRIP), turned toward the enemy: the face narrows to `turn`
+## of its width about the grip, and the rim's thickness shows as a sliver on one edge. `back` shows the
+## side facing the bearer (plain wood or leather, grip bar and straps, the painted face peeking around
+## the rim) — what we see of a shield carried on the far arm; otherwise the painted face.
+static func shield(ci: CanvasItem, kind: String, sh: Vector2, b: float, pal: Array, tm: Color, team: Color, pose: Dictionary, t: float, lk: Dictionary, runes := false, turn := 1.0, back := false) -> void:
+	if kind == "":
+		return
+	if kind == "energy":
+		# A translucent ward looks the same from either side.
+		back = false
+	var grip := sh + FkSkeleton.SHIELD_GRIP * b
+	var edge := 2.2 * b * sqrt(maxf(0.0, 1.0 - turn * turn))
+	var squash := func(dx: float) -> void:
+		FkPaint.push(ci, Transform2D(0.0, grip + Vector2(dx, 0)) * Transform2D(0.0, Vector2(turn, 1.0), 0.0, Vector2.ZERO) * Transform2D(0.0, -grip))
+	if back:
+		# The painted face peeks around the leading rim; the bare back covers the rest.
+		squash.call(edge)
+		_face(ci, kind, sh, b, pal, tm, pose, t, lk, runes, false)
+		FkPaint.pop(ci)
+		squash.call(0.0)
+		_face(ci, kind, sh, b, pal, FkPaint.tint(Color("6b4a2b"), pose), pose, t, lk, runes, true)
+		var strap := FkPaint.tint(Color("3a2616"), pose)
+		for y in [-4.0, 4.0]:
+			ci.draw_line(grip + Vector2(-4, y) * b, grip + Vector2(4, y) * b, strap, 1.4 * b)
+		ci.draw_line(grip + Vector2(0, -3) * b, grip + Vector2(0, 3) * b, strap.lightened(0.15), 2.0 * b)
+		FkPaint.pop(ci)
+	else:
+		# The rim's thickness, behind the face.
+		var metal: Color = FkPaint.tint(pal[2], pose)
+		var dark := [metal.darkened(0.55), metal.darkened(0.55), metal.darkened(0.45)]
+		squash.call(-edge)
+		_face(ci, kind, sh, b, dark, metal.darkened(0.5), pose, t, lk, runes, true)
+		FkPaint.pop(ci)
+		squash.call(0.0)
+		_face(ci, kind, sh, b, pal, tm, pose, t, lk, runes, false)
+		FkPaint.pop(ci)
+
+
+## One shield kind laid out around `sh` (grip at SHIELD_GRIP). `plain` leaves off the painted and
+## fitted details (bosses, emblems, ribs, runes): the outline, rim and field only.
+static func _face(ci: CanvasItem, kind: String, sh: Vector2, b: float, pal: Array, tm: Color, pose: Dictionary, t: float, lk: Dictionary, runes: bool, plain: bool) -> void:
 	var metal: Color = FkPaint.tint(pal[2], pose)
 	var g: Color = lk.glow
 	match kind:
@@ -149,7 +189,8 @@ static func shield(ci: CanvasItem, kind: String, sh: Vector2, b: float, pal: Arr
 			var c := sh + Vector2(7, 11) * b
 			ci.draw_circle(c, 10.5 * b, metal.darkened(0.2))
 			ci.draw_circle(c, 9 * b, tm)
-			ci.draw_circle(c, 2.5 * b, metal)
+			if not plain:
+				ci.draw_circle(c, 2.5 * b, metal)
 		"kite":
 			var c := sh + Vector2(7, 9) * b
 			FkPaint.poly(ci, [c + Vector2(-7, -8) * b, c + Vector2(7, -8) * b, c + Vector2(6, 4) * b, c + Vector2(0, 14) * b, c + Vector2(-6, 4) * b], metal.darkened(0.3))
@@ -158,22 +199,25 @@ static func shield(ci: CanvasItem, kind: String, sh: Vector2, b: float, pal: Arr
 			var c := sh + Vector2(7, 12) * b
 			FkPaint.ellipse(ci, c, Vector2(8.5, 11) * b, FkPaint.tint(Color("6e4a2c"), pose))
 			FkPaint.ellipse(ci, c, Vector2(6.5, 9) * b, FkPaint.tint(Color("8d6a45"), pose))
-			ci.draw_line(c + Vector2(-5, -2) * b, c + Vector2(5, -2) * b, tm, 2.5 * b)
+			if not plain:
+				ci.draw_line(c + Vector2(-5, -2) * b, c + Vector2(5, -2) * b, tm, 2.5 * b)
 		"scutum":
 			# Tall curved legion shield: team field, metal rim and boss, painted wings.
 			var c := sh + Vector2(8, 10) * b
 			FkPaint.shade_poly(ci, [c + Vector2(-5, -15) * b, c + Vector2(5, -14) * b, c + Vector2(6, 0) * b, c + Vector2(5, 14) * b, c + Vector2(-5, 15) * b, c + Vector2(-4, 0) * b], metal.darkened(0.25))
 			FkPaint.shade_poly(ci, [c + Vector2(-3.8, -13.5) * b, c + Vector2(4, -12.5) * b, c + Vector2(4.8, 0) * b, c + Vector2(4, 12.5) * b, c + Vector2(-3.8, 13.5) * b, c + Vector2(-2.8, 0) * b], tm)
-			ci.draw_circle(c + Vector2(0.8, 0) * b, 3.0 * b, metal)
-			ci.draw_line(c + Vector2(0.8, -11) * b, c + Vector2(0.8, 11) * b, Color(FkPaint.tint(Color("d9b25c"), pose), 0.8), 1.2 * b)
+			if not plain:
+				ci.draw_circle(c + Vector2(0.8, 0) * b, 3.0 * b, metal)
+				ci.draw_line(c + Vector2(0.8, -11) * b, c + Vector2(0.8, 11) * b, Color(FkPaint.tint(Color("d9b25c"), pose), 0.8), 1.2 * b)
 		"leaf":
 			# Elven shield: a tall leaf of lacquered wood with a gilt rib.
 			var c := sh + Vector2(7, 10) * b
 			FkPaint.shade_poly(ci, [c + Vector2(0, -16) * b, c + Vector2(6.5, -6) * b, c + Vector2(6, 6) * b, c + Vector2(0, 16) * b, c + Vector2(-5.5, 6) * b, c + Vector2(-6, -6) * b], FkPaint.tint(Color("5a6a3a"), pose))
 			FkPaint.shade_poly(ci, [c + Vector2(0, -13) * b, c + Vector2(4.8, -5) * b, c + Vector2(4.4, 5) * b, c + Vector2(0, 13) * b, c + Vector2(-4, 5) * b, c + Vector2(-4.4, -5) * b], tm)
-			ci.draw_line(c + Vector2(0, -14) * b, c + Vector2(0, 14) * b, FkPaint.tint(Color("d9b25c"), pose), 1.4 * b)
-			for k in 3:
-				ci.draw_line(c + Vector2(0, -6 + k * 5) * b, c + Vector2(3.5, -9 + k * 5) * b, FkPaint.tint(Color("d9b25c"), pose), 0.8)
+			if not plain:
+				ci.draw_line(c + Vector2(0, -14) * b, c + Vector2(0, 14) * b, FkPaint.tint(Color("d9b25c"), pose), 1.4 * b)
+				for k in 3:
+					ci.draw_line(c + Vector2(0, -6 + k * 5) * b, c + Vector2(3.5, -9 + k * 5) * b, FkPaint.tint(Color("d9b25c"), pose), 0.8)
 		"moon":
 			# Moonsilver leaf shield with a glowing rim.
 			var c := sh + Vector2(7, 10) * b
@@ -181,8 +225,9 @@ static func shield(ci: CanvasItem, kind: String, sh: Vector2, b: float, pal: Arr
 			FkPaint.shade_poly(ci, pts, metal)
 			var ring := PackedVector2Array(pts)
 			ring.append(pts[0])
-			ci.draw_polyline(ring, Color(g, 0.6 + 0.3 * sin(t * 4.0)), 1.6 * b)
-			ci.draw_arc(c, 5 * b, -2.2, 1.0, 12, tm, 2.4 * b)
+			if not plain:
+				ci.draw_polyline(ring, Color(g, 0.6 + 0.3 * sin(t * 4.0)), 1.6 * b)
+				ci.draw_arc(c, 5 * b, -2.2, 1.0, 12, tm, 2.4 * b)
 		"dwarf":
 			# Big round dwarf shield: iron rim with rivets, team field, anvil boss.
 			var c := sh + Vector2(6, 11) * b
@@ -190,6 +235,8 @@ static func shield(ci: CanvasItem, kind: String, sh: Vector2, b: float, pal: Arr
 			ci.draw_circle(c, 10.5 * b, tm.darkened(0.08))
 			for k in 8:
 				ci.draw_circle(c + Vector2.RIGHT.rotated(TAU * k / 8.0) * 11.5 * b, 0.9 * b, metal.lightened(0.3))
+			if plain:
+				return
 			for k in 4:
 				ci.draw_line(c, c + Vector2.RIGHT.rotated(TAU * k / 4.0 + 0.4) * 10 * b, tm.darkened(0.3), 1.4 * b)
 			FkPaint.shade_poly(ci, FkPaint.ellipse_pts(c, Vector2(4, 4) * b), metal)
@@ -198,8 +245,9 @@ static func shield(ci: CanvasItem, kind: String, sh: Vector2, b: float, pal: Arr
 		"plate":
 			var c := sh + Vector2(8, 8) * b
 			ci.draw_rect(Rect2(c + Vector2(-6, -11) * b, Vector2(12, 24) * b), metal.darkened(0.35))
-			ci.draw_rect(Rect2(c + Vector2(-2, -6) * b, Vector2(6, 2) * b), Color(0.05, 0.05, 0.05))
-			ci.draw_rect(Rect2(c + Vector2(-6, 6) * b, Vector2(12, 3) * b), tm)
+			if not plain:
+				ci.draw_rect(Rect2(c + Vector2(-2, -6) * b, Vector2(6, 2) * b), Color(0.05, 0.05, 0.05))
+				ci.draw_rect(Rect2(c + Vector2(-6, 6) * b, Vector2(12, 3) * b), tm)
 		"energy":
 			# Arcane ward: a translucent hex pane on a brass bracer.
 			var c := sh + Vector2(10, 10) * b

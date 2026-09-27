@@ -1,10 +1,11 @@
 extends SceneTree
 ## Renders animation frames of every unit (3 races × 6 ages × 4 roles) for review: each frame is one
-## grid image where every cell holds the unit twice — walking (left) and attacking in place (right).
+## grid image where every cell holds the unit three times — walking, attacking in place, and the same attack
+## mirrored as the enemy army draws it.
 ## tools/anim_page.py slices the frames into one looping GIF per unit and writes a browsable page.
 ##   godot --path . --resolution 1280x720 -s tools/unit_anim.gd -- --out=reports/anim/frames --frames=24
 
-const CELL := Vector2(400, 260)
+const CELL := Vector2(600, 260)
 const COLS := 6
 const SCALE := 2.0
 
@@ -56,9 +57,11 @@ func _draw() -> void:
 		# Attack: the whole 0..1 swing, then a short guard hold so the loop reads.
 		var a := u * 1.25
 		var attack := {"walk": 0.6, "move": 0.0, "atk": a if a <= 1.0 else -1.0, "t": u * 2.0, "flash": 0.0}
-		for p in 2:
-			FkPaint.begin(node, Transform2D(0.0, Vector2(SCALE, SCALE), 0.0, cell + Vector2(100 + p * 200, CELL.y - 18)))
-			UnitArt.draw_unit(node, def, Color("3a78d8"), walk if p == 0 else attack, 5, race)
+		# Walking, attacking, and the same attack as the enemy army sees it (mirrored, facing left).
+		for p in 3:
+			var enemy := p == 2
+			FkPaint.begin(node, Transform2D(0.0, Vector2(-SCALE if enemy else SCALE, SCALE), 0.0, cell + Vector2(100 + p * 200, CELL.y - 18)))
+			UnitArt.draw_unit(node, def, Color("c8423a") if enemy else Color("3a78d8"), walk if p == 0 else (attack.merged({"mirrored": true}) if enemy else attack), 5, race)
 		node.draw_set_transform(Vector2.ZERO)
 
 

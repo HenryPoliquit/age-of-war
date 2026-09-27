@@ -225,8 +225,14 @@ static func _parts(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, 
 	# The shield rides on the far hand: its drawing is laid out around sh with the grip at SHIELD_GRIP.
 	# It stands in front of the chest and head at the near shoulder's depth, so the weapon arm (same
 	# depth, later rank) always strikes over it.
+	# Seen from the side a shield is turned toward the enemy: a figure facing right (unmirrored) shows us
+	# the back of the shield on its far arm, its hand on the grip; a mirrored one shows the painted face.
+	var back_view: bool = not pose.get("mirrored", false)
 	var draw_shield := func() -> void:
-		FkArmour.shield(ci, shield, (j.hand_f as Vector2) - FkSkeleton.SHIELD_GRIP * b, build, pal, tm, team, pose, t, lk, st.get("runes", false))
+		FkArmour.shield(ci, shield, (j.hand_f as Vector2) - FkSkeleton.SHIELD_GRIP * b, build, pal, tm, team, pose, t, lk,
+			st.get("runes", false), j.shield_turn, back_view)
+		if back_view and shield not in ["", "energy"]:
+			fist(ci, j.hand_f, 0.0, b * 0.85, skin.darkened(0.25))
 	add.call("shield", z.sh_n, draw_shield)
 	var draw_smear := func() -> void:
 		if fam in ["blade", "chop"]:
