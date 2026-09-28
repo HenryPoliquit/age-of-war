@@ -52,3 +52,12 @@ func test_giant_contact_fires_just_after_landing() -> void:
 	var u := FkMachines.giant_contact(PI / 2 + 0.1)
 	check(u > 0.0 and u < 0.2, "starts on landing")
 	check_eq(FkMachines.giant_contact(PI / 2 + 2.0), -1.0, "over while the foot is planted")
+
+
+func test_giants_are_right_handed_from_both_sides() -> void:
+	# Owner: "mine use the right hand to attack but enemies use the left" — a mirrored giant is the same
+	# right-handed body turned around: its right (attacking) arm and leg go behind, its left ones in front.
+	var ours := FkMachines.giant_order({})
+	check_eq(ours, ["left leg", "right leg", "left arm", "body", "right arm"], "ours: left side far, right side near")
+	var theirs := FkMachines.giant_order({"mirrored": true})
+	check_eq(theirs, ["right leg", "left leg", "right arm", "body", "left arm"], "theirs: turned around")

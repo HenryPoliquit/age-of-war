@@ -287,6 +287,15 @@ static func steamtank(ci: CanvasItem, st: Dictionary, pose: Dictionary, _seed: i
 		FkPaint.wheel(ci, Vector2(x, -9), 9, roll * 1.7, iron.darkened(0.2), brass, 6)
 
 
+## Draw order of a giant's limbs around its body (golem, treant). Drawn facing right, its left side is
+## the far one; mirrored (the enemy army), it is the same right-handed body turned around, so its right
+## (attacking) arm and leg go behind the body and the left ones come to the front.
+static func giant_order(pose: Dictionary) -> Array:
+	if pose.get("mirrored", false):
+		return ["right leg", "left leg", "right arm", "body", "left arm"]
+	return ["left leg", "right leg", "left arm", "body", "right arm"]
+
+
 ## Steam Golem: an iron-and-brass walker with a furnace chest and a hammer fist.
 static func golem(ci: CanvasItem, st: Dictionary, pose: Dictionary, _seed: int) -> void:
 	var team: Color = st.team
@@ -300,16 +309,21 @@ static func golem(ci: CanvasItem, st: Dictionary, pose: Dictionary, _seed: int) 
 	var g: Color = st.look.glow
 	var bob := lerpf(sin(t * 1.3) * 0.8, absf(sin(walk)) * 3.0, mv)
 	var hip := Vector2(0, -40 + bob)
+	var order := giant_order(pose)
+	# The side turned away from us is shaded darker.
+	var far_side := "left" if order[0] == "left leg" else "right"
 	FkPaint.shadow(ci, 30)
 	var contacts := []
-	for i in [1, 0]:
+	for leg in order.slice(0, 2):
+		var i := 0 if leg == "right leg" else 1
 		var ph: float = walk + PI * i
 		var a := lerpf(0.1 if i == 0 else -0.1, sin(ph) * 0.45, mv)
 		var knee := hip + Vector2(4, 18).rotated(-a)
 		var ankle := knee + Vector2(-2, 18).rotated(-a + maxf(0.0, cos(ph)) * 0.5 * mv)
-		var c := iron.darkened(0.3 if i == 1 else 0.0)
+		var far: bool = leg.begins_with(far_side)
+		var c := iron.darkened(0.3 if far else 0.0)
 		FkPaint.seg(ci, hip, knee, 13.0, 11.0, c)
-		ci.draw_circle(knee, 5.0, brass.darkened(0.2 if i == 1 else 0.0))
+		ci.draw_circle(knee, 5.0, brass.darkened(0.2 if far else 0.0))
 		FkPaint.seg(ci, knee, ankle, 11.0, 10.0, c)
 		# The landing foot crushes flat (squash) as the stride's weight comes down on it.
 		var u := giant_contact(ph) if mv > 0.3 else -1.0
@@ -320,43 +334,57 @@ static func golem(ci: CanvasItem, st: Dictionary, pose: Dictionary, _seed: int) 
 			contacts.append([ankle + Vector2(1.5, 5), u])
 	# A hunched, heavy torso rocking over the supporting leg.
 	FkPaint.push(ci, Transform2D(sin(walk) * 0.06 * mv + 0.08, hip) * Transform2D(0.0, -hip))
-	# Back arm: a heavy pendulum lagging behind the stride.
 	var drag := sin(walk - 0.9) * 0.35 * mv
-	var back_sh := hip + Vector2(-8, -30)
-	FkPaint.seg(ci, back_sh, back_sh + Vector2(-6, 22).rotated(drag), 10.0, 9.0, iron.darkened(0.3))
-	# Barrel body with a furnace.
-	var body := [hip + Vector2(-20, 2), hip + Vector2(18, 2), hip + Vector2(22, -24), hip + Vector2(14, -40), hip + Vector2(-16, -40), hip + Vector2(-22, -22)]
-	FkPaint.shade_poly(ci, body, iron)
-	ci.draw_line(hip + Vector2(-21, -14), hip + Vector2(20, -14), brass, 3.0)
-	ci.draw_line(hip + Vector2(-19, -34), hip + Vector2(17, -34), brass, 3.0)
-	FkPaint.rivets(ci, hip + Vector2(-19, -14), hip + Vector2(19, -14), 7, brass.lightened(0.35), 1.1)
-	ci.draw_rect(Rect2(hip + Vector2(0, -30), Vector2(12, 12)), Color(0.12, 0.1, 0.1))
-	ci.draw_rect(Rect2(hip + Vector2(1.5, -28.5), Vector2(9, 9)), Color(1.0, 0.55, 0.2, 0.75 + 0.25 * sin(t * 8.0)))
-	for k in 3:
-		ci.draw_line(hip + Vector2(1.5, -26 + k * 3), hip + Vector2(10.5, -26 + k * 3), Color(0.15, 0.1, 0.08), 1.0)
-	FkPaint.poly(ci, [hip + Vector2(-18, -10), hip + Vector2(-4, -10), hip + Vector2(-4, -2), hip + Vector2(-18, -2)], tm)
-	# Head: a small domed helm with a rune visor.
-	var head := hip + Vector2(4, -46)
-	FkPaint.shade_poly(ci, FkPaint.ellipse_pts(head, Vector2(9, 7.5)), brass)
-	ci.draw_line(head + Vector2(0, 0), head + Vector2(9, 0), Color(g, 0.95), 2.4)
-	# Chimney pipes puffing.
-	ci.draw_rect(Rect2(hip + Vector2(-18, -52), Vector2(5, 14)), iron.darkened(0.25))
-	var u := fmod(t * 0.9, 1.0)
-	ci.draw_circle(hip + Vector2(-16 - u * 10, -54 - u * 20), 3.0 + u * 6.0, Color(0.85, 0.85, 0.82, 0.4 * (1.0 - u)))
-	# Front arm: a piston swing into a hammer fist.
-	var theta := 0.3 - drag
-	if atk >= 0.0:
-		theta = lerpf(0.3, 2.4, ease(atk / 0.35, 0.6)) if atk < 0.35 else (lerpf(2.4, 0.9, ease((atk - 0.35) / 0.15, 0.4)) if atk < 0.5 else lerpf(0.9, 0.3, (atk - 0.5) / 0.5))
-	var shp := hip + Vector2(10, -32)
-	var elbow := shp + Vector2(0, 16).rotated(-theta)
-	var fist := elbow + Vector2(0, 14).rotated(-theta * 0.7 - 0.5)
-	ci.draw_circle(shp, 7.0, brass)
-	FkPaint.seg(ci, shp, elbow, 10.0, 9.0, iron)
-	FkPaint.seg(ci, elbow, fist, 9.0, 8.0, iron.lightened(0.05))
-	var orth := (fist - elbow).normalized().orthogonal()
-	var fd := (fist - elbow).normalized()
-	FkPaint.shade_poly(ci, [fist - orth * 9 - fd * 3, fist + orth * 9 - fd * 3, fist + orth * 9 + fd * 8, fist - orth * 9 + fd * 8], iron.darkened(0.2))
-	ci.draw_line(fist - orth * 7 + fd * 2.5, fist + orth * 7 + fd * 2.5, Color(g, 0.7), 1.6)
+	var parts := {}
+	# Left arm: a heavy pendulum lagging behind the stride — upper arm, forearm and an iron fist.
+	parts["left arm"] = func() -> void:
+		var c := iron.darkened(0.3 if far_side == "left" else 0.0)
+		var sh := hip + Vector2(-8, -30)
+		# Hung a little back from the barrel so it reads beside the body, swinging wide with the stride.
+		var elbow := sh + Vector2(-5, 17).rotated(drag * 1.5 + 0.25)
+		var hand := elbow + Vector2(-2, 16).rotated(drag * 1.8 + 0.3)
+		FkPaint.seg(ci, sh, elbow, 10.0, 9.0, c)
+		ci.draw_circle(elbow, 4.0, brass.darkened(0.2 if far_side == "left" else 0.0))
+		FkPaint.seg(ci, elbow, hand, 9.0, 8.0, c)
+		FkPaint.shade_poly(ci, FkPaint.ellipse_pts(hand + Vector2(0, 3), Vector2(6, 5)), c.darkened(0.15))
+	# Barrel body with a furnace, head and chimney.
+	parts["body"] = func() -> void:
+		var body := [hip + Vector2(-20, 2), hip + Vector2(18, 2), hip + Vector2(22, -24), hip + Vector2(14, -40), hip + Vector2(-16, -40), hip + Vector2(-22, -22)]
+		FkPaint.shade_poly(ci, body, iron)
+		ci.draw_line(hip + Vector2(-21, -14), hip + Vector2(20, -14), brass, 3.0)
+		ci.draw_line(hip + Vector2(-19, -34), hip + Vector2(17, -34), brass, 3.0)
+		FkPaint.rivets(ci, hip + Vector2(-19, -14), hip + Vector2(19, -14), 7, brass.lightened(0.35), 1.1)
+		ci.draw_rect(Rect2(hip + Vector2(0, -30), Vector2(12, 12)), Color(0.12, 0.1, 0.1))
+		ci.draw_rect(Rect2(hip + Vector2(1.5, -28.5), Vector2(9, 9)), Color(1.0, 0.55, 0.2, 0.75 + 0.25 * sin(t * 8.0)))
+		for k in 3:
+			ci.draw_line(hip + Vector2(1.5, -26 + k * 3), hip + Vector2(10.5, -26 + k * 3), Color(0.15, 0.1, 0.08), 1.0)
+		FkPaint.poly(ci, [hip + Vector2(-18, -10), hip + Vector2(-4, -10), hip + Vector2(-4, -2), hip + Vector2(-18, -2)], tm)
+		# Head: a small domed helm with a rune visor.
+		var head := hip + Vector2(4, -46)
+		FkPaint.shade_poly(ci, FkPaint.ellipse_pts(head, Vector2(9, 7.5)), brass)
+		ci.draw_line(head + Vector2(0, 0), head + Vector2(9, 0), Color(g, 0.95), 2.4)
+		# Chimney pipes puffing.
+		ci.draw_rect(Rect2(hip + Vector2(-18, -52), Vector2(5, 14)), iron.darkened(0.25))
+		var u := fmod(t * 0.9, 1.0)
+		ci.draw_circle(hip + Vector2(-16 - u * 10, -54 - u * 20), 3.0 + u * 6.0, Color(0.85, 0.85, 0.82, 0.4 * (1.0 - u)))
+	# Right arm: a piston swing into a hammer fist.
+	parts["right arm"] = func() -> void:
+		var shade := 0.3 if far_side == "right" else 0.0
+		var theta := 0.3 - drag
+		if atk >= 0.0:
+			theta = lerpf(0.3, 2.4, ease(atk / 0.35, 0.6)) if atk < 0.35 else (lerpf(2.4, 0.9, ease((atk - 0.35) / 0.15, 0.4)) if atk < 0.5 else lerpf(0.9, 0.3, (atk - 0.5) / 0.5))
+		var shp := hip + Vector2(10, -32)
+		var elbow := shp + Vector2(0, 16).rotated(-theta)
+		var fist := elbow + Vector2(0, 14).rotated(-theta * 0.7 - 0.5)
+		ci.draw_circle(shp, 7.0, brass.darkened(shade))
+		FkPaint.seg(ci, shp, elbow, 10.0, 9.0, iron.darkened(shade))
+		FkPaint.seg(ci, elbow, fist, 9.0, 8.0, iron.lightened(0.05).darkened(shade))
+		var orth := (fist - elbow).normalized().orthogonal()
+		var fd := (fist - elbow).normalized()
+		FkPaint.shade_poly(ci, [fist - orth * 9 - fd * 3, fist + orth * 9 - fd * 3, fist + orth * 9 + fd * 8, fist - orth * 9 + fd * 8], iron.darkened(0.2 + shade))
+		ci.draw_line(fist - orth * 7 + fd * 2.5, fist + orth * 7 + fd * 2.5, Color(g, 0.7), 1.6)
+	for name in order.slice(2):
+		(parts[name] as Callable).call()
 	FkPaint.pop(ci)
 	for c in contacts:
 		_giant_contact(ci, c[0], c[1])
@@ -375,14 +403,18 @@ static func treant(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int) 
 	var g: Color = st.look.glow
 	var bob := lerpf(sin(t * 1.1 + seed) * 0.8, absf(sin(walk)) * 2.5, mv)
 	var hip := Vector2(0, -34 + bob)
+	var order := giant_order(pose)
+	# The side turned away from us is shaded darker.
+	var far_side := "left" if order[0] == "left leg" else "right"
 	FkPaint.shadow(ci, 30)
 	var contacts := []
-	for i in [1, 0]:
+	for leg in order.slice(0, 2):
+		var i := 0 if leg == "right leg" else 1
 		var ph: float = walk + PI * i
 		var a := lerpf(0.1 if i == 0 else -0.1, sin(ph) * 0.45, mv)
 		var knee := hip + Vector2(3, 17).rotated(-a)
 		var foot := knee + Vector2(0, 17).rotated(-a + maxf(0.0, cos(ph)) * 0.5 * mv)
-		var c := bark.darkened(0.3 if i == 1 else 0.0)
+		var c := bark.darkened(0.3 if leg.begins_with(far_side) else 0.0)
 		FkPaint.seg(ci, hip, knee, 14.0, 11.0, c)
 		FkPaint.seg(ci, knee, foot, 11.0, 9.0, c)
 		# Roots splay flat as the weight crushes down on the landing foot.
@@ -394,42 +426,54 @@ static func treant(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int) 
 			contacts.append([foot + Vector2(0, 3), u])
 	# A hunched, heavy trunk rocking over the supporting leg.
 	FkPaint.push(ci, Transform2D(sin(walk) * 0.06 * mv + 0.07, hip) * Transform2D(0.0, -hip))
-	# Back branch arm: a heavy pendulum lagging behind the stride.
 	var sway := sin(t * 1.4 + seed) * 0.08
 	var drag := sin(walk - 0.9) * 0.35 * mv
-	var back_sh := hip + Vector2(-8, -38)
-	FkPaint.seg(ci, back_sh, back_sh + Vector2(-14, 24).rotated(drag), 8.0, 5.0, bark.darkened(0.3))
-	# Trunk with bark grooves, a knot face with glowing eyes, and a team sash of woven vines.
-	var trunk := [hip + Vector2(-15, 4), hip + Vector2(15, 4), hip + Vector2(13, -30), hip + Vector2(10, -52), hip + Vector2(-10, -54), hip + Vector2(-14, -30)]
-	FkPaint.shade_poly(ci, trunk, bark)
-	for k in 4:
-		ci.draw_polyline(PackedVector2Array([hip + Vector2(-10 + k * 6, 2), hip + Vector2(-8 + k * 6 + sin(k) * 2, -24), hip + Vector2(-9 + k * 6, -48)]), bark.darkened(0.3), 1.4)
-	FkPaint.ellipse(ci, hip + Vector2(4, -40), Vector2(7, 5), bark.darkened(0.35))
-	for e in [Vector2(1, -41), Vector2(8, -41)]:
-		FkPaint.halo(ci, hip + e, 3.0, g, 0.8)
-		ci.draw_circle(hip + e, 1.2, Color(1, 1, 1, 0.9))
-	ci.draw_line(hip + Vector2(-15, -14), hip + Vector2(15, -20), tm, 4.0)
-	# Leafy crown, swaying.
-	var crown := hip + Vector2(0, -62)
-	for k in 9:
-		var a := TAU * k / 9.0 + sway
-		var p := crown + Vector2(cos(a) * 17, sin(a) * 11)
-		FkPaint.shade_poly(ci, FkPaint.ellipse_pts(p, Vector2(10, 8), a, 10), leaf.darkened(0.12 * (k % 3)))
-	FkPaint.shade_poly(ci, FkPaint.ellipse_pts(crown + Vector2(2, -2), Vector2(14, 10), 0.0, 12), leaf.lightened(0.06))
-	for k in 5:
-		ci.draw_circle(crown + Vector2(-12 + k * 6, -8 + sin(k * 2.1) * 6), 1.6, Color(g, 0.7))
-	# Front branch arm: a heavy overhead slam.
-	var theta := 0.35 - drag
-	if atk >= 0.0:
-		theta = lerpf(0.35, 2.5, ease(atk / 0.35, 0.6)) if atk < 0.35 else (lerpf(2.5, 0.8, ease((atk - 0.35) / 0.15, 0.4)) if atk < 0.5 else lerpf(0.8, 0.35, (atk - 0.5) / 0.5))
-	var shp := hip + Vector2(8, -40)
-	var elbow := shp + Vector2(0, 18).rotated(-theta)
-	var hand := elbow + Vector2(0, 16).rotated(-theta * 0.8 - 0.4)
-	FkPaint.seg(ci, shp, elbow, 10.0, 8.0, bark)
-	FkPaint.seg(ci, elbow, hand, 8.0, 6.0, bark.lightened(0.05))
-	for k in 3:
-		ci.draw_line(hand, hand + (hand - elbow).normalized().rotated(-0.6 + k * 0.6) * 9.0, bark.darkened(0.1), 2.6)
-	FkPaint.ellipse(ci, elbow + Vector2(-2, -4), Vector2(5, 3), leaf, 0.6)
+	var parts := {}
+	# Left branch arm: a heavy pendulum lagging behind the stride, ending in a twig hand.
+	parts["left arm"] = func() -> void:
+		var c := bark.darkened(0.3 if far_side == "left" else 0.0)
+		var sh := hip + Vector2(-8, -38)
+		var elbow := sh + Vector2(-7, 15).rotated(drag * 1.4 + 0.1)
+		var hand := elbow + Vector2(-3, 14).rotated(drag * 1.7)
+		FkPaint.seg(ci, sh, elbow, 8.0, 6.5, c)
+		FkPaint.seg(ci, elbow, hand, 6.5, 5.0, c)
+		for k in 3:
+			ci.draw_line(hand, hand + (hand - elbow).normalized().rotated(-0.6 + k * 0.6) * 7.0, c.darkened(0.1), 2.2)
+	# Trunk with bark grooves, a knot face with glowing eyes, a team sash of woven vines, a leafy crown.
+	parts["body"] = func() -> void:
+		var trunk := [hip + Vector2(-15, 4), hip + Vector2(15, 4), hip + Vector2(13, -30), hip + Vector2(10, -52), hip + Vector2(-10, -54), hip + Vector2(-14, -30)]
+		FkPaint.shade_poly(ci, trunk, bark)
+		for k in 4:
+			ci.draw_polyline(PackedVector2Array([hip + Vector2(-10 + k * 6, 2), hip + Vector2(-8 + k * 6 + sin(k) * 2, -24), hip + Vector2(-9 + k * 6, -48)]), bark.darkened(0.3), 1.4)
+		FkPaint.ellipse(ci, hip + Vector2(4, -40), Vector2(7, 5), bark.darkened(0.35))
+		for e in [Vector2(1, -41), Vector2(8, -41)]:
+			FkPaint.halo(ci, hip + e, 3.0, g, 0.8)
+			ci.draw_circle(hip + e, 1.2, Color(1, 1, 1, 0.9))
+		ci.draw_line(hip + Vector2(-15, -14), hip + Vector2(15, -20), tm, 4.0)
+		var crown := hip + Vector2(0, -62)
+		for k in 9:
+			var a := TAU * k / 9.0 + sway
+			var p := crown + Vector2(cos(a) * 17, sin(a) * 11)
+			FkPaint.shade_poly(ci, FkPaint.ellipse_pts(p, Vector2(10, 8), a, 10), leaf.darkened(0.12 * (k % 3)))
+		FkPaint.shade_poly(ci, FkPaint.ellipse_pts(crown + Vector2(2, -2), Vector2(14, 10), 0.0, 12), leaf.lightened(0.06))
+		for k in 5:
+			ci.draw_circle(crown + Vector2(-12 + k * 6, -8 + sin(k * 2.1) * 6), 1.6, Color(g, 0.7))
+	# Right branch arm: a heavy overhead slam.
+	parts["right arm"] = func() -> void:
+		var shade := 0.3 if far_side == "right" else 0.0
+		var theta := 0.35 - drag
+		if atk >= 0.0:
+			theta = lerpf(0.35, 2.5, ease(atk / 0.35, 0.6)) if atk < 0.35 else (lerpf(2.5, 0.8, ease((atk - 0.35) / 0.15, 0.4)) if atk < 0.5 else lerpf(0.8, 0.35, (atk - 0.5) / 0.5))
+		var shp := hip + Vector2(8, -40)
+		var elbow := shp + Vector2(0, 18).rotated(-theta)
+		var hand := elbow + Vector2(0, 16).rotated(-theta * 0.8 - 0.4)
+		FkPaint.seg(ci, shp, elbow, 10.0, 8.0, bark.darkened(shade))
+		FkPaint.seg(ci, elbow, hand, 8.0, 6.0, bark.lightened(0.05).darkened(shade))
+		for k in 3:
+			ci.draw_line(hand, hand + (hand - elbow).normalized().rotated(-0.6 + k * 0.6) * 9.0, bark.darkened(0.1 + shade), 2.6)
+		FkPaint.ellipse(ci, elbow + Vector2(-2, -4), Vector2(5, 3), leaf.darkened(shade), 0.6)
+	for name in order.slice(2):
+		(parts[name] as Callable).call()
 	FkPaint.pop(ci)
 	for c in contacts:
 		_giant_contact(ci, c[0], c[1])
