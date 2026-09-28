@@ -96,6 +96,7 @@ func test_marching_archer_carries_the_bow_on_the_far_side() -> void:
 		var walk := {"walk": TAU * i / 8.0, "move": 1.0, "atk": -1.0}
 		var names := FkFigure.layers(_spec("bow"), walk)
 		check(_before(names, "bow", "torso"), "bow behind the body, walk phase %d" % i)
+		check(_before(names, "bow", "far leg") and _before(names, "bow", "near leg"), "held beside the outside of the left leg, walk phase %d" % i)
 		names = FkFigure.layers(_spec("bow"), walk.merged({"mirrored": true}))
 		check(_before(names, "torso", "bow"), "turned around, the bow hand is the near one, walk phase %d" % i)
 	for atk in [-1.0, 0.34]:

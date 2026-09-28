@@ -230,8 +230,10 @@ static func _parts(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, 
 		FkWeapons.weapon(ci, weapon, j, build, FkUnits.swing(atk), atk, pal, tm, skin, pose, t, lk)
 	var held_far: bool = weapon in FkWeapons.HELD_FAR
 	# Standing to shoot, the bow is out in front of the face; carried on the march it hangs in the bow
-	# hand on that hand's side of the body (behind it, unless the figure is turned around).
-	var bow_z := lerpf(1.0, z.hand_f, mv) if held_far and atk < 0.0 else 1.0
+	# hand beside the outside of that side's leg: behind both legs on the far side, in front of the body
+	# when the figure is turned around.
+	var carried: float = -51.0 if z.hand_f < 0.0 else z.hand_f
+	var bow_z := lerpf(1.0, carried, mv) if held_far and atk < 0.0 else 1.0
 	add.call("bow", bow_z, draw_weapon if held_far else nothing)
 	# The shield rides on the far hand: its drawing is laid out around sh with the grip at SHIELD_GRIP.
 	# It stands in front of the chest and head at the near shoulder's depth, so the weapon arm (same
