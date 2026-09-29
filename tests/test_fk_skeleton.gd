@@ -512,7 +512,8 @@ func test_depth_near_side_toward_the_viewer() -> void:
 	var j := FkSkeleton.solve(1.0, "sword", {"atk": -1.0})
 	check(j.z.sh_n > 0.0 and j.z.sh_f < 0.0, "near shoulder toward the viewer, far shoulder away")
 	check(j.z.hip_n > 0.0 and j.z.hip_f < 0.0, "near hip toward the viewer, far hip away")
-	check_eq(j.z.elbow_n, j.z.sh_n, "an unsteered arm stays in its plane")
+	check_eq(j.z.hand_n, j.z.sh_n, "the hand stays in its shoulder's plane")
+	check(j.z.elbow_n > j.z.sh_n, "the elbow swings out toward the viewer, never behind the shoulder")
 	check_eq(j.z.hand_n, j.z.sh_n, "…hand too")
 
 
@@ -788,3 +789,38 @@ func test_p3_bones_keep_their_exact_length() -> void:
 				["hip", "hip_n", j.w], ["hip", "hip_f", j.w]]:
 			var d: float = (p3[bone[0]] as Vector3).distance_to(p3[bone[1]])
 			check_near(d, bone[2], 0.05, "%s: %s-%s" % [tag, bone[0], bone[1]]))
+
+
+func _shaft_offset(j: Dictionary) -> float:
+	return absf(((j.hand_f as Vector2) - (j.hand_n as Vector2)).cross(j.dir))
+
+
+func test_two_handed_grip_puts_the_far_hand_on_the_shaft_from_the_game_camera() -> void:
+	# Each hand used to be drawn in its own shoulder's plane, a shoulder-width apart: seen from 25° the far hand
+	# stood off a vertical shaft by up to 3.4 px. Both hands now grip the shaft on the centreline.
+	for atk in [-1.0, 0.2, 0.34, 0.45, 0.55]:
+		check(_shaft_offset(FkSkeleton.solve(1.0, "spear", {"atk": atk}, "", false, {}, GAME_VIEW)) < 0.1, "spear grip at atk %.2f" % atk)
+	for atk in [0.2, 0.34, 0.45, 0.55]:
+		check(_shaft_offset(FkSkeleton.solve(1.0, "halberd", {"atk": atk}, "", false, {}, GAME_VIEW)) < 0.1, "halberd grip at atk %.2f" % atk)
+	check(_shaft_offset(FkSkeleton.solve(1.0, "halberd", {"atk": -1.0}, "", false, {}, GAME_VIEW)) < 1.6, "halberd carried upright")
+	for atk in [-1.0, 0.2, 0.34]:
+		check(_shaft_offset(FkSkeleton.solve(1.0, "staff", {"atk": atk}, "", false, {}, GAME_VIEW)) < 0.6, "staff in both hands at atk %.2f" % atk)
+
+
+func test_the_grip_is_left_alone_when_a_hand_is_not_on_the_shaft() -> void:
+	var held := FkSkeleton.solve(1.0, "spear", {"atk": -1.0}, "round")
+	check_near(held.z.hand_n, held.z.sh_n, 1e-3, "a spear held in one hand with a shield stays in its shoulder's plane")
+	for j in _walk("spear"):
+		check_near(j.z.hand_f, j.z.sh_f, 1e-3, "the skirmisher's free off hand swings in its own plane")
+	var hit := FkSkeleton.solve(1.0, "staff", {"atk": 0.55})
+	check_near(hit.z.hand_n, hit.z.sh_n, 1e-3, "the staff raised in one hand is in its shoulder's plane")
+
+
+func test_every_bent_arm_swings_out_toward_the_viewer_never_away() -> void:
+	# The elbow's default swing is toward the viewer; no arm folds toward the far side (the bow's steered elbow aside).
+	for w in FkSkeleton.FAMILY.keys():
+		_each_frame(w, func(j: Dictionary, f: Array) -> void:
+			if j.el_w == 0.0:
+				check(j.z.elbow_n >= minf(j.z.sh_n, j.z.hand_n) - 1e-3, "%s %s: the elbow is not behind its arm" % [w, f]))
+	var idle := FkSkeleton.solve(1.0, "none", {"atk": -1.0})
+	check(idle.z.elbow_n > idle.z.sh_n + 1.0, "even a hanging arm's elbow stands a little out (%.1f)" % (idle.z.elbow_n - idle.z.sh_n))

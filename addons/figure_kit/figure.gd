@@ -50,6 +50,17 @@ static func shoulder_cap(ci: CanvasItem, shoulder: Vector2, elbow: Vector2, b: f
 	FkPaint.ellipse(ci, c + Vector2(0, -0.4) * b, Vector2(3.5, 2.6) * b, col, ang, 12)
 
 
+## How far (px of z) an elbow can stand out of its shoulder's plane before the arm's sort order follows it.
+const ELBOW_SLACK := 0.75
+
+
+## The z (from the shoulder's) an arm part sorts at, given the summed z offsets of the two joints it spans: their
+## mean, but toward the viewer only what passes the slack (so an elbow that is barely out leaves the order alone).
+static func _slack(total: float) -> float:
+	var mean := total / 2.0
+	return mean if mean < 0.0 else maxf(0.0, mean - ELBOW_SLACK / 2.0)
+
+
 ## Figure parts in today's draw order, back to front. Each frame they are sorted by depth; a tie keeps
 ## this order, so parts only swap where the pose really puts one in front of another.
 const PARTS := ["shadow", "far leg", "near leg", "cape", "pack", "far arm", "torso", "head", "bow", "shield", "smear",
@@ -257,7 +268,10 @@ static func _parts(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, 
 	var grip: float = (j.hand_n - j.elbow_n).angle() if fam in ["idle", "crew", "bow"] else (j.dir as Vector2).angle()
 	var impact := clampf(1.0 - absf(atk - 0.52) / 0.08, 0.0, 1.0) if fam in ["blade", "chop"] else 0.0
 	# The weapon arm takes the far side's shadow when it is behind the body.
-	var sleeve := cloth.lightened(0.12) if z.sh_n > 0.0 else cloth.darkened(0.3)
+	# The upper arm wears what the shoulder cap does: with the elbow out it sorts over the cap, and an armoured
+	# figure's sleeve is then its metal, not the cloth the cap used to hide.
+	var cap_col := metal.lightened(0.05) if armoured else cloth.lightened(0.05)
+	var sleeve := cap_col if z.sh_n > 0.0 else cap_col.darkened(0.3)
 	var bracer := (metal if armoured else leather).darkened(0.0 if z.sh_n > 0.0 else 0.3)
 	var planar: bool = absf(z.elbow_n - z.sh_n) < 0.75 and absf(z.hand_n - z.sh_n) < 0.75
 	var draw_upper := func() -> void:
@@ -268,15 +282,18 @@ static func _parts(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, 
 	var draw_fore := func() -> void:
 		if not planar:
 			forearm(ci, j.elbow_n, j.hand_n, grip, b, skin, bracer, impact)
-	var upper_z: float = (z.sh_n + z.elbow_n) / 2.0
+	# The arm sorts by its own depth, but an elbow only just out of its plane (under ELBOW_SLACK) keeps the approved
+	# order, so the arm does not jump over the cap the moment a swing begins; toward the far side it sorts as it is.
+	var upper_z: float = z.sh_n + _slack(z.elbow_n - z.sh_n)   # (the shoulder's own offset is 0)
 	add.call("near upper arm", upper_z, draw_upper)
 	# The hand always reads over its own upper arm (folded back along the neck on a bow release it would
 	# otherwise vanish under the sleeve); against every other part the forearm sorts by its own depth.
-	add.call("near forearm", maxf((z.elbow_n + z.hand_n) / 2.0, upper_z), draw_fore)
+	add.call("near forearm", maxf(z.sh_n + _slack((z.elbow_n - z.sh_n) + (z.hand_n - z.sh_n)), upper_z), draw_fore)
 	var draw_cap := func() -> void:
-		shoulder_cap(ci, j.sh_n, j.elbow_n, b, metal.lightened(0.05) if armoured else cloth.lightened(0.05))
+		shoulder_cap(ci, j.sh_n, j.elbow_n, b, cap_col)
 	add.call("shoulder cap", z.sh_n, draw_cap)
-	add.call("weapon", z.hand_n + 0.01, nothing if held_far else draw_weapon)
+	# (A two-handed grip puts the hand on the centreline; the weapon still sorts at its shoulder's depth.)
+	add.call("weapon", maxf(z.hand_n, z.sh_n) + 0.01, nothing if held_far else draw_weapon)
 	var draw_impact := func() -> void:
 		if fam in ["blade", "chop"] and legs:
 			_impact_accents(ci, j, weapon, build, atk)

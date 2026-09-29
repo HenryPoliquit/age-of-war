@@ -71,6 +71,9 @@ const FAMILY := {
 ##         arm, so + swings the face away from the enemy toward the outside of the stance). How wide the plate
 ##         shows is |sin(shield_yaw − camera yaw)|, and which side of it shows follows from the sign: 0.96 (55°)
 ##         is the brace, 1.36 (78°) the cleave, which read 0.5 and 0.8 wide from the 25° camera
+##   mid  how far both hands are drawn in from their own shoulders' planes to the shaft on the centreline (0..1): a
+##         two-handed weapon is held on one line, so the far hand sits on the shaft from any camera, not a
+##         shoulder-width behind it (ignored while the far hand holds a shield)
 ##   elbow_out  the near elbow swung round the shoulder→hand axis out of the picture toward the viewer (rad; 0 = folded
 ##         in the picture plane the way `bend` says, PI/2 = straight out to the side): a raised sword arm
 ##         puts its elbow out instead of folding upper arm and forearm over each other
@@ -87,7 +90,7 @@ const STANCES := {
 		"wind": {"h": Vector2(-2, -10), "a": -2.3, "f": Vector2(3, 6), "s": Vector2(-1, -2),
 			"crouch": 2.5, "lean": -0.05, "lunge": -1.0, "pelvis_yaw": -0.2, "chest_yaw": -0.6, "elbow_out": 1.0},
 		"hit": {"h": Vector2(25, 5), "a": 0.02, "f": Vector2(-1, 8), "s": Vector2(2, 1), "crouch": 3.0, "lean": 0.18,
-			"lunge": 7.0, "step": 1.0, "pelvis_yaw": 0.3, "chest_yaw": 0.6}},
+			"lunge": 7.0, "step": 1.0, "pelvis_yaw": 0.3, "chest_yaw": 0.6, "elbow_out": 0.0}},
 	# Sword or hand axe with a shield: coil — deep wide crouch, weapon raised high and pulled back above
 	# the helmet, blade pointing back; cleave — a 45° line of action, the weapon sweeping a crescent over
 	# the shield's rim, foreshortened larger as it comes down; lockout — arm straight, wrist locked with
@@ -98,19 +101,19 @@ const STANCES := {
 		"wind": {"h": Vector2(-7, -15), "a": -2.7, "rim": Vector2(10, -9.5), "s": Vector2(-1.5, -2),
 			"crouch": 5.0, "wide": 12.0, "lean": -0.05, "lunge": -1.0, "pelvis_yaw": -0.15, "chest_yaw": -0.5, "elbow_out": 1.0},
 		"hit": {"h": Vector2(22.5, 10), "a": 0.49, "rim": Vector2(11, -9.5), "s": Vector2(3, 1), "crouch": 5.5,
-			"wide": 14.0, "lean": 0.35, "lunge": 8.0, "zoom": 1.12, "lock": 1.0, "shield_yaw": 1.36, "pelvis_yaw": 0.25, "chest_yaw": 0.55}},
+			"wide": 14.0, "lean": 0.35, "lunge": 8.0, "zoom": 1.12, "lock": 1.0, "shield_yaw": 1.36, "pelvis_yaw": 0.25, "chest_yaw": 0.55, "elbow_out": 0.0}},
 	"chop": {"path": "arc",
 		"guard": {"h": Vector2(14, 5), "a": -0.33},
 		"wind": {"h": Vector2(3.6, -14.5), "a": -2.03, "lean": -0.08, "lunge": -1.5, "pelvis_yaw": -0.25, "chest_yaw": -0.7, "elbow_out": 1.0},
-		"hit": {"h": Vector2(13, 9), "a": 0.1, "lean": 0.2, "lunge": 6.0, "pelvis_yaw": 0.3, "chest_yaw": 0.7}},
+		"hit": {"h": Vector2(13, 9), "a": 0.1, "lean": 0.2, "lunge": 6.0, "pelvis_yaw": 0.3, "chest_yaw": 0.7, "elbow_out": 0.0}},
 	"thrust": {"two": true,
-		"guard": {"h": Vector2(12, 9), "a": -0.12},
-		"wind": {"h": Vector2(0, 9), "a": -0.12, "lean": -0.06, "lunge": -2.0},
-		"hit": {"h": Vector2(22, 8), "a": -0.12, "lean": 0.18, "lunge": 7.0}},
+		"guard": {"h": Vector2(12, 9), "a": -0.12, "mid": 1.0},
+		"wind": {"h": Vector2(0, 9), "a": -0.12, "lean": -0.06, "lunge": -2.0, "mid": 1.0},
+		"hit": {"h": Vector2(22, 8), "a": -0.12, "lean": 0.18, "lunge": 7.0, "mid": 1.0}},
 	"pole": {"two": true,
-		"guard": {"h": Vector2(10, 8), "a": -PI / 2},
-		"wind": {"h": Vector2(0, 9), "a": -0.12, "lean": -0.06, "lunge": -2.0},
-		"hit": {"h": Vector2(22, 8), "a": -0.12, "lean": 0.18, "lunge": 7.0}},
+		"guard": {"h": Vector2(10, 8), "a": -PI / 2, "mid": 1.0},
+		"wind": {"h": Vector2(0, 9), "a": -0.12, "lean": -0.06, "lunge": -2.0, "mid": 1.0},
+		"hit": {"h": Vector2(22, 8), "a": -0.12, "lean": 0.18, "lunge": 7.0, "mid": 1.0}},
 	# Marksman: aggressive forward lean, soft knees, the butt of the stock seated in the shoulder pocket
 	# (the shoulder lifts to meet it), trigger hand just ahead of it, the support hand out on the forend
 	# with its elbow tucked under (that shoulder rolls forward); the shot kicks straight back through the
@@ -155,8 +158,8 @@ const STANCES := {
 	# arm straight from shoulder to hand at about 30 degrees up and forward, the staff upright; the other
 	# hand lets go and settles by the hip.
 	"staff": {
-		"guard": {"h": Vector2(10, 6), "f": Vector2(9, 13), "a": -1.456},
-		"wind": {"h": Vector2(8, 6), "f": Vector2(7, 13), "a": -1.5},
+		"guard": {"h": Vector2(10, 6), "f": Vector2(9, 13), "a": -1.456, "mid": 1.0},
+		"wind": {"h": Vector2(8, 6), "f": Vector2(7, 13), "a": -1.5, "mid": 1.0},
 		"hit": {"h": Vector2(19, -9), "f": Vector2(2, 17), "a": -1.25, "lean": 0.12, "lunge": 3.0}},
 	"crew": {"guard": {"h": Vector2(14, 8), "f": Vector2(12, 9)}, "wind": {"h": Vector2(14, 8), "f": Vector2(12, 9)},
 		"hit": {"h": Vector2(15, 8), "f": Vector2(13, 9), "lean": 0.1}},
@@ -217,7 +220,7 @@ const GAITS := {
 const SHIELD_GRIP := Vector2(6, 11)
 
 const _FLOATS := {"a": 0.0, "lean": 0.0, "lunge": 0.0, "crouch": 0.0, "step": 0.0, "wide": 0.0, "zoom": 1.0, "lock": 0.0, "rise": 0.0, "bend": 1.0, "shield_yaw": 0.96,
-	"pelvis_yaw": 0.0, "chest_yaw": 0.0, "elbow_out": 0.0}
+	"pelvis_yaw": 0.0, "chest_yaw": 0.0, "elbow_out": 0.6, "mid": 0.0}
 const _VECTORS := {"s": Vector2.ZERO, "sf": Vector2.ZERO}
 
 
@@ -416,7 +419,8 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 	var target_n := sh + (k.h as Vector2) * b
 	if pose.get("atk", -1.0) < 0.0:
 		target_n.x -= sin(walk) * g.get("hswing", 0.0) * mv * b
-	var hand_n := FkRig.reach3(shoulder_n, FkRig.at(target_n, shoulder_n.z), UPPER * b, FORE * b)
+	var grip: float = k.mid if shield == "" and (k.two or k.has("f")) else 0.0
+	var hand_n := FkRig.reach3(shoulder_n, FkRig.at(target_n, lerpf(shoulder_n.z, 0.0, grip)), UPPER * b, FORE * b)
 	var bend: float = k.bend
 	if absf(bend) < 1.0:
 		# Changing which way the elbow folds: the arm straightens through the change, so it never snaps.
@@ -448,7 +452,7 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 		ft = hand_xy - dir * 8.0 * b
 	else:
 		ft = FkRig.xy(shoulder_f) + Vector2(0, 16.5 * b).rotated(sin(walk) * g.swing * mv - 0.1)
-	var hand_f := FkRig.reach3(shoulder_f, FkRig.at(ft, shoulder_f.z), UPPER * b, FORE * b)
+	var hand_f := FkRig.reach3(shoulder_f, FkRig.at(ft, lerpf(shoulder_f.z, 0.0, grip)), UPPER * b, FORE * b)
 	p["sh_n"] = shoulder_n
 	p["sh_f"] = shoulder_f
 	p["elbow_n"] = elbow_n
