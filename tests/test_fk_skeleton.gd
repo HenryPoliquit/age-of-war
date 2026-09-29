@@ -232,10 +232,10 @@ func test_elbows_never_snap() -> void:
 				prev = j
 
 
-func _walk(w: String, shield := "", n := 16) -> Array:
+func _walk(w: String, shield := "", n := 16, view := {}) -> Array:
 	var out := []
 	for i in n:
-		out.append(FkSkeleton.solve(1.0, w, {"walk": TAU * i / n, "move": 1.0, "t": 0.0}, shield))
+		out.append(FkSkeleton.solve(1.0, w, {"walk": TAU * i / n, "move": 1.0, "t": 0.0}, shield, false, {}, view))
 	return out
 
 
@@ -600,9 +600,13 @@ func test_head_level_while_walking() -> void:
 
 # --- Shield turn (owner: shields face the camera while the body is side-on) --------------------
 
+## The camera the game draws with (25°): the shield yaws are authored to read 0.5 and 0.8 wide from it.
+const GAME_VIEW := {"yaw": 0.4363}
+
+
 func test_shield_turns_open_on_the_strike() -> void:
-	var turn := func(atk: float) -> float: return FkSkeleton.solve(1.0, "sword", {"atk": atk}, "round").shield_turn
-	check_near(turn.call(-1.0), 0.5, 1e-4, "braced at a three-quarter turn on guard")
+	var turn := func(atk: float) -> float: return FkSkeleton.solve(1.0, "sword", {"atk": atk}, "round", false, {}, GAME_VIEW).shield.width
+	check_near(turn.call(-1.0), 0.5, 1e-3, "braced at a three-quarter turn on guard")
 	check_near(turn.call(0.34), 0.5, 0.02, "still braced through the coil")
 	check(turn.call(0.55) > 0.7, "swings open as the cut comes over the rim (%.2f)" % turn.call(0.55))
 	check(absf(turn.call(0.99) - 0.5) < 0.05, "back to the brace by the end of the recovery")
@@ -611,10 +615,62 @@ func test_shield_turns_open_on_the_strike() -> void:
 
 
 func test_shield_braced_on_the_march_and_for_spears() -> void:
-	for j in _walk("sword", "round"):
-		check_near(j.shield_turn, 0.5, 1e-4, "shield wall march")
+	for j in _walk("sword", "round", 16, GAME_VIEW):
+		check_near(j.shield.width, 0.5, 1e-3, "shield wall march")
 	for atk in [-1.0, 0.34, 0.5]:
-		check_near(FkSkeleton.solve(1.0, "spear", {"atk": atk}, "round").shield_turn, 0.5, 1e-4, "spear and shield at %s" % atk)
+		check_near(FkSkeleton.solve(1.0, "spear", {"atk": atk}, "round", false, {}, GAME_VIEW).shield.width, 0.5, 1e-3, "spear and shield at %s" % atk)
+
+
+func test_shield_plate_shows_as_wide_as_the_camera_sees_it() -> void:
+	for yaw in [0.0, 0.2618, 0.4363]:
+		for atk in [-1.0, 0.2, 0.34, 0.45, 0.55, 0.8]:
+			var j := FkSkeleton.solve(1.0, "sword", {"atk": atk}, "round", false, {}, {"yaw": yaw})
+			check_near(j.shield.width, absf(sin(j.shield.yaw - yaw)), 1e-5, "width at camera %.2f, atk %.1f" % [yaw, atk])
+			check(j.shield.width > 0.1 and j.shield.width <= 1.0, "never edge-on or past full at camera %.2f, atk %.1f" % [yaw, atk])
+	check(not FkSkeleton.solve(1.0, "sword", {"atk": -1.0}).has("shield"), "no shield, no plate")
+
+
+func test_shield_shows_its_back_to_our_army_and_its_face_to_the_mirrored_one() -> void:
+	for yaw in [0.0, 0.2618, 0.4363]:
+		for atk in [-1.0, 0.34, 0.55, 0.9]:
+			var ours := FkSkeleton.solve(1.0, "sword", {"atk": atk}, "round", false, {}, {"yaw": yaw})
+			var theirs := FkSkeleton.solve(1.0, "sword", {"atk": atk, "mirrored": true}, "round", false, {}, {"yaw": yaw})
+			check(ours.shield.back and not theirs.shield.back, "back for ours, face for theirs, camera %.2f atk %.1f" % [yaw, atk])
+			check_eq(ours.shield.width, theirs.shield.width, "the same width either way")
+
+
+func test_raised_sword_arm_swings_its_elbow_out() -> void:
+	# The wind-up puts the elbow out toward the viewer instead of folding the arm over itself in the picture.
+	for spec in [["sword", ""], ["sword", "round"], ["axe", ""], ["axe", "round"]]:
+		var wind := FkSkeleton.solve(1.0, spec[0], {"atk": 0.34}, spec[1])
+		var tag := "%s %s" % spec
+		check(wind.z.elbow_n > wind.z.sh_n + 2.5, tag + ": the elbow stands out toward the viewer (%.1f)" % (wind.z.elbow_n - wind.z.sh_n))
+		check_near(wind.z.hand_n, wind.z.sh_n, 1e-4, tag + ": the hand stays in the shoulder's plane")
+		check(wind.sh_n.distance_to(wind.elbow_n) < FkSkeleton.UPPER * 0.95, tag + ": the upper arm foreshortens on screen")
+	var coil := FkSkeleton.solve(1.0, "sword", {"atk": -1.0}, "round")
+	check(coil.z.elbow_n > coil.z.sh_n + 2.5, "the shield family's coiled guard has its elbow out too")
+
+
+func test_marching_and_striking_arms_stay_in_their_plane() -> void:
+	# The approved shield-wall march and the locked-out strike are as they were: only the raised arm swings out.
+	for j in _walk("sword", "round"):
+		check_near(j.z.elbow_n, j.z.sh_n, 1e-3, "shield wall march keeps the elbow in the plane")
+	for w in ["sword", "axe"]:
+		for shield in ["", "round"]:
+			var hit := FkSkeleton.solve(1.0, w, {"atk": 0.55}, shield)
+			check_near(hit.z.elbow_n, hit.z.sh_n, 1e-3, "%s %s: the strike is in the plane" % [w, shield])
+
+
+func test_elbows_never_snap_in_3d() -> void:
+	for w in ["sword", "axe"]:
+		for shield in ["", "round"]:
+			var prev := {}
+			for i in 101:
+				var j := FkSkeleton.solve(1.0, w, {"atk": i / 100.0}, shield)
+				if not prev.is_empty():
+					var jump: float = (j.p3.elbow_n - prev.p3.elbow_n).length() - (j.p3.hand_n - prev.p3.hand_n).length() - (j.p3.sh_n - prev.p3.sh_n).length()
+					check(jump < 2.0, "%s %s: elbow snaps in 3D at atk %.2f (%.1f px)" % [w, shield, i / 100.0, jump])
+				prev = j
 
 
 # --- Refinements (owner, 2026-09-28) ------------------------------------------------------------

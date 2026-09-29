@@ -78,24 +78,27 @@ New: `j.p3` (joint name → `Vector3`) and, from stage 3, `j.wpn` and `j.shield`
 
 **Stance channels.**
 - `h`, `f`, `rim` accept `Vector3`. Its `z` is the lateral offset, + toward the near side. A `Vector2` means today's meaning (the shoulder's own plane), so every existing keyframe stays valid.
-- New `pole` (elbow or knee direction, `Vector3`). The default reproduces today's in-plane fold side from the `bend` rules, so nothing moves until a family opts in.
+- New `elbow_out` (rad): the near elbow swung out of the picture about the shoulder→hand axis (§4, stage 3). Default 0 is today's fold.
+- New `shield_yaw` (rad) replaces `turn` (§4, stage 3).
 - New `pelvis_yaw` and `chest_yaw` (rad), blended like any channel (stage 2).
-- Retired at stage 3: `el`, `bend`, `zoom`, `lock`, `turn`.
+- Retired at stage 3: `turn`. `zoom` stays (a perspective cue, §4). `el`, `bend` and `lock` stay until stage 4 re-authors the families that use them (the bow, the wrist lock).
 - `lean`, `lunge`, `crouch`, `step`, `wide`, `rise`, `s`, `sf`, `a` and the `guard / wind / hit` structure stay.
 
-## 4. Held objects as 3D frames (stage 3)
+## 4. The sword arm and the shield (stage 3)
 
-**Weapon.** `j.wpn = {origin, axis, edge}` (`Vector3` each): grip, tip direction, and the cutting-edge normal. Drawing projects the tip and the edge:
-- the blade lengthens or shortens with the projected axis, replacing `zoom` (`j.dir` and `j.zoom` are still emitted as projected values while consumers migrate);
-- a blade reads thin when edge-on and wide when flat, from the projected edge normal;
-- the wrist locking to the forearm is the axis following the forearm, replacing `lock`.
+**The elbow swings out (built).** A raised sword arm folded upper arm and forearm over each other in the picture (the loop over the face in the coil and wind-up frames). The elbow is now parameterised as a swivel about the shoulder→hand axis, `elbow_out` (rad): 0 folds it in the picture plane the way today's `bend` rule says, PI/2 folds it straight out toward the viewer. `FkRig.swivel_pole` turns the in-plane pole toward the viewer, `ik3` places the elbow, and the bones keep their lengths, so in profile the upper arm foreshortens and the forearm rises above it. It replaces the `pole` channel the first draft had: a swivel angle blends as a plain scalar, keeps the in-plane fold side (so "the elbow folds the pose's way" still holds), and 0 is exactly today's pose.
+- Authored for the wind-up of blade and chop (1.0) and for the shield family's coiled guard (0.9) and wind-up (1.0). The strike is 0: the arm is straight there. The shield-wall walk carry sets 0, so the approved march is unchanged.
+- The hand stays in its shoulder's plane; only the elbow leaves it. An arm whose elbow is out by more than 0.75 px splits into upper arm and forearm parts sorted by their own z (the bow's rule), so the upper arm sorts over the shoulder cap and the weapon.
 
-**Shield.** `j.shield = {origin, normal, up}`: a plate at the far hand.
-- Each shield kind is still authored flat in its own plane (`_face`). It is drawn under one `Transform2D` built from the projected plate axes (`FkPaint.push` already takes a `Transform2D`; today's `squash` is the special case `Vector2(turn, 1)`).
-- Which face shows (painted face or grip side, replacing `back_view`) is the sign of `normal · view`. The rim's thickness sliver is the plate thickness projected along the normal.
-- A shield can now swing open, bash forward or tilt, by turning its frame.
+**The shield plate (built).** `j.shield = {yaw, width, back}`. The shield is a plate carried on the far arm, turned `shield_yaw` outward from the way the figure faces.
+- It shows `|sin(shield_yaw − camera yaw)|` wide, replacing the hand-authored `turn`. Which side shows follows from the sign of that sine, flipped for the mirrored army: our figure shows the back (grip and hand), the mirrored one the painted face, as before.
+- The yaws are authored so the game's 25° camera reads the widths the owner had approved: 55° for the brace (0.5 wide) and 78° for the cleave (0.8). At other cameras the width follows correctly.
+- `FkArmour.shield` is unchanged: it still squashes its flat art by the width. The full projected affine (a tilted plate) waits until something tilts one.
 
-**Body parts.** The same idea applies where it is cheap: the torso polygon is anchored on the chest frame (it turns with `chest_yaw`), and limbs stay capsules between projected joints. Head yaw is out of scope: the face art has no turned views.
+**What is not built, and why.**
+- **Weapon frame (`axis`, `edge`).** `zoom` makes the blade bigger as it swings toward the viewer, a perspective cue the owner asked for ("foreshortened larger at the bottom of the cut"). An orthographic camera does the opposite (a blade swinging toward the viewer projects shorter), so a frame cannot replace it. `zoom` and `lock` stay; the edge normal waits for stage 4, when hand targets get lateral paths.
+- **Turning the torso outline.** A torso is about as wide seen from the front as it is deep in profile, so its silhouette barely changes with `chest_yaw`. The chest turn already moves the shoulders and arms.
+- **Head yaw**: the face art has no turned views.
 
 ## 5. Depth and layering
 
@@ -107,8 +110,8 @@ Every stage: tests green, `tools/unit_sheet.gd` renders, and the animation page 
 
 1. **Core.** `FkRig`, `p3`, IK3 with in-plane poles. Nothing visual changes. The 720-frame golden test (`fk_golden.txt`) proves it.
 2. **Torso turn and camera yaw.** `pelvis_yaw`, `chest_yaw` channels, first authored for the melee swings (blade, shield, chop): the weapon shoulder pulls back on the wind-up and drives forward on the strike, the hips leading the chest, and the strike targets move forward with the shoulder so the arm still locks straight. `view.yaw` plumbed through `spec.view` (`UnitArt.view_yaw`). Sheet, gallery and animation tools get `--yaw=`. Reviewed at 0°, 15° and 25°: the owner picked 25° (2026-09-29).
-3. **Held-object frames.** Shield plate and weapon frames. Retire `turn`, `zoom`, `lock`, `el`, `bend`.
-4. **Re-author the families in 3D**, one per owner brief, starting from the approved 2D motion (same hand target, plus a lateral component and a pole). Order: sword and shield (the brief that started this), blade, chop, thrust and pole, bow, aim, throw and sling, staff.
+3. **The sword arm and the shield.** `elbow_out` for the raised sword arm and the shield plate (`shield_yaw`, replacing `turn`), built as §4 describes. The weapon frame and the torso outline were dropped (§4 says why).
+4. **Re-author the families in 3D**, one per owner brief, starting from the approved 2D motion (same hand target, plus a lateral component and an `elbow_out`), and retiring `el`, `bend` and `lock` as their families move over. Order: sword and shield (the brief that started this), blade, chop, thrust and pole, bow, aim, throw and sling, staff.
 5. **Mounts on `FkRig`.** Revise the mount spec and plan: the quadruped's IK becomes `ik3` and its `z` a real axis. Then the rest of that spec.
 
 ## 7. Testing
@@ -116,7 +119,7 @@ Every stage: tests green, `tools/unit_sheet.gd` renders, and the animation page 
 **Kept, unchanged:** all existing tests (baseline on this branch: 148 tests, 0 failures). `test_default_look_matches_the_pre_rig_skeleton` (golden) stays the identity check for every stage-1 and stage-2 change at yaw 0.
 
 **New (`tests/test_fk_rig.gd`, additions to `tests/test_fk_skeleton.gd`):**
-- `ik3` with an in-plane pole equals `ik` for both bend signs, over a grid of targets.
+- `ik3` with an in-plane pole equals `ik` for both bend signs, over a grid of targets; `swivel_pole` at 0 is the in-plane pole, a quarter turn is straight toward the viewer, and the swivelled elbow keeps both bone lengths and moves without a jump.
 - `ik3` keeps both bone lengths exactly, and the joint is continuous as the pole turns a full circle around the axis (no jump larger than the pole step).
 - `project` at yaw 0 is `(x, y)`. A yawed near-side point shifts toward the rear, and a figure turned 180° projects as the mirror image, which is what the view's flip and the kit's negated z already do.
 - The camera moves the picture, not the rig: `p3` is identical at every yaw. The layering (`FkFigure.layers`) is identical at every yaw.

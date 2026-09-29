@@ -238,13 +238,14 @@ static func _parts(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, 
 	# The shield rides on the far hand: its drawing is laid out around sh with the grip at SHIELD_GRIP.
 	# It stands in front of the chest and head at the near shoulder's depth, so the weapon arm (same
 	# depth, later rank) always strikes over it.
-	# Seen from the side a shield is turned toward the enemy: a figure facing right (unmirrored) shows us
-	# the back of the shield on its far arm, its hand on the grip; a mirrored one shows the painted face.
-	var back_view: bool = not pose.get("mirrored", false)
+	# The shield is a plate turned toward the enemy (the skeleton's j.shield: how wide it shows and which side):
+	# a figure facing right (unmirrored) shows us the back of the shield on its far arm, its hand on the grip;
+	# a mirrored one shows the painted face.
+	var plate: Dictionary = j.get("shield", {"width": 1.0, "back": false})
 	var draw_shield := func() -> void:
 		FkArmour.shield(ci, shield, (j.hand_f as Vector2) - FkSkeleton.SHIELD_GRIP * b, build, pal, tm, team, pose, t, lk,
-			st.get("runes", false), j.shield_turn, back_view)
-		if back_view and shield not in ["", "energy"]:
+			st.get("runes", false), plate.width, plate.back)
+		if plate.back and shield not in ["", "energy"]:
 			fist(ci, j.hand_f, 0.0, b * 0.85, skin.darkened(0.25))
 	add.call("shield", maxf(z.sh_n, z.sh_f), draw_shield)
 	var draw_smear := func() -> void:
@@ -258,7 +259,7 @@ static func _parts(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, 
 	# The weapon arm takes the far side's shadow when it is behind the body.
 	var sleeve := cloth.lightened(0.12) if z.sh_n > 0.0 else cloth.darkened(0.3)
 	var bracer := (metal if armoured else leather).darkened(0.0 if z.sh_n > 0.0 else 0.3)
-	var planar: bool = absf(z.elbow_n - z.sh_n) < 1e-3 and absf(z.hand_n - z.sh_n) < 1e-3
+	var planar: bool = absf(z.elbow_n - z.sh_n) < 0.75 and absf(z.hand_n - z.sh_n) < 0.75
 	var draw_upper := func() -> void:
 		if planar:
 			arm(ci, j.sh_n, j.elbow_n, j.hand_n, grip, b, sleeve, skin, bracer, impact)

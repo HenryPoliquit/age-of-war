@@ -82,3 +82,16 @@ static func plane_pole(root: Vector3, target: Vector3, bend: float) -> Vector3:
 	var v := Vector2(target.x - root.x, target.y - root.y)
 	var dir := v.normalized() if v.length() > 1e-4 else Vector2.DOWN
 	return Vector3(-dir.y, dir.x, 0.0) * signf(bend)
+
+
+## `plane_pole` swivelled about the root→target axis by `out` (rad) toward the viewer's side (`side` +1, the
+## near side) or away from it (−1): 0 is the in-plane fold, PI/2 a fold straight out of the picture. The joint
+## turns round the axis, so the bones keep their lengths and the elbow only swings out and in.
+static func swivel_pole(root: Vector3, target: Vector3, bend: float, out: float, side := 1.0) -> Vector3:
+	var pole := plane_pole(root, target, bend)
+	if out == 0.0 or pole == Vector3.ZERO:
+		return pole
+	var axis := (target - root).normalized()
+	var toward := Vector3(0, 0, side)
+	toward = (toward - axis * toward.dot(axis)).normalized()
+	return pole * cos(out) + toward * sin(out)

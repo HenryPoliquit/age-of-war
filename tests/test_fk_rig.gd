@@ -126,3 +126,43 @@ func test_project_dir_is_the_screen_direction_of_a_rig_direction() -> void:
 	# A direction along the camera's line of sight has no screen direction: it falls back, never NaN.
 	var line := FkRig.project_dir(Vector3(sin(YAW), 0, cos(YAW)), {"yaw": YAW})
 	check(not is_nan(line.x) and not is_nan(line.y), "no NaN along the line of sight")
+
+
+func test_swivel_zero_is_the_plane_pole() -> void:
+	for target in [Vector3(10, -2, 1.7), Vector3(-12, 5, 1.7), Vector3(3, -20, 1.7)]:
+		var root := Vector3(0, -28, 1.7)
+		for bend in [FkSkeleton.ELBOW, FkSkeleton.KNEE, 0.0]:
+			check_eq(FkRig.swivel_pole(root, target, bend, 0.0), FkRig.plane_pole(root, target, bend), "swivel 0, bend %s" % bend)
+
+
+func test_swivel_turns_the_fold_toward_the_viewer_about_the_axis() -> void:
+	var root := Vector3(0, 0, 2.0)
+	var target := Vector3(12, 3, 2.0)
+	var axis := (target - root).normalized()
+	var flat := FkRig.plane_pole(root, target, FkSkeleton.ELBOW)
+	var quarter := FkRig.swivel_pole(root, target, FkSkeleton.ELBOW, PI / 2.0)
+	check(quarter.distance_to(Vector3(0, 0, 1)) < 1e-5, "a quarter turn folds straight toward the viewer")
+	check(absf(quarter.dot(axis)) < 1e-5, "and stays at right angles to the axis")
+	var away := FkRig.swivel_pole(root, target, FkSkeleton.ELBOW, PI / 2.0, -1.0)
+	check(away.distance_to(Vector3(0, 0, -1)) < 1e-5, "the far arm's side turns the other way")
+	for deg in range(0, 91, 10):
+		var p := FkRig.swivel_pole(root, target, FkSkeleton.ELBOW, deg_to_rad(deg))
+		check_near(p.length(), 1.0, 1e-5, "a unit pole at %d°" % deg)
+		check_near(p.dot(flat), cos(deg_to_rad(deg)), 1e-5, "%d° from the in-plane fold" % deg)
+
+
+func test_swivelled_elbow_keeps_bone_lengths_and_moves_smoothly() -> void:
+	var root := Vector3(0, 0, 4.0)
+	var target := Vector3(8, -9, 4.0)
+	var prev := Vector3.ZERO
+	for i in 91:
+		var pole := FkRig.swivel_pole(root, target, FkSkeleton.ELBOW, deg_to_rad(i))
+		var elbow := FkRig.ik3(root, target, 9.0, 8.5, pole)
+		check_near(root.distance_to(elbow), 9.0, 0.02, "upper arm at %d°" % i)
+		check_near(elbow.distance_to(target), 8.5, 0.02, "forearm at %d°" % i)
+		if i > 0:
+			check(elbow.distance_to(prev) < 0.35, "no jump at %d°" % i)
+		prev = elbow
+	var flat := FkRig.ik3(root, target, 9.0, 8.5, FkRig.swivel_pole(root, target, FkSkeleton.ELBOW, 0.0))
+	var out := FkRig.ik3(root, target, 9.0, 8.5, FkRig.swivel_pole(root, target, FkSkeleton.ELBOW, PI / 2.0))
+	check(out.z > flat.z + 5.0, "swivelled out, the elbow stands well toward the viewer (%.1f vs %.1f)" % [out.z, flat.z])

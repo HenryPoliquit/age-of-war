@@ -7,13 +7,23 @@ func _spec(weapon: String, shield := "", race := &"human", build := 1.0, view :=
 		"palette": FkLooks.PALETTES[race][2], "team": Color.RED, "build": build, "view": view}
 
 
+## The near arm's parts when its elbow swings out toward the viewer (the coiled guard of a sword and shield): the
+## upper arm and forearm sort over the shoulder cap and the weapon, the same rule that keeps a drawing elbow visible.
+const ELBOW_OUT_ORDER := ["shadow", "far leg", "near leg", "cape", "pack", "far arm", "torso", "head", "bow", "shield", "smear",
+	"shoulder cap", "weapon", "near upper arm", "near forearm", "impact", "dust"]
+
+
+func _standing_order(weapon: String, shield: String) -> Array:
+	return ELBOW_OUT_ORDER if shield != "" and FkSkeleton.FAMILY.get(weapon, "idle") in ["blade", "chop"] else FkFigure.PARTS
+
+
 func test_standing_order_is_the_approved_order() -> void:
 	# (Not the bow: its guard is the pre-draw, the drawing elbow already swung out toward the viewer; the
 	# bow test below covers it.)
 	for w in ["sword", "axe", "spear", "halberd", "musket", "javelin", "sling", "staff", "crew", "none", "no_such_weapon"]:
 		for shield in ["", "round"]:
 			for race in [&"human", &"dwarf", &"elf"]:
-				check_eq(FkFigure.layers(_spec(w, shield, race), {"atk": -1.0}), FkFigure.PARTS, "%s %s %s" % [w, shield, race])
+				check_eq(FkFigure.layers(_spec(w, shield, race), {"atk": -1.0}), _standing_order(w, shield), "%s %s %s" % [w, shield, race])
 
 
 func test_marching_shield_wall_keeps_the_weapon_arm_on_top() -> void:
@@ -75,7 +85,7 @@ func test_mirrored_figure_is_turned_around_not_left_handed() -> void:
 			check(_before(names, "head", "shield") and _before(names, "torso", "far arm"), tag + ": shield arm and shield in front")
 			check(_before(names, "near leg", "far leg"), tag + ": the left leg is the near one")
 			# Our own army is unchanged.
-			check_eq(FkFigure.layers(_spec("sword", "round", race), pose), FkFigure.PARTS if pose.atk < 0.0 else FkFigure.layers(_spec("sword", "round", race), pose), tag)
+			check_eq(FkFigure.layers(_spec("sword", "round", race), pose), _standing_order("sword", "round") if pose.atk < 0.0 and not pose.has("move") else FkFigure.layers(_spec("sword", "round", race), pose), tag)
 
 
 func test_mirrored_archer_holds_the_bow_in_front_and_draws_behind_the_head() -> void:
