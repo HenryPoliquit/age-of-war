@@ -559,16 +559,16 @@ static func _medieval(ci: CanvasItem, team: Color, t: float) -> void:
 
 ## An arched window on the plane z = zf, set `depth` into the wall: a limestone surround (`dress`, if opaque), a dark recess by
 ## day, and at night the inner plane glows warm (drawn live).
-static func _arch_win(ci: CanvasItem, x: float, y_bottom: float, w: float, h: float, zf: float, depth: float, jamb: Color, dress := Color(0, 0, 0, 0)) -> void:
-	var y_spring := y_bottom - (h - w * 0.5)
-	var op := Arch.arch_pts(x, x + w, y_bottom, y_spring, w * 0.5, 0.0, 8)
+static func _arch_win(ci: CanvasItem, x: float, y_bottom: float, w: float, h: float, zf: float, depth: float, jamb: Color, dress := Color(0, 0, 0, 0), point := 0.0) -> void:
+	var y_spring := y_bottom - (h - w * 0.5 - point)
+	var op := Arch.arch_pts(x, x + w, y_bottom, y_spring, w * 0.5, point, 8)
 	if dynamic_pass:
 		if night > 0.05:
 			Arch.on_front(ci, zf - depth, func() -> void:
 				ci.draw_colored_polygon(PackedVector2Array(op), Color(1.0, 0.72, 0.35, 0.9 * night)))
 		return
 	if dress.a > 0.0:
-		var sur := Arch.arch_pts(x - 2.5, x + w + 2.5, y_bottom + 3.0, y_spring, w * 0.5 + 2.5, 0.0, 8)
+		var sur := Arch.arch_pts(x - 2.5, x + w + 2.5, y_bottom + 3.0, y_spring, w * 0.5 + 2.5, point, 8)
 		Arch.on_front(ci, zf, func() -> void:
 			_sp(ci, sur, dress)
 			ci.draw_line(Vector2(x - 4.5, y_bottom + 3.5), Vector2(x + w + 4.5, y_bottom + 3.5), dress.lightened(0.2), 2.5))
@@ -702,10 +702,10 @@ static func _gunpowder(ci: CanvasItem, team: Color, t: float) -> void:
 	Arch.on_front(ci, -6.0, func() -> void:
 		_quoins(ci, -176.0, -198.0, -108.0, 7.0, stone, 1.0)
 		_quoins(ci, -62.0, -198.0, -108.0, 7.0, stone, -1.0)
-		ci.draw_line(Vector2(-176, -156), Vector2(-62, -156), stone, 3.0)
-		for x in [-158.0, -134.0, -110.0, -86.0]:
-			_arch_win(ci, x, -162.0, 14.0, 26.0, -6.0, 5.0, jamb, stone)
-			_arch_win(ci, x, -124.0, 14.0, 26.0, -6.0, 5.0, jamb, stone))
+		ci.draw_line(Vector2(-176, -156), Vector2(-62, -156), stone, 3.0))
+	for x in [-158.0, -134.0, -110.0, -86.0]:
+		_arch_win(ci, x, -162.0, 14.0, 26.0, -6.0, 5.0, jamb, stone)
+		_arch_win(ci, x, -124.0, 14.0, 26.0, -6.0, 5.0, jamb, stone)
 	Arch.box(ci, -182, -56, -206, -198, -54, -1, stone.lightened(0.04))
 	# Chimneys and the clock cupola, behind the roof's front so their feet sink into it.
 	for cx in [-158.0, -95.0]:
@@ -1101,259 +1101,576 @@ static func _lantern_glow(ci: CanvasItem, zf: float, x: float, y: float, t: floa
 	ci.draw_circle(c, 3.0, Color(1.0, 0.9, 0.6, 0.35 + 0.6 * night))
 
 
-## Elven tree-hall: a great tree that gains decks, halls, a white tower and silver spires with each
-## age, crowned with glowing crystal in the Arcane age. The trunk is a solid of revolution with root
-## flares, the decks and hall timber boxes with real eaves, the canopy layers of foliage in depth.
-static func _elf(ci: CanvasItem, age: int, team: Color, t: float) -> void:
-	var look := Scenery.look(&"elf", age)
-	var leaf: Color = look.leaf
-	var glow: Color = RaceLook.look(&"elf").glow
-	var bark := Color("5e4632")
-	var wood := Color("9a7650")
-	# Where the hall's and the decks' fronts stand, and the trunk's front at the height of the knot-hole.
-	var hall_z := 26.0
-	var deck_z := 30.0
-	var trunk := [[-262.0, 24.0], [-160.0, 26.0], [-100.0, 28.0], [-60.0, 33.0], [-30.0, 42.0], [-14.0, 56.0], [-5.0, 72.0], [0.0, 87.0]]
+# ---------------------------------------------------------------------------
+# Elves: architecture that improves with each age, standing in the forest (trees flank the buildings, the buildings are
+# not trees). Stone: a woodland camp of turf and wattle. Bronze: a timber lodge on a stone footing under a swooping roof.
+# Iron: a tiered timber hall. Medieval: a white-stone citadel with pointed arcades and copper-green cones. Gunpowder: silver
+# spires linked by sky-bridges. Arcane: a crystal palace.
+
+## A leaf-shaped (pointed at both ends) outline centred on (cx, cy).
+static func _leaf_pts(cx: float, cy: float, w: float, h: float, n := 8) -> Array:
+	var pts: Array = []
+	for i in n + 1:
+		var s := float(i) / n
+		pts.append(Vector2(cx + w * 0.5 * pow(sin(PI * s), 0.85), cy - h * 0.5 + h * s))
+	for i in range(n - 1, 0, -1):
+		var s := float(i) / n
+		pts.append(Vector2(cx - w * 0.5 * pow(sin(PI * s), 0.85), cy - h * 0.5 + h * s))
+	return pts
+
+
+## A leaf-shaped window on the plane z = zf: a gilt frame, dark by day, warm at night (drawn live).
+static func _leaf_win(ci: CanvasItem, cx: float, cy: float, w: float, h: float, zf: float, frame: Color) -> void:
 	if dynamic_pass:
-		if age >= 3:
-			for p in [Vector3(-150, -150, hall_z), Vector3(-60, -150, hall_z), Vector3(-120, -222, 24.0)]:
-				var c := Arch.pt(p.x, p.y, p.z)
-				var k := 0.8 + 0.2 * sin(t * 3.0 + p.x)
-				ci.draw_circle(c, 12.0, Color(1.0, 0.85, 0.5, (0.1 + 0.25 * night) * k))
-				ci.draw_circle(c, 3.0, Color(1.0, 0.9, 0.6, 0.5 + 0.5 * night))
-		if age >= 5:
-			ci.draw_circle(Arch.pt(-198, -238, -17), 10.0, Color(glow, 0.25 + 0.2 * sin(t * 2.0)))
-		if age == 6:
-			# Motes circling the crown, in depth.
-			for i in 8:
-				var a := t * 0.4 + TAU * i / 8.0
-				ci.draw_circle(Arch.pt(-110 + cos(a) * 90.0, -300 + sin(a * 1.3) * 40.0, sin(a) * 50.0), 2.2, Color(glow, 0.7 + 0.3 * sin(t * 3.0 + i)))
-			var c := Vector2(Arch.cylinder_x(-110, 0), -372 + sin(t * 1.2) * 4.0)
+		if night > 0.05:
+			var g := _leaf_pts(cx, cy, w - 2.0, h - 3.0)
+			Arch.on_front(ci, zf, func() -> void:
+				ci.draw_colored_polygon(PackedVector2Array(g), Color(1.0, 0.75, 0.4, 0.9 * night)))
+		return
+	var outer := _leaf_pts(cx, cy, w + 5.0, h + 6.0)
+	var inner := _leaf_pts(cx, cy, w, h)
+	Arch.on_front(ci, zf, func() -> void:
+		ci.draw_colored_polygon(PackedVector2Array(outer), frame)
+		ci.draw_colored_polygon(PackedVector2Array(inner), Color(0.07, 0.06, 0.05))
+		ci.draw_line(Vector2(cx, cy - h * 0.4), Vector2(cx, cy + h * 0.4), Color(frame, 0.6), 1.0))
+
+
+## The front outline of a swooping hip roof over x in [x0, x1]: eaves at y_eave curling up at the tips, slopes shallow at
+## the eaves and steep toward the ridge (at y_ridge, from x0 + inset to x1 - inset).
+static func _elf_roof_pts(x0: float, x1: float, y_eave: float, y_ridge: float, inset: float, curl: float) -> Array:
+	var n := 7
+	var pts: Array = [Vector2(x0 - 7.0, y_eave - curl)]
+	for i in n + 1:
+		var u := float(i) / n
+		pts.append(Vector2(lerpf(x0, x0 + inset, u), y_eave + (y_ridge - y_eave) * pow(u, 1.8)))
+	for i in range(n, -1, -1):
+		var u := float(i) / n
+		pts.append(Vector2(lerpf(x1, x1 - inset, u), y_eave + (y_ridge - y_eave) * pow(u, 1.8)))
+	pts.append(Vector2(x1 + 7.0, y_eave - curl))
+	pts.append(Vector2(x1 + 1.0, y_eave + 5.0))
+	pts.append(Vector2((x0 + x1) * 0.5, y_eave + 8.0))
+	pts.append(Vector2(x0 - 1.0, y_eave + 5.0))
+	return pts
+
+
+## A swooping hip roof: shingle courses, a ridge cap, gilt horns at the ridge ends, a dark eave board.
+static func _elf_roof(ci: CanvasItem, x0: float, x1: float, y_eave: float, y_ridge: float, inset: float, curl: float, z0: float, z1: float, col: Color, trim: Color) -> void:
+	var pts := _elf_roof_pts(x0, x1, y_eave, y_ridge, inset, curl)
+	Arch.prism(ci, pts, z0, z1, col)
+	Arch.on_front(ci, z1, func() -> void:
+		_slates(ci, pts, 5.0)
+		ci.draw_line(Vector2(x0 + inset, y_ridge), Vector2(x1 - inset, y_ridge), trim, 2.6)
+		for side in [-1.0, 1.0]:
+			var rx := x0 + inset if side < 0.0 else x1 - inset
+			ci.draw_polyline(PackedVector2Array([Vector2(rx, y_ridge), Vector2(rx + side * 3.0, y_ridge - 6.0), Vector2(rx + side * 8.0, y_ridge - 10.0), Vector2(rx + side * 12.0, y_ridge - 9.0)]), trim, 2.2)
+		var n := pts.size()
+		ci.draw_polyline(PackedVector2Array([pts[n - 3], pts[n - 2], pts[n - 1]]), col.darkened(0.45), 2.6)
+		ci.draw_polyline(PackedVector2Array(pts.slice(0, 10)), Color(1, 1, 1, 0.16), 1.2))
+
+
+## Timber framing on a wall face: plaster panels, posts, rails and braces.
+static func _elf_frame(ci: CanvasItem, r: Rect2, plaster: Color, timber: Color, step := 30.0) -> void:
+	_sp(ci, _rect_pts(r), plaster)
+	var mid := r.position.y + r.size.y * 0.5
+	ci.draw_line(Vector2(r.position.x, mid), Vector2(r.end.x, mid), timber, 3.0)
+	var x := r.position.x
+	var k := 0
+	while x + step <= r.end.x + 0.5:
+		ci.draw_line(Vector2(x, r.position.y), Vector2(x, r.end.y), timber, 3.4)
+		var a := Vector2(x + 2.0, mid) if k % 2 == 0 else Vector2(x + step - 2.0, mid)
+		var b := Vector2(x + step - 2.0, r.position.y + 2.0) if k % 2 == 0 else Vector2(x + 2.0, r.position.y + 2.0)
+		ci.draw_line(a, b, timber.lightened(0.05), 2.2)
+		x += step
+		k += 1
+	ci.draw_line(Vector2(r.end.x, r.position.y), Vector2(r.end.x, r.end.y), timber, 3.4)
+	ci.draw_line(Vector2(r.position.x, r.position.y + 1.0), Vector2(r.end.x, r.position.y + 1.0), timber, 4.0)
+	ci.draw_line(Vector2(r.position.x, r.end.y - 1.0), Vector2(r.end.x, r.end.y - 1.0), timber, 4.0)
+
+
+## A slender carved post standing at (x, z) on y_base: a swelling foot, a leaf-flared capital.
+static func _elf_post(ci: CanvasItem, x: float, z: float, y_top: float, col: Color, y_base := 0.0, r := 3.6) -> void:
+	var prof := [[y_top, r * 1.9], [y_top + 5.0, r * 1.9], [y_top + 9.0, r * 1.1], [y_base - 14.0, r], [y_base - 6.0, r * 1.15], [y_base, r * 1.6]]
+	Arch.lathe(ci, x, z, prof, col, 0, 10)
+	var top := Arch.pt(x, y_top + 3.0, z)
+	for s in [-1.0, 1.0]:
+		FkPaint.ellipse(ci, top + Vector2(s * 7.0, -3.0), Vector2(5.5, 2.4), col.lightened(0.14), s * -0.55)
+
+
+## A broadleaf tree standing at (x, z): a tapering trunk with a root flare and crowns of foliage in depth.
+static func _elf_tree(ci: CanvasItem, x: float, z: float, h: float, leaf: Color, trunk: Color, birch := false) -> void:
+	var prof := [[-h, 2.2], [-h * 0.6, 3.6], [-26.0, 5.2], [-9.0, 7.0], [0.0, 10.5]]
+	Arch.lathe(ci, x, z, prof, trunk, 2, 10)
+	var cx := Arch.cylinder_x(x, z)
+	if birch:
+		for k in 7:
+			var y := -14.0 - k * h * 0.085
+			ci.draw_line(Vector2(cx - 3.2, y), Vector2(cx + 0.5 + (k % 2) * 2.0, y - 1.6), Color(0.1, 0.09, 0.08, 0.7), 1.5)
+	ci.draw_line(Arch.pt(x, -h * 0.5, z), Arch.pt(x - 18.0, -h * 0.8, z), trunk.darkened(0.1), 3.0)
+	ci.draw_line(Arch.pt(x, -h * 0.56, z), Arch.pt(x + 20.0, -h * 0.86, z), trunk.darkened(0.1), 3.0)
+	var r := h * 0.2
+	for b in [[-0.7, 0.8, -8.0, 0.8, -0.14], [0.75, 0.86, 6.0, 0.85, -0.06], [0.0, 0.97, 0.0, 0.95, 0.0], [-0.25, 0.72, 12.0, 0.72, 0.06], [0.55, 0.7, 14.0, 0.6, 0.1]]:
+		var tone: float = b[4]
+		var col := leaf.lightened(tone) if tone > 0.0 else leaf.darkened(-tone)
+		Arch.blob(ci, x + float(b[0]) * r, -h * float(b[1]), z + float(b[2]), Vector2(r * float(b[3]), r * float(b[3]) * 0.74), col, 0.15)
+
+
+## A woven dome hut: bent-sapling ribs, hoops, a low door, a leaf thatch.
+static func _elf_hut(ci: CanvasItem, cx: float, r: float, h: float, z0: float, z1: float, col: Color, leaf: Color) -> void:
+	var dome: Array = []
+	for i in 13:
+		var da := PI * i / 12.0
+		dome.append(Vector2(cx - cos(da) * r, -sin(da) * h))
+	Arch.prism(ci, dome, z0, z1, col, Color(0, 0, 0, 0.3), 0.8)
+	Arch.on_front(ci, z1, func() -> void:
+		for k in 5:
+			var wa := Vector2(cx - r * 0.85 + k * r * 0.425, 0.0)
+			ci.draw_polyline(PackedVector2Array([wa, wa + Vector2(4, -h * 0.55), wa + Vector2(2 + k, -h * 0.9)]), Color(0, 0, 0, 0.22), 1.3)
+		for k in 4:
+			ci.draw_arc(Vector2(cx, 0), r * 0.35 + k * r * 0.22, PI, TAU, 12, Color(0, 0, 0, 0.16), 1.2)
+		_sp(ci, [Vector2(cx - 8, 0), Vector2(cx - 8, -h * 0.4), Vector2(cx, -h * 0.55), Vector2(cx + 8, -h * 0.4), Vector2(cx + 8, 0)], Color(0.08, 0.06, 0.05))
+		for k in 6:
+			FkPaint.ellipse(ci, Vector2(cx - r * 0.9 + k * r * 0.36, -h * 0.72 - sin(k * 1.0) * 5.0 - (k % 2) * 4.0), Vector2(6.0, 3.0), leaf.darkened(0.05 * (k % 3)), 0.4 * (k % 2 - 0.5)))
+
+
+## Fireflies drifting in a box, drawn live.
+static func _fireflies(ci: CanvasItem, t: float, n: int, x0: float, x1: float, y0: float, y1: float, tint := Color(1.0, 0.95, 0.55)) -> void:
+	for i in n:
+		var fx := lerpf(x0, x1, 0.5 + 0.5 * sin(t * 0.37 + i * 1.7)) + cos(t * 0.31 + i) * 14.0
+		var fy := lerpf(y0, y1, float(i) / maxi(n - 1, 1)) + sin(t * 0.9 + i * 2.3) * 16.0
+		var fk := 0.4 + 0.6 * sin(t * 2.2 + i * 1.3) ** 2
+		var fp := Arch.pt(fx, fy, sin(t * 0.4 + i) * 34.0)
+		ci.draw_circle(fp, 5.0, Color(tint, 0.12 * fk))
+		ci.draw_circle(fp, 1.4, Color(tint.lightened(0.3), 0.85 * fk))
+
+
+## Leaves drifting down through the frame, drawn live.
+static func _falling_leaves(ci: CanvasItem, t: float, col: Color, n := 9) -> void:
+	for i in n:
+		var ph := fposmod(t * 0.12 + i * 0.113, 1.0)
+		var p := Arch.pt(-220.0 + fposmod(i * 37.0, 240.0) + sin(t * 0.8 + i * 2.0) * 14.0, -330.0 + ph * 320.0, 40.0)
+		FkPaint.ellipse(ci, p, Vector2(3.6, 1.8), col.darkened(0.08 * (i % 3)), t * 1.6 + i)
+
+
+static func _elf(ci: CanvasItem, age: int, team: Color, t: float) -> void:
+	match age:
+		1: _elf_camp(ci, team, t)
+		2: _elf_lodge(ci, team, t)
+		3: _elf_hall(ci, team, t)
+		4: _elf_citadel(ci, team, t)
+		_: _elf_spires(ci, age, team, t)
+
+
+## Stone Age: a woodland camp. A turf-roofed longhouse of wattle and daub, a woven dome hut, a stake fence, a hearth, and a
+## gate of two carved totem posts under an arch of bent saplings, all among birch and oak.
+static func _elf_camp(ci: CanvasItem, team: Color, t: float) -> void:
+	var leaf: Color = Scenery.look(&"elf", 1).leaf
+	var timber := Color("6b4a2b")
+	var daub := Color("c9ad7a")
+	var turf := Color("5f8a3a")
+	var trunk := Color("6a5040")
+	var bone := Color("d8cbb0")
+	var bark := Color("5e4632")
+	if dynamic_pass:
+		for i in 4:
+			var ph := fmod(t * 0.3 + i * 0.25, 1.0)
+			ci.draw_circle(Arch.pt(-107.0, -124.0, -2.0) + Vector2(ph * 22.0, -ph * 58.0), 3.5 + ph * 10.0, Color(0.72, 0.72, 0.7, 0.4 * (1.0 - ph)))
+		var fire := Arch.pt(-92.0, -4.0, 56.0)
+		var fl := 0.7 + 0.3 * sin(t * 11.0)
+		ci.draw_circle(fire + Vector2(0, -6), 20.0, Color(1.0, 0.55, 0.2, 0.16 + 0.22 * night))
+		for k in 3:
+			ci.draw_colored_polygon(PackedVector2Array([fire + Vector2(-6 + k * 6, 0), fire + Vector2(k * 6, 0), fire + Vector2(-3 + k * 6, -15 * fl - k * 2)]), Color(1.0, 0.6 + k * 0.1, 0.2))
+		for x in [-46.0, 0.0]:
+			_torch_flame(ci, Arch.pt(x, -110.0, 22.0), t, x)
+		_fireflies(ci, t, 8, -200.0, 20.0, -210.0, -30.0)
+		_banner(ci, Vector2(Arch.cylinder_x(-108.0, -12.0), -150.0), team, t)
+		return
+	_elf_tree(ci, -214.0, -46.0, 230.0, leaf, trunk)
+	_elf_tree(ci, 14.0, -72.0, 190.0, leaf.lightened(0.04), Color("d8d4c8"), true)
+	# The dome hut at the left, the longhouse beside it.
+	_elf_hut(ci, -198.0, 30.0, 40.0, 4.0, 32.0, Color("a88a5a"), leaf)
+	Arch.box(ci, -158, -60, -46, 0, -16, 22, daub, func(r: Rect2) -> void: _elf_frame(ci, r, daub, timber, 24), func(r: Rect2) -> void: _planks(ci, r, Arch.end_col(timber), 8))
+	Arch.on_front(ci, 22.0, func() -> void:
+		_sp(ci, [Vector2(-116, 0), Vector2(-116, -22), Vector2(-108, -28), Vector2(-100, -22), Vector2(-100, 0)], Color(0.08, 0.06, 0.05))
+		for x in [-146.0, -84.0]:
+			ci.draw_circle(Vector2(x, -22), 4.5, Color(0.1, 0.08, 0.06))
+			ci.draw_arc(Vector2(x, -22), 4.5, 0, TAU, 10, bone, 1.0))
+	# The turf roof: a rounded hummock, grass tufts along its top, a smoke-hole cowl.
+	var hump := func(x: float) -> float:
+		var u := clampf((x + 166.0) / 116.0, 0.0, 1.0)
+		return -46.0 - 54.0 * pow(sin(PI * u), 0.55)
+	var roof: Array = []
+	for i in 13:
+		var x := lerpf(-166.0, -50.0, i / 12.0)
+		roof.append(Vector2(x, hump.call(x)))
+	Arch.box(ci, -113, -101, -114, -88, -8, 4, timber, Callable(), Callable())
+	Arch.prism(ci, [Vector2(-115, -114), Vector2(-107, -122), Vector2(-99, -114)], -10, 6, timber.darkened(0.2))
+	Arch.prism(ci, roof, -20, 26, turf)
+	Arch.on_front(ci, 26.0, func() -> void:
+		for i in 11:
+			var x := -160.0 + i * 10.6
+			var y: float = hump.call(x)
+			ci.draw_line(Vector2(x, y + 20.0), Vector2(x + 6.0, y + 24.0), turf.darkened(0.25), 2.0)
+			ci.draw_line(Vector2(x, y + 1.0), Vector2(x - 1.0, y - 5.0), turf.lightened(0.14), 1.4)
+			ci.draw_line(Vector2(x + 3.0, y + 1.0), Vector2(x + 5.0, y - 4.0), turf.lightened(0.08), 1.4)
+		ci.draw_line(Vector2(-166, -46), Vector2(-50, -46), Color(0, 0, 0, 0.3), 2.0))
+	# The gate: two carved totem posts topped with fire bowls, an arch of bent saplings between them, charms hanging.
+	for x in [-46.0, 0.0]:
+		_elf_post(ci, x, 22.0, -102.0, timber, 0.0, 4.2)
+		for y in [-84.0, -64.0, -44.0]:
+			Arch.lathe(ci, x, 22.0, [[y, 5.1], [y + 4.0, 5.1]], bone.darkened(0.15), 0, 8)
+		Arch.on_front(ci, 22.0, func() -> void: _sp(ci, [Vector2(x - 8, -108), Vector2(x + 8, -108), Vector2(x + 4, -101), Vector2(x - 4, -101)], Color("4a4038")))
+	Arch.on_front(ci, 14.0, func() -> void: ci.draw_arc(Vector2(-23, -80), 21.0, PI, TAU, 12, bark.darkened(0.2), 4.0))
+	Arch.on_front(ci, 30.0, func() -> void:
+		ci.draw_arc(Vector2(-23, -80), 21.0, PI, TAU, 12, bark.lightened(0.1), 4.0)
+		for k in 6:
+			var a := PI + PI * (k + 0.5) / 6.0
+			FkPaint.ellipse(ci, Vector2(-23, -80) + Vector2(cos(a), sin(a)) * 21.0, Vector2(5.0, 2.4), leaf.darkened(0.06 * (k % 3)), a + 1.2)
+		for k in 3:
+			var cx := -33.0 + k * 10.0
+			ci.draw_line(Vector2(cx, -76.0 - sin(k * 1.5) * 4.0), Vector2(cx, -66.0 - k * 4.0), bone, 1.0)
+			ci.draw_circle(Vector2(cx, -64.0 - k * 4.0), 2.4, bone))
+	# A lashed stake fence along the front, a ring of stones round the hearth, a few toadstools.
+	for k in 8:
+		var x := -206.0 + k * 10.0
+		Arch.prism(ci, [Vector2(x - 3.5, 0), Vector2(x - 3.5, -19), Vector2(x, -26), Vector2(x + 3.5, -19), Vector2(x + 3.5, 0)], 44, 51, timber.lightened(0.05 * (k % 3)), Color(0, 0, 0, 0.3), 0.8)
+	Arch.on_front(ci, 51.0, func() -> void:
+		ci.draw_line(Vector2(-210, -14), Vector2(-134, -13), Color("9a8a5a"), 2.0)
+		ci.draw_line(Vector2(-210, -6), Vector2(-134, -5), Color("9a8a5a"), 2.0))
+	for k in 8:
+		var a := TAU * k / 8.0
+		Arch.blob(ci, -92.0 + cos(a) * 13.0, -3.0, 56.0 + sin(a) * 6.0, Vector2(4.5, 3.2), Color("8a8880").darkened(0.06 * (k % 3)), 0.0, 8)
+	for m in [[-62.0, 40.0, 1.0, Color("c86a4a")], [-52.0, 46.0, 0.7, Color("c86a4a")], [-176.0, 60.0, 0.8, Color("e8dcc0")]]:
+		_mushroom(ci, m[0], m[1], m[2], m[3])
+
+
+## Bronze Age: a timber lodge on a stone footing, plastered panels framed in dark posts, a swooping shingle roof with a louvre
+## cupola, a porch over a round-headed door, a carved spirit pole, birches close by.
+static func _elf_lodge(ci: CanvasItem, team: Color, t: float) -> void:
+	var leaf: Color = Scenery.look(&"elf", 2).leaf
+	var timber := Color("6b4a2b")
+	var plaster := Color("dccca2")
+	var stone := Color("8e8a80")
+	var roofc := Color("6f8a52")
+	var gold := Color("d9b25c")
+	var birch := Color("d8d4c8")
+	var win_xs := [-182.0, -150.0, -118.0, -86.0, -54.0]
+	var door := Arch.arch_pts(-40, -6, -22, -50, 12, 12)
+	if dynamic_pass:
+		for x in win_xs:
+			_leaf_win(ci, x, -62.0, 11.0, 24.0, 22.0, gold)
+		if night > 0.05:
+			Arch.on_front(ci, 14.0, func() -> void: ci.draw_colored_polygon(PackedVector2Array(door), Color(1.0, 0.72, 0.35, 0.55 * night)))
+		for x in [-40.0, -6.0]:
+			_lantern_glow(ci, 44.0, x, -78.0, t)
+		for i in 3:
+			var ph := fmod(t * 0.3 + i * 0.33, 1.0)
+			ci.draw_circle(Arch.pt(-108.0, -194.0, -2.0) + Vector2(ph * 20.0, -ph * 44.0), 3.0 + ph * 9.0, Color(0.72, 0.72, 0.7, 0.4 * (1.0 - ph)))
+		_fireflies(ci, t, 9, -210.0, 20.0, -230.0, -40.0)
+		_banner(ci, Vector2(Arch.cylinder_x(-108.0, -6.0), -260.0), team, t)
+		return
+	_elf_tree(ci, -220.0, -34.0, 250.0, leaf, birch, true)
+	_elf_tree(ci, -66.0, -90.0, 290.0, leaf.lightened(0.05), birch, true)
+	# The louvre cupola on the ridge, behind the roof's front so its foot sinks into it.
+	Arch.box(ci, -122, -94, -196, -150, -8, 4, plaster, func(r: Rect2) -> void: _elf_frame(ci, r, plaster, timber, 14), Callable())
+	_elf_roof(ci, -132, -84, -192, -220, 10, 7, -12, 8, roofc.darkened(0.08), gold)
+	ci.draw_line(Arch.pt(-108.0, -226.0, -2.0), Arch.pt(-108.0, -242.0, -2.0), gold, 1.8)
+	# The stone footing and the lodge on it.
+	Arch.box(ci, -206, -12, -22, 0, -30, 30, stone, _face_msn(ci, stone, 9, 18), _end_msn(ci, stone, 9, 12))
+	Arch.box(ci, -198, -14, -100, -22, -28, 22, plaster, func(r: Rect2) -> void: _elf_frame(ci, r, plaster, timber, 32), func(r: Rect2) -> void: _elf_frame(ci, r, Arch.end_col(plaster), Arch.end_col(timber), 24))
+	for x in win_xs:
+		_leaf_win(ci, x, -62.0, 11.0, 24.0, 22.0, gold)
+	Arch.recess(ci, door, 22.0, 8.0, timber.darkened(0.3), Color(0.1, 0.08, 0.06))
+	Arch.on_front(ci, 22.0, func() -> void: ci.draw_polyline(PackedVector2Array(door), gold, 2.0))
+	_elf_roof(ci, -214, 2, -96, -160, 46, 12, -34, 30, roofc, gold)
+	# The porch: steps, two carved posts, a lintel, a small swooping roof, lanterns.
+	Arch.box(ci, -50, 4, -11, 0, 30, 50, stone.lightened(0.05), _face_msn(ci, stone.lightened(0.05), 9, 16), Callable())
+	Arch.box(ci, -46, -2, -22, -11, 30, 40, stone.lightened(0.08), _face_msn(ci, stone.lightened(0.08), 9, 16), Callable())
+	for x in [-46.0, 0.0]:
+		_elf_post(ci, x, 44.0, -84.0, timber, -11.0, 3.8)
+	Arch.box(ci, -52, 6, -84, -78, 38, 48, timber, func(r: Rect2) -> void: _planks(ci, r, timber, 9), Callable())
+	_elf_roof(ci, -62, 16, -86, -116, 12, 8, -4, 50, roofc.lightened(0.04), gold)
+	Arch.on_front(ci, 44.0, func() -> void:
+		for x in [-40.0, -6.0]:
+			_hang_lantern(ci, x, -78.0, timber.darkened(0.2)))
+	# A carved spirit pole at the left, a team banner hanging from its arm.
+	_elf_post(ci, -216.0, 44.0, -150.0, timber.lightened(0.05), 0.0, 3.4)
+	for y in [-120.0, -96.0, -72.0]:
+		Arch.lathe(ci, -216.0, 44.0, [[y, 4.4], [y + 4.0, 4.4]], gold.darkened(0.1), 0, 8)
+	Arch.on_front(ci, 44.0, func() -> void:
+		ci.draw_line(Vector2(-216, -140), Vector2(-194, -140), timber, 2.5)
+		_hang_banner(ci, -203.0, -139.0, 14.0, 44.0, team, gold))
+	for m in [[-30.0, 62.0, 0.9, Color("c86a4a")], [-190.0, 66.0, 0.8, Color("e8dcc0")]]:
+		_mushroom(ci, m[0], m[1], m[2], m[3])
+
+
+## Iron Age: a tiered timber hall. A stone plinth and steps, a plank hall with carved posts and leaf windows under a wide
+## swooping roof, a second storey under a narrower roof, a small pavilion crowning it with a gilt spire; lanterns and banners
+## hang under the eaves.
+static func _elf_hall(ci: CanvasItem, team: Color, t: float) -> void:
+	var leaf: Color = Scenery.look(&"elf", 3).leaf
+	var timber := Color("7a5636")
+	var plank := Color("a88358")
+	var stone := Color("bab6aa")
+	var roofc := Color("4a8a5a")
+	var gold := Color("d9b25c")
+	var trunk := Color("5a4030")
+	var low_win := [-187.0, -153.0, -119.0, -85.0, -51.0]
+	var up_win := [-170.0, -142.0, -114.0, -86.0, -58.0]
+	var door := Arch.arch_pts(-40, -6, -30, -66, 10, 18)
+	if dynamic_pass:
+		for x in low_win:
+			_leaf_win(ci, x, -70.0, 12.0, 28.0, 22.0, gold)
+		for x in up_win:
+			_leaf_win(ci, x, -172.0, 11.0, 26.0, 14.0, gold)
+		_leaf_win(ci, -115.0, -262.0, 10.0, 24.0, 6.0, gold)
+		if night > 0.05:
+			Arch.on_front(ci, 12.0, func() -> void: ci.draw_colored_polygon(PackedVector2Array(door), Color(1.0, 0.72, 0.35, 0.55 * night)))
+		for x in low_win:
+			_lantern_glow(ci, 32.0, x, -98.0, t)
+		_fireflies(ci, t, 10, -215.0, 20.0, -280.0, -40.0)
+		_banner(ci, Vector2(Arch.cylinder_x(-115.0, -4.0), -354.0), team, t, 26)
+		return
+	_elf_tree(ci, -224.0, -44.0, 270.0, leaf, trunk)
+	_elf_tree(ci, 14.0, -80.0, 220.0, leaf.lightened(0.05), trunk)
+	# The pavilion on top, then the upper storey, each under its own roof.
+	Arch.box(ci, -134, -96, -282, -240, -14, 6, plank, func(r: Rect2) -> void: _planks(ci, r, plank, 8), func(r: Rect2) -> void: _planks(ci, r, Arch.end_col(plank), 8))
+	_leaf_win(ci, -115.0, -262.0, 10.0, 24.0, 6.0, gold)
+	_elf_roof(ci, -148, -82, -278, -316, 12, 9, -18, 10, roofc.darkened(0.1), gold)
+	ci.draw_line(Arch.pt(-115.0, -316.0, -4.0), Arch.pt(-115.0, -336.0, -4.0), gold, 1.8)
+	ci.draw_circle(Arch.pt(-115.0, -338.0, -4.0), 2.6, gold)
+	Arch.box(ci, -186, -44, -196, -150, -22, 14, plank, func(r: Rect2) -> void: _planks(ci, r, plank, 9), func(r: Rect2) -> void: _planks(ci, r, Arch.end_col(plank), 9))
+	Arch.on_front(ci, 14.0, func() -> void:
+		for x in [-186.0, -158.0, -130.0, -102.0, -74.0, -44.0]:
+			ci.draw_line(Vector2(x, -196), Vector2(x, -150), timber, 3.2)
+		ci.draw_line(Vector2(-186, -194), Vector2(-44, -194), timber, 3.6))
+	for x in up_win:
+		_leaf_win(ci, x, -172.0, 11.0, 26.0, 14.0, gold)
+	_elf_roof(ci, -204, -26, -192, -240, 38, 12, -26, 18, roofc.darkened(0.05), gold)
+	# The plinth and the ground-floor hall.
+	Arch.box(ci, -212, 8, -30, 0, -34, 32, stone, _face_msn(ci, stone, 10, 22), _end_msn(ci, stone, 10, 14))
+	Arch.box(ci, -204, 2, -106, -30, -28, 22, plank,
+		func(r: Rect2) -> void:
+			_planks(ci, r, plank, 9)
+			for x in [-204.0, -170.0, -136.0, -102.0, -68.0, -34.0, 0.0]:
+				ci.draw_line(Vector2(x, r.position.y), Vector2(x, r.end.y), timber, 3.4),
+		func(r: Rect2) -> void: _planks(ci, r, Arch.end_col(plank), 9))
+	for x in low_win:
+		_leaf_win(ci, x, -70.0, 12.0, 28.0, 22.0, gold)
+	Arch.recess(ci, door, 22.0, 10.0, timber.darkened(0.3), Color(0.1, 0.08, 0.06))
+	Arch.on_front(ci, 22.0, func() -> void: ci.draw_polyline(PackedVector2Array(door), gold, 2.4))
+	_elf_roof(ci, -224, 10, -102, -152, 52, 14, -32, 32, roofc, gold)
+	# Steps, the carved posts that carry the eave over the door, lanterns and banners under the eave.
+	Arch.box(ci, -52, 4, -15, 0, 32, 52, stone.lightened(0.05), _face_msn(ci, stone.lightened(0.05), 10, 18), Callable())
+	Arch.box(ci, -48, 0, -30, -15, 32, 42, stone.lightened(0.08), _face_msn(ci, stone.lightened(0.08), 10, 18), Callable())
+	for x in [-46.0, 2.0]:
+		_elf_post(ci, x, 30.0, -100.0, timber, -30.0, 4.2)
+	Arch.on_front(ci, 32.0, func() -> void:
+		for x in low_win:
+			_hang_lantern(ci, x, -98.0, Color("5a4a34"))
+		for x in [-170.0, -102.0]:
+			_hang_banner(ci, x, -98.0, 12.0, 42.0, team, gold))
+	for m in [[-30.0, 62.0, 0.9, Color("c86a4a")], [-196.0, 58.0, 0.8, Color("e8dcc0")]]:
+		_mushroom(ci, m[0], m[1], m[2], m[3])
+
+
+## Medieval: a white-stone citadel. A pointed arcade under an upper storey of lancets and a leaf frieze, a swooping copper-green
+## roof, a great pointed gate with gilt tracery, a round tower at the left, two more behind, all under cones; autumn trees.
+static func _elf_citadel(ci: CanvasItem, team: Color, t: float) -> void:
+	var leaf: Color = Scenery.look(&"elf", 4).leaf
+	var white := Color("e8e4da")
+	var verd := Color("5aa08a")
+	var gold := Color("d9b25c")
+	var trunk := Color("6a4a30")
+	var jamb := white.darkened(0.42)
+	var arcade := [-194.0, -156.0, -118.0, -80.0]
+	var lancets := [-181.0, -143.0, -105.0, -67.0]
+	var gate := Arch.arch_pts(-42, -4, -26, -84, 14, 24)
+	var tx := Arch.cylinder_x(-198.0, 6.0)
+	var mx := Arch.cylinder_x(-108.0, -34.0)
+	var rx := Arch.cylinder_x(-2.0, -14.0)
+	if dynamic_pass:
+		for x in arcade:
+			_arch_win(ci, x, -26.0, 30.0, 74.0, 14.0, 10.0, jamb, Color(0, 0, 0, 0), 14.0)
+		for cx in lancets:
+			_arch_win(ci, cx - 6.0, -112.0, 12.0, 40.0, 14.0, 6.0, jamb, Color(0, 0, 0, 0), 8.0)
+		_window(ci, Rect2(tx - 3.0, -224.0, 6, 18))
+		_window(ci, Rect2(tx - 3.0, -176.0, 6, 18))
+		if night > 0.05:
+			Arch.on_front(ci, 2.0, func() -> void: ci.draw_colored_polygon(PackedVector2Array(gate), Color(1.0, 0.72, 0.35, 0.5 * night)))
+			ci.draw_circle(Arch.pt(-23.0, -142.0, 14.0), 8.0, Color(1.0, 0.72, 0.35, 0.9 * night))
+		for x in [-46.0, 0.0]:
+			_lantern_glow(ci, 16.0, x, -92.0, t)
+		_pennon(ci, Vector2(tx, -334.0), 22.0, team, t)
+		_pennon(ci, Vector2(rx, -264.0), 20.0, team, t)
+		_banner(ci, Vector2(mx, -350.0), team, t, 26)
+		_falling_leaves(ci, t, leaf.lightened(0.1))
+		_fireflies(ci, t, 6, -215.0, 20.0, -260.0, -40.0)
+		return
+	_elf_tree(ci, -226.0, -50.0, 250.0, leaf, trunk)
+	_elf_tree(ci, 22.0, -84.0, 210.0, leaf.lightened(0.05), trunk)
+	# The towers: the tall one behind the hall, the small one behind the gate, the round one at the hall's left end.
+	Arch.cylinder(ci, -108, -34, 17, -252, -70, white.darkened(0.03), 12, 13)
+	for y in [-236.0, -190.0, -146.0]:
+		Arch.cylinder(ci, -108, -34, 18.4, y - 2.0, y + 2.0, gold.darkened(0.15))
+	Arch.cone(ci, -108, -34, 23, -252, -326, verd, 6)
+	ci.draw_line(Vector2(mx, -326), Vector2(mx, -340), gold, 1.8)
+	ci.draw_circle(Vector2(mx, -342), 2.6, gold)
+	Arch.cylinder(ci, -2, -14, 13, -214, -60, white.darkened(0.04), 12, 12)
+	Arch.cone(ci, -2, -14, 18, -214, -264, verd, 4)
+	Arch.cylinder(ci, -198, 6, 19, -264, -26, white, 12, 13)
+	for y in [-246.0, -206.0, -150.0]:
+		Arch.cylinder(ci, -198, 6, 20.4, y - 2.0, y + 2.0, gold.darkened(0.15))
+	Arch.lathe(ci, -198, 6, [[-196.0, 25.0], [-192.0, 25.0], [-186.0, 20.0]], white.lightened(0.02))
+	Arch.cone(ci, -198, 6, 26, -264, -334, verd, 6)
+	ci.draw_line(Vector2(tx, -334), Vector2(tx, -342), gold, 1.8)
+	_window(ci, Rect2(tx - 3.0, -224.0, 6, 18))
+	_window(ci, Rect2(tx - 3.0, -176.0, 6, 18))
+	# The platform, the hall, its steps.
+	Arch.box(ci, -218, 8, -26, 0, -34, 16, white.darkened(0.07), _face_msn(ci, white.darkened(0.07), 10, 22), _end_msn(ci, white.darkened(0.07), 10, 14))
+	Arch.box(ci, -204, 4, -172, -26, -30, 14, white, _face_msn(ci, white, 12, 24), _end_msn(ci, white, 12, 14))
+	Arch.on_front(ci, 14.0, func() -> void:
+		ci.draw_line(Vector2(-204, -100), Vector2(4, -100), white.darkened(0.2), 3.0)
+		ci.draw_line(Vector2(-204, -98), Vector2(4, -98), Color(1, 1, 1, 0.2), 1.0)
+		for k in 30:
+			FkPaint.ellipse(ci, Vector2(-200.0 + k * 6.9, -155.0), Vector2(3.4, 1.7), gold.darkened(0.1), 0.0)
+		ci.draw_line(Vector2(-204, -158), Vector2(4, -158), gold.darkened(0.2), 1.2)
+		ci.draw_line(Vector2(-204, -152), Vector2(4, -152), gold.darkened(0.2), 1.2))
+	for x in arcade:
+		_arch_win(ci, x, -26.0, 30.0, 74.0, 14.0, 10.0, jamb, white.lightened(0.05), 14.0)
+	for cx in lancets:
+		_arch_win(ci, cx - 6.0, -112.0, 12.0, 40.0, 14.0, 6.0, jamb, white.lightened(0.05), 8.0)
+	Arch.recess(ci, gate, 14.0, 12.0, jamb, Color(0.09, 0.07, 0.06))
+	Arch.bars(ci, gate, 14.0, 12.0, 8.0, [-32, -23, -14], [-70, -50], gold.darkened(0.2), 1.6)
+	Arch.on_front(ci, 14.0, func() -> void:
+		ci.draw_polyline(PackedVector2Array(gate), gold, 3.0)
+		ci.draw_circle(Vector2(-23, -142), 10.0, gold)
+		ci.draw_circle(Vector2(-23, -142), 8.2, Color(0.1, 0.08, 0.06))
+		for k in 8:
+			var a := TAU * k / 8.0
+			ci.draw_line(Vector2(-23, -142), Vector2(-23, -142) + Vector2(cos(a), sin(a)) * 8.0, gold.darkened(0.1), 1.0)
+		for x in [-162.0, -124.0, -86.0]:
+			_hang_banner(ci, x, -150.0, 10.0, 40.0, team, gold))
+	_elf_roof(ci, -212, 10, -168, -238, 60, 14, -34, 18, verd, gold)
+	Arch.box(ci, -56, 10, -13, 0, 16, 36, white.darkened(0.04), _face_msn(ci, white.darkened(0.04), 10, 20), Callable())
+	Arch.box(ci, -50, 4, -26, -13, 16, 26, white.darkened(0.02), _face_msn(ci, white.darkened(0.02), 10, 20), Callable())
+	Arch.on_front(ci, 16.0, func() -> void:
+		for x in [-46.0, 0.0]:
+			_hang_lantern(ci, x, -92.0, Color("5a4a34")))
+
+
+## Gunpowder and Arcane: slender silver spires (Gunpowder) or crystal towers (Arcane) rising behind an ivory hall under a
+## swooping roof, joined by sky-bridges, in a misty wood (Gunpowder) or a starlit grove (Arcane). The hall has a pointed arcade with a great gate.
+static func _elf_spires(ci: CanvasItem, age: int, team: Color, t: float) -> void:
+	var crystal := age == 6
+	var leaf: Color = Scenery.look(&"elf", age).leaf
+	var glow: Color = RaceLook.look(&"elf").glow
+	var ivory := Color("ece8dc")
+	var spire_col := Color("cfd6dc") if not crystal else Color(glow, 0.95).lerp(Color("8fd0e8"), 0.35)
+	var gold := Color("d9b25c")
+	var trunk := Color("2a3a36")
+	var jamb := ivory.darkened(0.45)
+	var arcade := [-200.0, -164.0, -128.0, -92.0]
+	var gate := Arch.arch_pts(-42, -4, -30, -84, 14, 24)
+	# [x, z, top, r]: the tall one in the middle, behind the dome.
+	var top_c := -330.0 if crystal else -350.0
+	var spires := [[-206.0, -8.0, -292.0, 15.0, [0.42, 0.62]], [-150.0, -30.0, -252.0, 13.0, [0.3]], [-104.0, -34.0, top_c, 17.0, [0.3]], [-58.0, -30.0, -300.0, 13.0, [0.3]], [-2.0, -8.0, -264.0, 14.0, [0.42, 0.62]]]
+	var roof_col := Color("9cc8c4") if not crystal else Color(glow, 0.9).lerp(Color("8fd0e8"), 0.3)
+	if dynamic_pass:
+		for x in arcade:
+			_arch_win(ci, x, -30.0, 26.0, 74.0, 16.0, 10.0, jamb, Color(0, 0, 0, 0), 16.0)
+		for sp in spires:
+			var sx := Arch.cylinder_x(sp[0], sp[1])
+			for f: float in sp[4]:
+				_window(ci, Rect2(sx - 2.0, float(sp[2]) + f * (-96.0 - float(sp[2])), 4, 9))
+			if crystal:
+				var c := Vector2(sx, float(sp[2]) + 14.0)
+				var k := 0.7 + 0.3 * sin(t * 1.7 + sp[0] * 0.05)
+				ci.draw_circle(c, 22.0, Color(glow, 0.10 * k))
+				ci.draw_circle(c, 10.0, Color(glow, 0.16 * k))
+		if night > 0.05:
+			Arch.on_front(ci, 4.0, func() -> void: ci.draw_colored_polygon(PackedVector2Array(gate), Color(1.0, 0.72, 0.35, 0.5 * night)))
+		for x in [-46.0, 0.0]:
+			_lantern_glow(ci, 20.0, x, -92.0, t)
+		_pennon(ci, Vector2(Arch.cylinder_x(-206.0, -8.0), -294.0), 20.0, team, t)
+		_pennon(ci, Vector2(Arch.cylinder_x(-58.0, -30.0), -302.0), 20.0, team, t)
+		if crystal:
+			# The crown crystal floating over the central spire, shards circling the dome, glowing runes along the platform.
+			var c := Vector2(Arch.cylinder_x(-104.0, -26.0), top_c - 22.0 + sin(t * 1.2) * 4.0)
 			for i in 4:
-				ci.draw_circle(c, 26.0 - i * 6.0, Color(glow, 0.06 + i * 0.06))
+				ci.draw_circle(c, 24.0 - i * 5.0, Color(glow, 0.05 + i * 0.05))
 			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(0, -16), c + Vector2(7, 0), c + Vector2(0, 16), c + Vector2(-7, 0)]), glow.lightened(0.3))
-			for i in 3:
-				ci.draw_line(Arch.pt(-118, -60 - i * 50, 30), Arch.pt(-104, -72 - i * 50, 30), Color(glow, 0.5 + 0.3 * sin(t * 2.0 + i)), 2.0)
-		# Fireflies drifting through the branches; the lanterns glow; firelight in the root-hollow, a fire at the roots (Stone).
-		for i in 12:
-			var fx := -110.0 + sin(t * 0.5 + i * 1.7) * 96.0 + cos(t * 0.31 + i) * 30.0
-			var fy := -120.0 - i * 15.0 + sin(t * 0.9 + i * 2.3) * 22.0
-			var fk := 0.4 + 0.6 * sin(t * 2.2 + i * 1.3) ** 2
-			var fp := Arch.pt(fx, fy, sin(t * 0.4 + i) * 34.0)
-			ci.draw_circle(fp, 5.0, Color(1.0, 0.95, 0.55, 0.12 * fk))
-			ci.draw_circle(fp, 1.4, Color(1.0, 0.98, 0.7, 0.85 * fk))
-		if age >= 2:
-			for lx in [-170.0, -120.0, -70.0, -24.0]:
-				_lantern_glow(ci, deck_z, lx, -108.0, t)
-		if age >= 3:
-			for lx in [-160.0, -110.0, -60.0]:
-				_lantern_glow(ci, hall_z, lx, -162.0, t)
-		if age == 1:
-			_torch_flame(ci, Arch.pt(-88, -6, 44), t, 1.0)
-			Arch.on_front(ci, 0.0, func() -> void:
-				ci.draw_circle(Vector2(-110, -22), 22.0, Color(1.0, 0.7, 0.35, 0.16 + 0.22 * night)))
-		if age >= 4:
-			_window(ci, Rect2(Arch.cylinder_x(-24, -8) - 3.0, -190, 6, 12))
-			_window(ci, Rect2(Arch.cylinder_x(-24, -8) - 3.0, -130, 6, 12))
-		if age == 6:
-			# Crystal shards circling the crown.
 			for i in 5:
 				var a := t * 0.5 + TAU * i / 5.0
-				var sp := Arch.pt(-110 + cos(a) * 118.0, -300 + sin(a * 1.6) * 34.0, sin(a) * 70.0)
+				var sp := Arch.pt(-104.0 + cos(a) * 118.0, -220.0 + sin(a * 1.6) * 40.0, -10.0 + sin(a) * 70.0)
 				ci.draw_circle(sp, 12.0, Color(glow, 0.14 + 0.1 * sin(t * 2.0 + i)))
 				ci.draw_colored_polygon(PackedVector2Array([sp + Vector2(0, -8), sp + Vector2(4, 0), sp + Vector2(0, 8), sp + Vector2(-4, 0)]), glow.lightened(0.3))
-		# Leaf pennant at the crown.
-		var top := Arch.pt(-110, -340, 0) if age < 4 else Arch.pt(-24, -326, -8)
-		ci.draw_line(top, top + Vector2(0, 30), Color("3b2c20"), 2.0)
-		var sway := sin(t * 3.0) * 3.0
-		ci.draw_colored_polygon(PackedVector2Array([top + Vector2(0, 2), top + Vector2(22 + sway, 6), top + Vector2(34 + sway * 1.5, 4), top + Vector2(22 + sway, 12), top + Vector2(0, 14)]), team)
+			Arch.on_front(ci, 16.0, func() -> void:
+				for i in 14:
+					var p := Vector2(-206.0 + i * 15.0, -16.0)
+					ci.draw_polyline(PackedVector2Array([p, p + Vector2(3, -6), p + Vector2(6, 0), p + Vector2(9, -6)]), Color(glow, 0.5 + 0.3 * sin(t * 2.0 + i)), 1.6))
+		else:
+			# Mist along the foot.
+			for i in 7:
+				var mx := -230.0 + fposmod(i * 61.0 + t * 5.0, 290.0)
+				FkPaint.ellipse(ci, Vector2(mx, -6.0 - (i % 3) * 6.0), Vector2(40.0, 7.0), Color(0.85, 0.95, 1.0, 0.11))
+		_fireflies(ci, t, 8, -215.0, 20.0, -260.0, -40.0, Color(0.7, 0.95, 1.0))
 		return
-	# Silver spire on the far side (Gunpowder on), behind the trunk's flare.
-	if age >= 5:
-		var silver := Color("cfd6dc")
-		Arch.faceted(ci, -198, -16, [[-236.0, 1.5], [-214.0, 5.0], [-190.0, 8.0], [-60.0, 10.0], [0.0, 12.0]], silver, 6, 0.0)
-		for by in [-150.0, -100.0, -50.0]:
-			Arch.faceted(ci, -198, -16, [[by - 2.0, 10.5], [by + 2.0, 10.5]], Color("e8edf2"), 6, 0.0)
-		ci.draw_line(Arch.pt(-198, -232, -10), Arch.pt(-198, -250, -10), Color("dfe6ee"), 1.5)
-	# Back canopy: dark masses far behind the trunk.
-	for b in [[-170, -290, -46, 64, 40], [-60, -296, -46, 64, 40], [-110, -320, -54, 64, 40]]:
-		Arch.blob(ci, b[0], b[1], b[2], Vector2(b[3], b[4]), leaf.darkened(0.25))
-	# Trunk: a solid with root flares and bark grooves, two root fins reaching out along the lane.
-	Arch.lathe(ci, -110, 0, trunk, bark, 7)
-	Arch.prism(ci, [Vector2(-84, -34), Vector2(-66, -22), Vector2(-40, -9), Vector2(-16, 0), Vector2(-88, 0)], -6, 6, bark.lightened(0.04))
-	Arch.prism(ci, [Vector2(-136, -34), Vector2(-154, -22), Vector2(-180, -9), Vector2(-206, 0), Vector2(-132, 0)], -6, 6, bark.darkened(0.06))
-	# Branches reaching out to the canopy.
-	ci.draw_line(Arch.pt(-130, -230, 0), Arch.pt(-190, -280, -8), bark, 8.0)
-	ci.draw_line(Arch.pt(-90, -236, 0), Arch.pt(-40, -286, -8), bark, 8.0)
-	# White stone gate-tower with a green cone roof, bound by vines (Medieval on), behind the gate.
-	if age >= 4:
-		var white := Color("e6e2d8")
-		Arch.cylinder(ci, -24, -8, 12, -262, 0, white, 13.0, 13.0)
-		Arch.cone(ci, -24, -8, 18, -262, -318, leaf.lightened(0.1), 3)
-		Arch.helix(ci, -24, -8, 12.8, -250, -20, 4.0, 0.0, leaf.darkened(0.2), 2.2)
-		Arch.helix(ci, -24, -8, 12.8, -250, -20, 4.0, PI, leaf.darkened(0.3), 1.6)
-		_window(ci, Rect2(Arch.cylinder_x(-24, -8) - 3.0, -230, 6, 14))
-	match age:
-		1:
-			# Hide shelter against the roots, a lashed stake fence and an antler totem.
-			# A woven dome hut with a leaf thatch, a low door, and charms hung on the totem.
-			var dome: Array = []
-			for i in 13:
-				var da := PI * i / 12.0
-				dome.append(Vector2(-196.0 - cos(da) * 32.0, -sin(da) * 36.0))
-			Arch.prism(ci, dome, 24, 42, Color("a88a5a"), Color(0, 0, 0, 0.3), 0.8)
-			Arch.on_front(ci, 42.0, func() -> void:
-				for k in 5:
-					var wa := Vector2(-196.0 - 30.0 + k * 15.0, 0.0)
-					ci.draw_polyline(PackedVector2Array([wa, wa + Vector2(4, -22), wa + Vector2(2 + k, -34)]), Color(0, 0, 0, 0.22), 1.3)
-				for k in 4:
-					ci.draw_arc(Vector2(-196, 0), 10.0 + k * 7.0, PI, TAU, 12, Color(0, 0, 0, 0.16), 1.2)
-				_sp(ci, [Vector2(-204, 0), Vector2(-204, -14), Vector2(-196, -20), Vector2(-188, -14), Vector2(-188, 0)], Color(0.08, 0.06, 0.05))
-				for k in 6:
-					FkPaint.ellipse(ci, Vector2(-216.0 + k * 9.0, -26.0 - sin(k * 1.0) * 6.0 - (k % 2) * 4.0), Vector2(6.0, 3.0), leaf.darkened(0.05 * (k % 3)), 0.4 * (k % 2 - 0.5)))
-			for k in 3:
-				var cx := -150.0 + (k - 1) * 8.0
-				Arch.on_front(ci, 38.0, func() -> void:
-					ci.draw_line(Vector2(cx, -84), Vector2(cx, -68.0 - k * 6.0), Color("d8cbb0"), 1.0)
-					ci.draw_circle(Vector2(cx, -66.0 - k * 6.0), 2.4, Color("d8cbb0")))
-			for k in 8:
-				var x := -18.0 - k * 11.0
-				Arch.prism(ci, [Vector2(x - 3.5, 0), Vector2(x - 3.5, -34), Vector2(x, -42), Vector2(x + 3.5, -34), Vector2(x + 3.5, 0)], 24, 31, Color("6b4a2b"))
-			Arch.on_front(ci, 31.0, func() -> void:
-				ci.draw_line(Vector2(-100, -22), Vector2(-10, -20), Color("9a8a5a"), 2.0))
-			Arch.box(ci, -152, -148, -84, 0, 34, 38, Color("5a3a22"), Callable(), Callable(), false)
-			Arch.on_front(ci, 38.0, func() -> void:
-				ci.draw_polyline(PackedVector2Array([Vector2(-150, -84), Vector2(-162, -104), Vector2(-160, -118)]), Color("d8cbb0"), 2.5)
-				ci.draw_polyline(PackedVector2Array([Vector2(-150, -84), Vector2(-138, -104), Vector2(-140, -118)]), Color("d8cbb0"), 2.5))
-		2:
-			for k in 3:
-				var x := -200.0 + k * 22.0
-				Arch.prism(ci, [Vector2(x - 8, 0), Vector2(x - 6, -42 - k * 4), Vector2(x + 2, -48 - k * 4), Vector2(x + 8, -40), Vector2(x + 8, 0)], 14, 28, Color("8a8a80"))
-	# Decks (Bronze on) carry the turret mounts.
-	if age >= 2:
-		Arch.box(ci, -182, -12, -124, -115, -deck_z, deck_z, wood, func(r: Rect2) -> void: _planks(ci, r, wood, 9), func(r: Rect2) -> void: _planks(ci, r, Arch.end_col(wood), 9))
-		Arch.on_front(ci, deck_z, func() -> void:
-			for x in [-176.0, -120.0, -60.0, -18.0]:
-				ci.draw_line(Vector2(x, -115), Vector2(x + 8, -80), wood.darkened(0.3), 3.0)
-			for x in range(-178, -10, 33):
-				ci.draw_line(Vector2(x, -124), Vector2(x, -140), Color("c9b28a"), 1.2)
-			ci.draw_line(Vector2(-182, -140), Vector2(-12, -140), Color("c9b28a"), 1.2))
-	if age >= 3:
-		# Tree-hall wrapped round the trunk, hipped leaf-shingle roof with deep eaves, round windows; upper deck.
-		var hall := wood.lightened(0.05)
-		Arch.box(ci, -176, -46, -168, -124, -24, hall_z, hall, func(r: Rect2) -> void: _planks(ci, r, hall, 10), func(r: Rect2) -> void: _planks(ci, r, Arch.end_col(hall), 10))
-		Arch.on_front(ci, hall_z, func() -> void:
-			ci.draw_rect(Rect2(-176, -168, 130, 8), Color(0, 0, 0, 0.22))
-			for x in [-150.0, -60.0]:
-				ci.draw_circle(Vector2(x, -150), 7.0, Color(0.1, 0.08, 0.06))
-				ci.draw_arc(Vector2(x, -150), 7.0, 0, TAU, 12, Color("d9b25c"), 1.2))
-		FkPaint.push(ci, Transform2D(0.0, Vector2(0, -168)))
-		Arch.frustum(ci, -184, -38, -146, -74, -32, 34, -8, 8, -22, leaf.darkened(0.1))
-		var slope: Array = Arch.frustum_faces(-184, -38, -146, -74, -32, 34, -8, 8, -22)[0]
-		for k in 2:
-			var u := (k + 1.0) / 3.0
-			ci.draw_line((slope[0] as Vector2).lerp(slope[3], u), (slope[1] as Vector2).lerp(slope[2], u), Color(0, 0, 0, 0.18), 1.2)
-		FkPaint.pop(ci)
-		Arch.box(ci, -156, -44, -202, -195, -deck_z, deck_z, wood, func(r: Rect2) -> void: _planks(ci, r, wood, 9), func(r: Rect2) -> void: _planks(ci, r, Arch.end_col(wood), 9))
-	# Gate.
-	if age <= 2:
-		# A living arch of bent saplings, with vines.
-		Arch.on_front(ci, 8.0, func() -> void:
-			ci.draw_arc(Vector2(-22, 0), 20.0, PI, TAU, 10, bark.darkened(0.2), 4.0))
-		Arch.on_front(ci, 24.0, func() -> void:
-			ci.draw_arc(Vector2(-22, 0), 20.0, PI, TAU, 10, bark.lightened(0.1), 4.0)
-			for k in 3:
-				ci.draw_line(Vector2(-36 + k * 14, 0), Vector2(-34 + k * 12, -18), leaf.darkened(0.2), 2.0))
-	else:
-		# A grown gate: a bark-clad frame with a pointed doorway cut into it.
-		var frame := bark.lightened(0.1)
-		Arch.box(ci, -46, 0, -80, 0, -8, 18, frame, func(r: Rect2) -> void: _planks(ci, r, frame, 8), Callable())
-		var door := Arch.arch_pts(-40, -6, 0, -46, 16, 6)
-		Arch.recess(ci, door, 18.0, 14.0, bark.darkened(0.4), Color(0.1, 0.08, 0.06))
-		Arch.on_front(ci, 18.0, func() -> void:
-			var trim := PackedVector2Array(door)
-			ci.draw_polyline(trim, Color("d9b25c") if age >= 4 else wood, 2.0)
-			for k in 4:
-				var lx := -38.0 + k * 10.0
-				FkPaint.shade_poly(ci, [Vector2(lx, -76), Vector2(lx + 6, -81), Vector2(lx + 9, -74), Vector2(lx + 2, -71)], leaf.darkened(0.15)))
-	# --- Details: mushrooms and ferns at the roots, a hollow door in the trunk, and by age lanterns, banners, ladders, huts,
-	# stairs winding round the trunk and tower.
-	for m in [[-62.0, 40.0, 1.0, Color("c86a4a")], [-52.0, 46.0, 0.7, Color("c86a4a")], [-150.0, 44.0, 0.9, Color("e8dcc0")], [-168.0, 40.0, 0.65, Color("c86a4a")]]:
-		_mushroom(ci, m[0], m[1], m[2], m[3])
-	Arch.on_front(ci, 0.0, func() -> void:
-		_sp(ci, [Vector2(-125, 0), Vector2(-125, -34), Vector2(-110, -54), Vector2(-95, -34), Vector2(-95, 0)], Color(0.07, 0.05, 0.04))
-		ci.draw_polyline(PackedVector2Array([Vector2(-127, 0), Vector2(-127, -35), Vector2(-110, -57), Vector2(-93, -35), Vector2(-93, 0)]), bark.darkened(0.3), 3.0)
-		if age >= 3:
-			ci.draw_arc(Vector2(-110, -30), 9.0, 0.0, TAU, 14, Color("d9b25c"), 1.6))
-	if age >= 2:
-		var lantern_frame := Color("5a4a34")
-		Arch.on_front(ci, deck_z, func() -> void:
-			for lx in [-170.0, -120.0, -70.0, -24.0]:
-				_hang_lantern(ci, lx, -115.0, lantern_frame)
-			_hang_banner(ci, -146.0, -114.0, 16.0, 46.0, team, Color("d9b25c"))
-			_hang_banner(ci, -74.0, -114.0, 16.0, 46.0, team, Color("d9b25c")))
-		# A rope ladder from the deck to the ground.
-		Arch.on_front(ci, deck_z + 3.0, func() -> void:
-			for rx in [-38.0, -30.0]:
-				ci.draw_line(Vector2(rx, -115), Vector2(rx, 0), Color("b09060"), 1.4)
-			for k in 12:
-				ci.draw_line(Vector2(-38, -108.0 + k * 9.0), Vector2(-30, -108.0 + k * 9.0), Color("8a6a40"), 1.8))
-	if age == 2:
-		# Two wicker huts on the deck, thatched with leaves.
-		for hx in [-150.0, -64.0]:
-			var hd: Array = []
-			for i in 13:
-				var ha := PI * i / 12.0
-				hd.append(Vector2(hx - cos(ha) * 22.0, -124.0 - sin(ha) * 30.0))
-			Arch.prism(ci, hd, 4, 22, Color("b08e5a"), Color(0, 0, 0, 0.3), 0.8)
-			Arch.on_front(ci, 22.0, func() -> void:
-				_sp(ci, [Vector2(hx - 5, -124), Vector2(hx - 5, -137), Vector2(hx, -142), Vector2(hx + 5, -137), Vector2(hx + 5, -124)], Color(0.08, 0.06, 0.05))
-				for k in 4:
-					FkPaint.ellipse(ci, Vector2(hx - 15.0 + k * 10.0, -150.0 - (k % 2) * 3.0), Vector2(7.0, 3.2), leaf.darkened(0.04 * k), 0.3 * (k % 2 - 0.5)))
-	if age >= 3:
-		# The stair winding up the trunk to the deck, with a rail; hanging lanterns along the hall's eave; a leaf finial.
-		var rfn := func(y: float) -> float: return _profile_r(trunk, y) + 5.0
-		Arch.helix(ci, -110, 0, 40.0, -118.0, -8.0, 1.5, 0.0, wood.darkened(0.2), 5.5, rfn)
-		Arch.helix(ci, -110, 0, 40.0, -118.0, -8.0, 1.5, 0.0, wood.lightened(0.12), 2.0, rfn)
-		Arch.on_front(ci, hall_z, func() -> void:
-			for lx in [-160.0, -110.0, -60.0]:
-				_hang_lantern(ci, lx, -162.0, Color("5a4a34"))
-			# Wind chimes off the eave and flower boxes under the round windows.
-			for k in 4:
-				ci.draw_line(Vector2(-90.0 + k * 5.0, -160), Vector2(-90.0 + k * 5.0, -148.0 - (k % 2) * 4.0), Color("cfd6dc"), 1.4)
-			for bx in [-150.0, -60.0]:
-				_sp(ci, _rect_pts(Rect2(bx - 12, -140, 24, 6)), wood.darkened(0.22))
-				for k in 5:
-					ci.draw_circle(Vector2(bx - 9.0 + k * 4.5, -142.0 - (k % 2) * 2.0), 2.0, [Color("f2d8e6"), Color("f2c94c"), Color("e89ac8")][k % 3]))
-		Arch.on_front(ci, 0.0, func() -> void:
-			_sp(ci, [Vector2(-110, -190), Vector2(-105, -198), Vector2(-110, -212), Vector2(-115, -198)], Color("d9b25c")))
-	if age >= 4:
-		# The white tower: a spiral stair round it, a balcony ring, three windows.
-		Arch.helix(ci, -24, -8, 13.6, -246.0, -24.0, 5.5, 0.2, wood.darkened(0.1), 3.2)
-		Arch.lathe(ci, -24, -8, [[-176.0, 19.0], [-172.0, 19.0], [-166.0, 15.0]], Color("e2ded2"))
-		var tw := Arch.cylinder_x(-24, -8)
-		for k in 7:
-			ci.draw_line(Vector2(tw - 18.0 + k * 6.0, -176), Vector2(tw - 18.0 + k * 6.0, -186), Color("cfc8b8"), 1.0)
-		ci.draw_line(Vector2(tw - 19.0, -186), Vector2(tw + 19.0, -186), Color("cfc8b8"), 1.2)
-		_window(ci, Rect2(tw - 3.0, -190, 6, 12))
-		_window(ci, Rect2(tw - 3.0, -130, 6, 12))
-	if age == 6:
-		# Crystals growing among the roots.
-		for c in [[-42.0, 44.0, 16.0, 0.1], [-32.0, 30.0, 12.0, -0.25], [-54.0, 34.0, 12.0, 0.2]]:
-			var cw: float = 5.0 + float(c[2]) * 0.12
-			Arch.prism(ci, [Vector2(c[0] - cw, 0), Vector2(c[0] - cw * 0.6 + c[3] * 10.0, -c[1]), Vector2(c[0] + c[3] * 14.0, -c[1] - 10.0), Vector2(c[0] + cw * 0.6 + c[3] * 10.0, -c[1]), Vector2(c[0] + cw, 0)], c[2], c[2] + 8.0, Color(glow, 0.9).lerp(Color("6fa4cc"), 0.4), Color(0, 0, 0, 0.25), 0.8)
-	# Mid and front canopy: layers of foliage, nearer ones lighter and shifted against the far ones as the camera turns.
-	var canopy := leaf if age != 6 else leaf.lerp(glow, 0.25)
-	for b in [[-140, -300, 0, 52, 34], [-80, -306, 0, 52, 34]]:
-		Arch.blob(ci, b[0], b[1], b[2], Vector2(b[3], b[4]), canopy.darkened(0.1))
-	for b in [[-196, -262, 26], [-40, -272, 26], [-120, -300, 34], [-150, -330, 20], [-80, -330, 20]]:
-		Arch.blob(ci, b[0], b[1], b[2], Vector2(40, 26), canopy, 0.2)
-	# Vines hanging from the canopy, some ending in a leaf or a glowing bud.
-	for vx in [-200.0, -172.0, -144.0, -100.0, -74.0, -50.0, -30.0]:
-		var vy := -246.0 - (fposmod(vx, 3.0)) * 4.0
-		var vl := 18.0 + fposmod(vx * 1.7, 18.0)
-		ci.draw_polyline(PackedVector2Array([Arch.pt(vx, vy, 28), Arch.pt(vx + 3.0, vy + vl * 0.5, 28), Arch.pt(vx - 2.0, vy + vl, 28)]), leaf.darkened(0.3), 1.8)
-		FkPaint.ellipse(ci, Arch.pt(vx - 2.0, vy + vl + 3.0, 28), Vector2(5.0, 3.2), leaf.lightened(0.05), 0.6)
+	_elf_tree(ci, -228.0, -52.0, 260.0, leaf, trunk)
+	_elf_tree(ci, 24.0, -86.0, 215.0, leaf.lightened(0.05), trunk)
+	# The spires behind: a needle with a swelling lantern chamber, gilt bands (silver) or facets that glow (crystal).
+	for sp in spires:
+		var x: float = sp[0]
+		var z: float = sp[1]
+		var top: float = sp[2]
+		var r: float = sp[3]
+		# A slender leaf-blade: narrow at the tip, swelling about two thirds of the way down.
+		var h := -96.0 - top
+		var prof := [[top, 0.8], [top + 0.3 * h, r * 0.5], [top + 0.6 * h, r * 0.9], [top + 0.85 * h, r], [-96.0, r * 0.9]]
+		Arch.faceted(ci, x, z, prof, spire_col, 6, 0.0, Color(0, 0, 0, 0.22) if crystal else Color(0, 0, 0, 0.0), 0.8)
+		if not crystal:
+			for f: float in [0.36, 0.72]:
+				var y := top + f * h
+				var rr := _profile_r(prof, y) * 1.06
+				Arch.faceted(ci, x, z, [[y - 1.5, rr], [y + 1.5, rr]], gold, 6, 0.0)
+		var sx := Arch.cylinder_x(x, z)
+		for f: float in sp[4]:
+			_window(ci, Rect2(sx - 2.0, top + f * h, 4, 9))
+		ci.draw_line(Vector2(sx, top), Vector2(sx, top - 8.0), gold, 1.4)
+	# Sky-bridges between the spires: a slender arched span with a gilt rail.
+	for pair in [[0, 1, -226.0], [1, 2, -238.0], [2, 3, -238.0], [3, 4, -222.0]]:
+		var a: Array = spires[pair[0]]
+		var b: Array = spires[pair[1]]
+		var pts := PackedVector2Array()
+		var rail := PackedVector2Array()
+		for i in 11:
+			var u := i / 10.0
+			var y := float(pair[2]) - sin(PI * u) * 9.0
+			var p := Arch.pt(lerpf(a[0], b[0], u), y, lerpf(a[1], b[1], u))
+			pts.append(p)
+			rail.append(p + Vector2(0, -7))
+		ci.draw_polyline(pts, Color(glow, 0.55) if crystal else spire_col.darkened(0.12), 5.0)
+		ci.draw_polyline(rail, gold, 1.2)
+	# The platform, the hall with its pointed arcade and leaf frieze, and a swooping roof over it.
+	Arch.box(ci, -218, 8, -30, 0, -34, 16, ivory.darkened(0.08), _face_msn(ci, ivory.darkened(0.08), 10, 22), _end_msn(ci, ivory.darkened(0.08), 10, 14))
+	Arch.box(ci, -206, 4, -132, -30, -30, 14, ivory, _face_msn(ci, ivory, 12, 24), _end_msn(ci, ivory, 12, 14))
+	Arch.on_front(ci, 14.0, func() -> void:
+		ci.draw_line(Vector2(-206, -110), Vector2(4, -110), ivory.darkened(0.2), 3.0)
+		for k in 30:
+			FkPaint.ellipse(ci, Vector2(-202.0 + k * 6.9, -116.0), Vector2(3.4, 1.7), gold.darkened(0.1), 0.0))
+	for x in arcade:
+		_arch_win(ci, x, -30.0, 26.0, 74.0, 14.0, 10.0, jamb, ivory.lightened(0.04), 16.0)
+	Arch.recess(ci, gate, 14.0, 12.0, jamb, Color(0.09, 0.07, 0.06))
+	Arch.bars(ci, gate, 14.0, 12.0, 8.0, [-32, -23, -14], [-70, -50], gold.darkened(0.2), 1.6)
+	Arch.on_front(ci, 14.0, func() -> void:
+		ci.draw_polyline(PackedVector2Array(gate), gold, 3.0)
+		for x in [-172.0, -136.0, -100.0, -64.0]:
+			_hang_banner(ci, x, -102.0, 10.0, 34.0, team, gold))
+	_elf_roof(ci, -216, 12, -128, -196, 78, 16, -36, 18, roof_col, gold)
+	Arch.box(ci, -56, 10, -15, 0, 16, 36, ivory.darkened(0.04), _face_msn(ci, ivory.darkened(0.04), 10, 20), Callable())
+	Arch.box(ci, -50, 4, -30, -15, 16, 26, ivory.darkened(0.02), _face_msn(ci, ivory.darkened(0.02), 10, 20), Callable())
+	Arch.on_front(ci, 20.0, func() -> void:
+		for x in [-46.0, 0.0]:
+			_hang_lantern(ci, x, -92.0, Color("5a4a34")))
 
 
 ## The part of a silhouette between two heights (a slab of a mountain).
