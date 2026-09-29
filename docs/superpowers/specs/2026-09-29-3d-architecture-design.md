@@ -28,11 +28,15 @@ Units are 3D bodies seen through a 25° camera; the bases and towers are flat fr
 - **Tower.** A square shaft with visible end face, a machicolation ledge, thick merlons, a recessed arrow slit, hoarding brackets, a hanging banner and ivy on the front.
 - Checked square-on (yaw 0) and at night; tests cover the plane transforms, the end width (`depth · sin(yaw)`), the jamb width, the pyramid's visible slopes and the merlons.
 
+## Humans (built): the other five bases and towers
+
+- **Bases.** Hide camp, temple, Roman castrum, star fort and wizard citadel are built from `Arch` volumes: boxes, prisms, frustums, cylinders and recesses, with the existing masonry, windows and banners drawn on their faces.
+- **Towers.** Lashed lookout (tapered post prisms and a plank platform), temple plinth (stepped box base, fluted cylinder pilasters, gilt cornice), watchtower (tufa base with an arch recess, timber post boxes, tiled skirt), earthwork bastion (frustum of earth, brick cap, gabion boxes) and arcane pylon (tapered body, brass ring boxes, crystal on the front plane; the orbiting runestones stay flat).
+
 ## Rollout (not built)
 
-1. **Humans:** the other five bases (hide camp, temple, Roman castrum, star fort, wizard citadel) and towers (lashed lookout, temple plinth, watchtower, earthwork bastion, arcane pylon).
-2. **Elves:** grown structures, not masonry. The trunks are cylinders with root flares, the tree-halls timber bodies with real eaves, the canopies layered masses in depth; the towers woven and vine-bound columns (cylinders with spiral detail).
-3. **Dwarves:** mountain holds as stacked rock slabs with side faces and a stone hall at the foot; iron-banded towers as boxes and cylinders with rivet lines.
+1. **Elves:** grown structures, not masonry. The trunks are cylinders with root flares, the tree-halls timber bodies with real eaves, the canopies layered masses in depth; the towers woven and vine-bound columns (cylinders with spiral detail).
+2. **Dwarves:** mountain holds as stacked rock slabs with side faces and a stone hall at the foot; iron-banded towers as boxes and cylinders with rivet lines.
 
 Each step ends with a before and after gallery (`tools/base_gallery.gd`, with `--towers` and `--night=1`) for the owner to review; visual work cannot be verified in the cloud.
 

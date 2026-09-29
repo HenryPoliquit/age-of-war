@@ -88,3 +88,39 @@ func test_merlons_stand_along_the_front_and_the_lane_facing_end() -> void:
 		check((b.z1 - b.z0 if b.side == "front" else b.x1 - b.x0) <= 5.01, "a merlon is a thin block")
 	Arch.yaw = 0.0
 	check_eq(Arch.merlon_boxes(-204.0, 4.0, -22.0, 22.0, -122.0, 16.0, 22.0, 38.0, 5.0).filter(func(b: Dictionary) -> bool: return b.side == "end").size(), 0, "square-on the end merlons are edge-on and are not drawn")
+
+
+func test_prism_shows_only_the_right_facing_sides() -> void:
+	# A rock silhouette extruded in depth: the sides that face the lane show while the camera is turned; the ones
+	# facing up (edge-on) and the left never do.
+	var rock := [Vector2(-40, 0), Vector2(-36, -60), Vector2(0, -80), Vector2(30, -40), Vector2(40, 0)]
+	Arch.yaw = YAW
+	var sides := Arch.prism_sides(rock, -20.0, 30.0)
+	check(sides.size() >= 1, "some sides show")
+	for s in sides:
+		check(s.normal.x > 0.0, "a visible side faces the lane (normal %s)" % s.normal)
+		check(s.quad.size() == 4, "a side is a quad")
+	Arch.yaw = 0.0
+	check_eq(Arch.prism_sides(rock, -20.0, 30.0).size(), 0, "square-on no side shows")
+
+
+func test_prism_sides_widen_with_depth() -> void:
+	Arch.yaw = YAW
+	var wall := [Vector2(0, 0), Vector2(0, -50), Vector2(20, -50), Vector2(20, 0)]
+	var shallow := Arch.prism_sides(wall, -10.0, 10.0)
+	var deep := Arch.prism_sides(wall, -30.0, 30.0)
+	var w1: float = (shallow[0].quad[1] as Vector2).x - (shallow[0].quad[2] as Vector2).x
+	var w2: float = (deep[0].quad[1] as Vector2).x - (deep[0].quad[2] as Vector2).x
+	check_near(w2 / w1, 3.0, 1e-3, "a body three times as deep shows a side three times as wide")
+	Arch.yaw = 0.0
+
+
+func test_frustum_faces_taper() -> void:
+	Arch.yaw = YAW
+	var f := Arch.frustum_faces(-24.0, 24.0, -16.0, 16.0, -14.0, 14.0, -10.0, 10.0, -70.0)
+	check_eq(f.size(), 2, "front and lane-facing faces")
+	var front: Array = f[0]
+	check(front[0].x < front[3].x and front[1].x > front[2].x, "the front narrows toward the top")
+	check_eq(front[2].y, -70.0, "up to its height")
+	Arch.yaw = 0.0
+	check_eq(Arch.frustum_faces(-24.0, 24.0, -16.0, 16.0, -14.0, 14.0, -10.0, 10.0, -70.0).size(), 2, "the end of a tapered body still shows square-on: its slope faces the camera")

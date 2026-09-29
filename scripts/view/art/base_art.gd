@@ -181,63 +181,90 @@ static func _window(ci: CanvasItem, r: Rect2, warm := Color(1.0, 0.72, 0.35)) ->
 
 
 static func _stone(ci: CanvasItem, team: Color, t: float) -> void:
+	# The tent's door: a dark flap on the front slope of the pyramid.
+	var door := PackedVector2Array()
+	var apex := Vector3(-102, -176, -4)
+	for p in [Vector3(-114, -100, 14), Vector3(-86, -100, 14), Vector3(-100, -100, 14).lerp(apex, 0.44)]:
+		door.append(FkRig.project(p, {"yaw": Arch.yaw}))
 	if dynamic_pass:
 		if night > 0.05:
-			ci.draw_colored_polygon(PackedVector2Array([Vector2(-110, -100), Vector2(-90, -100), Vector2(-100, -124)]), Color(1.0, 0.6, 0.25, 0.6 * night))
-		# Fire pit.
-		var fl := 0.7 + 0.3 * sin(t * 11.0)
-		ci.draw_circle(Vector2(-150, -6), 14, Color(1.0, 0.55, 0.2, 0.18 + 0.2 * night))
-		for k in 3:
-			ci.draw_colored_polygon(PackedVector2Array([Vector2(-158 + k * 6, -2), Vector2(-152 + k * 6, -2), Vector2(-155 + k * 6, -14 * fl - k * 2)]), Color(1.0, 0.6 + k * 0.1, 0.2))
-		_banner(ci, Vector2(-100, -222), team, t)
+			ci.draw_colored_polygon(door, Color(1.0, 0.6, 0.25, 0.6 * night))
+		# Fire pit, in front of the rock.
+		Arch.on_front(ci, 44.0, func() -> void:
+			var fl := 0.7 + 0.3 * sin(t * 11.0)
+			ci.draw_circle(Vector2(-150, -6), 14, Color(1.0, 0.55, 0.2, 0.18 + 0.2 * night))
+			for k in 3:
+				ci.draw_colored_polygon(PackedVector2Array([Vector2(-158 + k * 6, -2), Vector2(-152 + k * 6, -2), Vector2(-155 + k * 6, -14 * fl - k * 2)]), Color(1.0, 0.6 + k * 0.1, 0.2)))
+		_banner(ci, Vector2(Arch.cylinder_x(-102, -4), -222), team, t)
 		return
-	# Rock outcrop, hide tent with stitched seams, stake palisade bound with rope, fire pit.
+	# A rock outcrop with a hide tent on a timber ledge cut into it, a stake palisade bound with rope in front, a
+	# fire pit: the rock a solid mass, the tent a pyramid, the stakes thin pointed slabs.
 	var rock := Color("7d6a58")
-	_sp(ci, [Vector2(-205, 0), Vector2(-196, -72), Vector2(-160, -118), Vector2(-104, -142), Vector2(-52, -124), Vector2(-20, -84), Vector2(-4, -30), Vector2(10, 0)], rock)
-	_sp(ci, [Vector2(-160, -118), Vector2(-104, -142), Vector2(-80, -132), Vector2(-128, -104)], rock.lightened(0.12))
-	for k in 6:
-		var a := Vector2(-190 + k * 28, -50 - (k % 3) * 22)
-		ci.draw_polyline(PackedVector2Array([a, a + Vector2(9, 8), a + Vector2(4, 18)]), Color(0, 0, 0, 0.3), 1.5)
+	var rock_pts := [Vector2(-205, 0), Vector2(-196, -72), Vector2(-160, -118), Vector2(-104, -142), Vector2(-52, -124), Vector2(-20, -84), Vector2(-4, -30), Vector2(10, 0)]
+	Arch.prism(ci, rock_pts, -44, 18, rock)
+	Arch.on_front(ci, 18.0, func() -> void:
+		_sp(ci, [Vector2(-160, -118), Vector2(-104, -142), Vector2(-80, -132), Vector2(-128, -104)], rock.lightened(0.12))
+		for k in 6:
+			var a := Vector2(-190 + k * 28, -50 - (k % 3) * 22)
+			ci.draw_polyline(PackedVector2Array([a, a + Vector2(9, 8), a + Vector2(4, 18)]), Color(0, 0, 0, 0.3), 1.5))
+	var wood := Color("6b4a2b")
+	Arch.box(ci, -156, -48, -100, -94, 6, 50, wood.lightened(0.05), func(r: Rect2) -> void: _planks(ci, r, wood.lightened(0.05), 9), Callable())
 	var hide := Color("8a6440")
-	_sp(ci, [Vector2(-148, -100), Vector2(-56, -100), Vector2(-100, -176)], hide)
-	for k in 4:
-		ci.draw_line(Vector2(-100, -176), Vector2(-138 + k * 26, -100), Color(0.25, 0.16, 0.1, 0.6), 1.2)
-	ci.draw_colored_polygon(PackedVector2Array([Vector2(-114, -100), Vector2(-86, -100), Vector2(-100, -134)]), Color(0.12, 0.08, 0.05))
+	Arch.pyramid(ci, -148, -56, -22, 14, -100, -176, hide, 4)
+	ci.draw_colored_polygon(door, Color(0.12, 0.08, 0.05))
 	for k in 10:
 		var x := -4.0 - k * 13.0
 		var h := 40.0 + (k % 3) * 5.0
-		_sp(ci, [Vector2(x - 4.5, 0), Vector2(x - 4.5, -h), Vector2(x, -h - 9), Vector2(x + 4.5, -h), Vector2(x + 4.5, 0)], Color("6b4a2b").lightened(0.04 * (k % 2)))
-	for y in [-20.0, -32.0]:
-		ci.draw_line(Vector2(-134, y), Vector2(0, y + 2), Color("b09060"), 2.0)
+		Arch.prism(ci, [Vector2(x - 4.5, 0), Vector2(x - 4.5, -h), Vector2(x, -h - 9), Vector2(x + 4.5, -h), Vector2(x + 4.5, 0)], 24, 32, wood.lightened(0.04 * (k % 2)))
+	Arch.on_front(ci, 32.0, func() -> void:
+		for y in [-20.0, -32.0]:
+			ci.draw_line(Vector2(-134, y), Vector2(0, y + 2), Color("b09060"), 2.0))
 
 
 static func _bronze(ci: CanvasItem, team: Color, t: float) -> void:
 	if dynamic_pass:
-		_banner(ci, Vector2(-98, -248), team, t)
+		_banner(ci, Vector2(Arch.cylinder_x(-98, 3), -248), team, t)
 		return
-	# Temple-fort: stepped masonry podium, fluted columns, pediment with a team frieze, bronze shields.
+	# Temple-fort: two podium steps, a cella set back behind a fluted colonnade, an entablature under a pediment
+	# with a team-coloured tympanum and gilt roundels, bronze shields on the cella wall.
 	var stone := Color("e1d3b3")
-	_masonry(ci, Rect2(-200, -34, 206, 34), stone.darkened(0.08), 11, 26)
-	_masonry(ci, Rect2(-190, -132, 186, 98), stone, 12, 30)
+	var cream := Color("f0e8d4")
+	Arch.box(ci, -204, 10, -12, 0, -34, 44, stone.darkened(0.14), _face_msn(ci, stone.darkened(0.14), 6, 26), _end_msn(ci, stone.darkened(0.14), 6, 14))
+	Arch.box(ci, -200, 6, -34, -12, -30, 36, stone.darkened(0.08), _face_msn(ci, stone.darkened(0.08), 11, 26), _end_msn(ci, stone.darkened(0.08), 11, 14))
+	Arch.box(ci, -178, -6, -132, -34, -28, 8, stone, _face_msn(ci, stone, 12, 30), _end_msn(ci, stone, 12, 14))
+	Arch.on_front(ci, 8.0, func() -> void:
+		# (The colonnade stands 16 nearer the camera than this wall, so a shield that reads as between two columns from
+		# the camera sits 16 · tan(yaw) further back along the wall.)
+		for k in 4:
+			var c := Vector2(-160 + k * 30 - 16.0 * tan(Arch.yaw), -84)
+			ci.draw_circle(c, 9, Color("8a5a24"))
+			ci.draw_circle(c, 7, Color("c28c3e"))
+			ci.draw_circle(c, 2, Color("f0d090")))
+	# The doorway, cut through both steps into the cella.
+	var door := Arch.arch_pts(-42, -8, 0, -34, 14)
+	Arch.recess(ci, door, 44.0, 14.0, stone.darkened(0.4), Color("5b3f24"))
+	Arch.bars(ci, door, 44.0, 14.0, 14.0, [-36, -30, -24, -18, -12], [], Color(0, 0, 0, 0.4), 1.2)
 	for k in 6:
-		var x := -182.0 + k * 30.0
-		_sp(ci, _rect_pts(Rect2(x, -126, 14, 92)), Color("f0e8d4"))
-		for f in 3:
-			ci.draw_line(Vector2(x + 3 + f * 4, -122), Vector2(x + 3 + f * 4, -38), Color(0, 0, 0, 0.12), 1.0)
-		_sp(ci, _rect_pts(Rect2(x - 3, -132, 20, 6)), Color("d8c8a4"))
-	_sp(ci, _rect_pts(Rect2(-198, -142, 202, 12)), Color("cdb88c"))
-	_sp(ci, [Vector2(-204, -142), Vector2(8, -142), Vector2(-98, -196)], Color("c9a060"))
-	_sp(ci, [Vector2(-172, -148), Vector2(-24, -148), Vector2(-98, -186)], team.darkened(0.1))
-	for k in 5:
-		ci.draw_circle(Vector2(-140 + k * 21, -158), 4, Color("d9b25e"))
-	for k in 3:
-		var c := Vector2(-160 + k * 50, -80)
-		ci.draw_circle(c, 9, Color("8a5a24"))
-		ci.draw_circle(c, 7, Color("c28c3e"))
-		ci.draw_circle(c, 2, Color("f0d090"))
-	_planks(ci, Rect2(-42, -76, 38, 76), Color("5b3f24"), 6)
-	for k in 4:
-		ci.draw_circle(Vector2(-35 + (k % 2) * 22, -60 + (k / 2) * 30), 1.8, Color("d9b25e"))
+		var cx := -175.0 + k * 30.0
+		Arch.cylinder(ci, cx, 24, 7, -126, -34, cream, 0.0, 12.0, 3)
+	for k in 6:
+		var cx := -175.0 + k * 30.0
+		Arch.box(ci, cx - 10, cx + 10, -132, -126, 14, 34, Color("d8c8a4"), Callable(), Callable(), false)
+	Arch.box(ci, -198, 4, -142, -132, -28, 34, Color("cdb88c"), Callable(), Callable())
+	Arch.prism(ci, [Vector2(-204, -142), Vector2(8, -142), Vector2(-98, -196)], -28, 34, Color("c9a060"))
+	Arch.on_front(ci, 34.0, func() -> void:
+		_sp(ci, [Vector2(-172, -148), Vector2(-24, -148), Vector2(-98, -186)], team.darkened(0.1))
+		for k in 5:
+			ci.draw_circle(Vector2(-140 + k * 21, -158), 4, Color("d9b25e")))
+
+
+## Masonry (or any flat art) for a body's front and end faces, as the Callables Arch.box takes.
+static func _face_msn(ci: CanvasItem, col: Color, course := 11.0, block := 22.0) -> Callable:
+	return func(r: Rect2) -> void: _masonry(ci, r, col, course, block)
+
+
+static func _end_msn(ci: CanvasItem, col: Color, course := 11.0, block := 14.0) -> Callable:
+	return func(r: Rect2) -> void: _masonry(ci, r, Arch.end_col(col), course, block)
 
 
 ## A recessed slit (or window) on a face: dark by day, lit warm at night on its inner plane.
@@ -302,40 +329,49 @@ static func _medieval(ci: CanvasItem, team: Color, t: float) -> void:
 
 static func _gunpowder(ci: CanvasItem, team: Color, t: float) -> void:
 	if dynamic_pass:
-		_window(ci, Rect2(-101, -210, 10, 14))
-		_banner(ci, Vector2(-95, -300), team, t, 30)
+		Arch.on_front(ci, 4.0, func() -> void: _window(ci, Rect2(-101, -210, 10, 14)))
+		_banner(ci, Vector2(Arch.cylinder_x(-95, -13), -300), team, t, 30)
 		return
-	# Star-fort bastion: sloped masonry glacis, gun ports with cannon, brick watchtower.
+	# Star-fort bastion: a sloped earthwork mass with embrasures and cannon, a masonry gun deck above it, a brick
+	# watchtower set back under a slate hip roof, a plank gate recessed into the slope.
 	var earth := Color("8a7b66")
-	_sp(ci, [Vector2(-214, 0), Vector2(-204, -108), Vector2(-152, -142), Vector2(-40, -142), Vector2(12, -100), Vector2(22, 0)], earth)
-	for r in 9:
-		var y := -12.0 - r * 14.0
-		ci.draw_line(Vector2(-210 + r * 1.2, y), Vector2(16 - r * 3.0, y), Color(0, 0, 0, 0.22), 1.2)
-	_sp(ci, [Vector2(-40, -142), Vector2(12, -100), Vector2(22, 0), Vector2(-18, 0)], earth.darkened(0.15))
-	_masonry(ci, Rect2(-152, -162, 112, 20), Color("6a5e52"), 10, 18)
+	var mound := [Vector2(-214, 0), Vector2(-204, -108), Vector2(-152, -142), Vector2(-40, -142), Vector2(12, -100), Vector2(22, 0)]
+	var brick := Color("8a5a44")
+	Arch.box(ci, -122, -68, -224, -150, -28, 4, brick, _face_msn(ci, brick, 7, 12), _end_msn(ci, brick, 7, 8))
+	Arch.pyramid(ci, -128, -62, -34, 10, -224, -252, Color("3a3f58"), 3)
+	Arch.on_front(ci, 4.0, func() -> void: _window(ci, Rect2(-101, -210, 10, 14)))
+	Arch.box(ci, -152, -40, -162, -142, -30, 12, Color("6a5e52"), _face_msn(ci, Color("6a5e52"), 10, 18), _end_msn(ci, Color("6a5e52"), 10, 12))
+	Arch.prism(ci, mound, -44, 30, earth)
+	Arch.on_front(ci, 30.0, func() -> void:
+		for r in 9:
+			var y := -12.0 - r * 14.0
+			ci.draw_line(Vector2(-210 + r * 1.2, y), Vector2(16 - r * 3.0, y), Color(0, 0, 0, 0.22), 1.2))
 	for k in 3:
 		var gp := Vector2(-140 + k * 44, -120)
-		ci.draw_rect(Rect2(gp, Vector2(22, 14)), Color(0.08, 0.07, 0.06))
-		ci.draw_line(gp + Vector2(11, 7), gp + Vector2(34, 5), Color(0.18, 0.18, 0.2), 6.0)
-	_masonry(ci, Rect2(-122, -224, 54, 62), Color("8a5a44"), 7, 12)
-	_sp(ci, [Vector2(-128, -224), Vector2(-62, -224), Vector2(-95, -252)], Color("3a3f58"))
-	_window(ci, Rect2(-101, -210, 10, 14))
-	_planks(ci, Rect2(-42, -64, 36, 64), Color("3a2a1c"), 6)
-
-
+		Arch.recess(ci, Arch.rect_pts(gp.x, gp.y, gp.x + 22, gp.y + 14), 30.0, 8.0, earth.darkened(0.4), Color(0.08, 0.07, 0.06))
+		Arch.on_front(ci, 30.0, func() -> void: ci.draw_line(gp + Vector2(11, 7), gp + Vector2(34, 5), Color(0.18, 0.18, 0.2), 6.0))
+	var gate := Arch.rect_pts(-42, -64, -6, 0)
+	Arch.recess(ci, gate, 30.0, 22.0, earth.darkened(0.45), Color("3a2a1c"))
+	Arch.bars(ci, gate, 30.0, 22.0, 22.0, [-36, -30, -24, -18, -12], [], Color(0, 0, 0, 0.4), 1.2)
 
 
 static func _castrum(ci: CanvasItem, team: Color, t: float) -> void:
+	var tufa := Color("c2b08e")
+	var tile := Color("b0583a")
+	var top_x := Arch.cylinder_x(-135, -14)
 	if dynamic_pass:
-		for p in [Vector2(-128, -186), Vector2(-66, -140), Vector2(-4, -140)]:
-			_window(ci, Rect2(p, Vector2(6, 12)))
+		for p in [Vector2(-128, -186)]:
+			Arch.on_front(ci, 6.0, func() -> void: _window(ci, Rect2(p, Vector2(6, 12))))
+		for p in [Vector2(-66, -140), Vector2(-4, -140)]:
+			Arch.on_front(ci, 34.0, func() -> void: _window(ci, Rect2(p, Vector2(6, 12))))
 		# Torches at the gate.
-		for x in [-52.0, -4.0]:
-			var fl := 0.7 + 0.3 * sin(t * 12.0 + x)
-			ci.draw_circle(Vector2(x, -70), 10.0, Color(1.0, 0.6, 0.25, 0.15 + 0.25 * night))
-			ci.draw_colored_polygon(PackedVector2Array([Vector2(x - 3, -66), Vector2(x + 3, -66), Vector2(x, -66 - 10 * fl)]), Color(1.0, 0.7, 0.3))
+		Arch.on_front(ci, 34.0, func() -> void:
+			for x in [-52.0, -4.0]:
+				var fl := 0.7 + 0.3 * sin(t * 12.0 + x)
+				ci.draw_circle(Vector2(x, -70), 10.0, Color(1.0, 0.6, 0.25, 0.15 + 0.25 * night))
+				ci.draw_colored_polygon(PackedVector2Array([Vector2(x - 3, -66), Vector2(x + 3, -66), Vector2(x, -66 - 10 * fl)]), Color(1.0, 0.7, 0.3)))
 		# Legion standard: a square vexillum under a gilded eagle.
-		var top := Vector2(-135, -318)
+		var top := Vector2(top_x, -318)
 		ci.draw_line(top, top + Vector2(0, 84), Color("3b2c20"), 3.0)
 		ci.draw_line(top + Vector2(-14, 10), top + Vector2(14, 10), Color("3b2c20"), 2.0)
 		var sway := sin(t * 2.2) * 1.5
@@ -345,74 +381,106 @@ static func _castrum(ci: CanvasItem, team: Color, t: float) -> void:
 		ci.draw_circle(top + Vector2(0, -3), 5.0, Color("d9b25c"))
 		ci.draw_colored_polygon(PackedVector2Array([top + Vector2(-10, -6), top + Vector2(0, -2), top + Vector2(10, -6), top + Vector2(0, 2)]), Color("c9a24c"))
 		return
-	# Roman castrum: tufa wall with a timber walkway, tiled tower and a twin-towered gate.
-	var tufa := Color("c2b08e")
-	var tile := Color("b0583a")
-	_masonry(ci, Rect2(-206, -110, 210, 110), tufa, 12, 28)
-	_planks(ci, Rect2(-208, -124, 214, 14), Color("7a5a3a"), 8)
+	# Roman castrum: a tufa wall with a timber walkway and palisade, a tiled central tower set back, and a twin-towered
+	# gate projecting from the wall with the arch recessed between the towers.
+	var timber := Color("7a5a3a")
+	Arch.box(ci, -170, -100, -206, -110, -34, 6, tufa.lightened(0.05), _face_msn(ci, tufa.lightened(0.05), 12, 20), _end_msn(ci, tufa.lightened(0.05), 12, 14))
+	Arch.pyramid(ci, -180, -90, -44, 16, -206, -240, tile, 6)
+	Arch.box(ci, -206, 4, -110, 0, -20, 20, tufa, _face_msn(ci, tufa, 12, 28), _end_msn(ci, tufa, 12, 14))
+	Arch.box(ci, -208, 6, -124, -110, -24, 24, timber, func(r: Rect2) -> void: _planks(ci, r, timber, 8), Callable())
 	for k in 14:
-		ci.draw_rect(Rect2(-206 + k * 15, -134, 6, 10), Color("6a4a2e"))
-	_masonry(ci, Rect2(-170, -206, 70, 96), tufa.lightened(0.05), 12, 20)
-	_sp(ci, [Vector2(-180, -206), Vector2(-90, -206), Vector2(-135, -240)], tile)
-	for k in 6:
-		ci.draw_line(Vector2(-135, -240), Vector2(-176 + k * 16, -206), Color(0, 0, 0, 0.2), 1.0)
+		Arch.box(ci, -206 + k * 15, -200 + k * 15, -134, -124, 16, 24, Color("6a4a2e"), Callable(), Callable(), false)
+	# Twin gate towers, projecting, with tiled caps; the arched gate between them.
 	for x in [-80.0, -14.0]:
-		_masonry(ci, Rect2(x, -160, 30, 160), tufa.darkened(0.05), 11, 15)
-		_sp(ci, [Vector2(x - 5, -160), Vector2(x + 35, -160), Vector2(x + 15, -184)], tile)
-	for p in [Vector2(-128, -186), Vector2(-66, -140), Vector2(-4, -140)]:
-		_window(ci, Rect2(p, Vector2(6, 12)))
-	# Arched gate with timber doors.
-	_sp(ci, [Vector2(-50, 0), Vector2(-50, -62), Vector2(-32, -80), Vector2(-14, -62), Vector2(-14, 0)], Color(0.12, 0.09, 0.07))
-	_planks(ci, Rect2(-48, -58, 32, 58), Color("5b3f24"), 6)
-	ci.draw_arc(Vector2(-32, -62), 18.0, PI, TAU, 12, tufa.darkened(0.25), 3.0)
+		Arch.box(ci, x, x + 30, -160, 0, -20, 34, tufa.darkened(0.05), _face_msn(ci, tufa.darkened(0.05), 11, 15), _end_msn(ci, tufa.darkened(0.05), 11, 12))
+		Arch.pyramid(ci, x - 5, x + 35, -25, 39, -160, -184, tile, 3)
+	var gate := Arch.arch_pts(-50, -30, 0, -62, 18)
+	gate = Arch.arch_pts(-50, -14, 0, -62, 18)
+	Arch.recess(ci, gate, 20.0, 14.0, tufa.darkened(0.35), Color(0.12, 0.09, 0.07))
+	Arch.bars(ci, gate, 20.0, 14.0, 14.0, [-44, -38, -32, -26, -20], [], Color(0.05, 0.03, 0.02, 0.7), 1.4)
+	Arch.on_front(ci, 20.0, func() -> void:
+		var stroke := PackedVector2Array()
+		for p in gate:
+			stroke.append(p)
+		ci.draw_polyline(stroke, tufa.darkened(0.25), 2.5))
 	# Legion shields hung along the wall.
-	for k in 4:
-		var c := Vector2(-194 + k * 30, -70)
-		_sp(ci, [c + Vector2(-8, -14), c + Vector2(8, -14), c + Vector2(9, 14), c + Vector2(-9, 14)], team.darkened(0.1))
-		ci.draw_circle(c, 3.0, Color("d9b25c"))
+	Arch.on_front(ci, 20.0, func() -> void:
+		for k in 4:
+			var c := Vector2(-194 + k * 30, -70)
+			_sp(ci, [c + Vector2(-8, -14), c + Vector2(8, -14), c + Vector2(9, 14), c + Vector2(-9, 14)], team.darkened(0.1))
+			ci.draw_circle(c, 3.0, Color("d9b25c")))
+	Arch.on_front(ci, 6.0, func() -> void:
+		for p in [Vector2(-128, -186)]:
+			_window(ci, Rect2(p, Vector2(6, 12))))
+	Arch.on_front(ci, 34.0, func() -> void:
+		for p in [Vector2(-66, -140), Vector2(-4, -140)]:
+			_window(ci, Rect2(p, Vector2(6, 12))))
+
+
+## A pointed window on a face: dark (recessed) by day, glowing on its inner plane by night.
+static func _pwin(ci: CanvasItem, p: Vector2, zf: float, depth: float, jamb: Color, glow: Color, k: float) -> void:
+	var pts: Array = [p + Vector2(0, 18), p, p + Vector2(5, -6), p + Vector2(10, 0), p + Vector2(10, 18)]
+	if dynamic_pass:
+		Arch.on_front(ci, zf - depth, func() -> void:
+			ci.draw_rect(Rect2(p, Vector2(10, 18)), Color(glow, 0.35 + 0.35 * night))
+			ci.draw_rect(Rect2(p, Vector2(10, 18)).grow(4), Color(glow, 0.08 + 0.1 * night)))
+	else:
+		Arch.recess(ci, pts, zf, depth, jamb, Color(0.1, 0.08, 0.12))
 
 
 static func _citadel(ci: CanvasItem, team: Color, t: float) -> void:
 	var glow: Color = RaceLook.look(&"human").glow
+	var stone := Color("6e6582")
+	var roof := Color("3a2d5e")
+	var brass := Color("c9a45c")
+	var jamb := stone.darkened(0.4)
+	var hall_windows := [Vector2(-190, -92), Vector2(-160, -92), Vector2(-120, -92)]
+	var spire_windows := [Vector2(-112, -250), Vector2(-112, -200)]
 	if dynamic_pass:
 		var k := 0.6 + 0.4 * sin(t * 1.8)
-		for p in [Vector2(-190, -92), Vector2(-160, -92), Vector2(-120, -92), Vector2(-112, -250), Vector2(-112, -200), Vector2(-186, -170)]:
-			ci.draw_rect(Rect2(p, Vector2(10, 18)), Color(glow, 0.35 + 0.35 * night))
-			ci.draw_rect(Rect2(p, Vector2(10, 18)).grow(4), Color(glow, 0.08 + 0.1 * night))
+		for p in hall_windows:
+			_pwin(ci, p, 22.0, 4.0, jamb, glow, k)
+		for p in spire_windows:
+			_pwin(ci, p, 10.0, 4.0, jamb, glow, k)
+		_pwin(ci, Vector2(-186, -170), 19.0, 4.0, jamb, glow, k)
 		# Floating crystal above the spire, and the ward across the gate.
-		var c := Vector2(-108, -392 + sin(t * 1.4) * 5.0)
+		var c := Vector2(Arch.cylinder_x(-108, -12), -392 + sin(t * 1.4) * 5.0)
 		for i in 4:
 			ci.draw_circle(c, 34.0 - i * 7.0, Color(glow, 0.06 + i * 0.05 * k))
 		ci.draw_colored_polygon(PackedVector2Array([c + Vector2(0, -20), c + Vector2(9, 0), c + Vector2(0, 20), c + Vector2(-9, 0)]), glow.lightened(0.3))
 		ci.draw_line(c + Vector2(0, -18), c + Vector2(0, 18), Color(1, 1, 1, 0.8), 1.5)
-		for i in 5:
-			var y := -8.0 - i * 13.0
-			ci.draw_line(Vector2(-46, y), Vector2(-8, y), Color(glow, 0.25 + 0.2 * sin(t * 4.0 + i)), 1.5)
-		_banner(ci, Vector2(-180, -254), team, t)
+		Arch.on_front(ci, 22.0, func() -> void:
+			for i in 5:
+				var y := -8.0 - i * 13.0
+				ci.draw_line(Vector2(-46, y), Vector2(-8, y), Color(glow, 0.25 + 0.2 * sin(t * 4.0 + i)), 1.5))
+		_banner(ci, Vector2(Arch.cylinder_x(-182, 0), -254), team, t)
 		return
-	# Wizard citadel: violet-grey hall with buttresses, a slender brass-banded spire and a side turret.
-	var stone := Color("6e6582")
-	var roof := Color("3a2d5e")
-	var brass := Color("c9a45c")
-	_masonry(ci, Rect2(-206, -122, 210, 122), stone, 12, 24)
-	for x in [-206.0, -138.0, -70.0]:
-		_sp(ci, [Vector2(x, 0), Vector2(x, -110), Vector2(x + 14, -60), Vector2(x + 18, 0)], stone.darkened(0.12))
-	for p in [Vector2(-190, -92), Vector2(-160, -92), Vector2(-120, -92)]:
-		_sp(ci, [p + Vector2(0, 18), p, p + Vector2(5, -6), p + Vector2(10, 0), p + Vector2(10, 18)], Color(0.1, 0.08, 0.12))
-	_masonry(ci, Rect2(-140, -286, 64, 164), stone.lightened(0.06), 12, 16)
+	# Wizard citadel: a violet-grey hall with sloped buttresses and pointed windows, a slender brass-banded spire
+	# rising behind it under a violet pyramid, a round side turret, a pointed gate in a brass frame.
+	Arch.box(ci, -140, -76, -286, 0, -34, 10, stone.lightened(0.06), _face_msn(ci, stone.lightened(0.06), 12, 16), _end_msn(ci, stone.lightened(0.06), 12, 12))
 	for y in [-150.0, -210.0, -270.0]:
-		ci.draw_line(Vector2(-142, y), Vector2(-74, y), brass, 3.0)
-	for p in [Vector2(-112, -250), Vector2(-112, -200)]:
-		_sp(ci, [p + Vector2(0, 18), p, p + Vector2(5, -6), p + Vector2(10, 0), p + Vector2(10, 18)], Color(0.1, 0.08, 0.12))
-	_sp(ci, [Vector2(-150, -286), Vector2(-66, -286), Vector2(-108, -360)], roof)
-	ci.draw_line(Vector2(-108, -360), Vector2(-108, -366), brass, 3.0)
-	_masonry(ci, Rect2(-200, -200, 36, 78), stone.darkened(0.04), 11, 12)
-	_sp(ci, [Vector2(-206, -200), Vector2(-158, -200), Vector2(-182, -240)], roof)
-	_sp(ci, [Vector2(-186, -170), Vector2(-186, -152), Vector2(-176, -152), Vector2(-176, -170), Vector2(-181, -176)], Color(0.1, 0.08, 0.12))
-	# Gate: pointed arch in a brass frame.
-	_sp(ci, [Vector2(-48, 0), Vector2(-48, -60), Vector2(-27, -86), Vector2(-6, -60), Vector2(-6, 0)], Color(0.09, 0.07, 0.11))
-	ci.draw_polyline(PackedVector2Array([Vector2(-48, 0), Vector2(-48, -60), Vector2(-27, -86), Vector2(-6, -60), Vector2(-6, 0)]), brass, 2.0)
-	ci.draw_rect(Rect2(-190, -60, 40, 20), team.darkened(0.1))
+		Arch.on_front(ci, 10.0, func() -> void: ci.draw_line(Vector2(-140, y), Vector2(-76, y), brass, 3.0))
+		Arch.on_end(ci, -76.0, 10.0, func() -> void: ci.draw_line(Vector2(0, y), Vector2(44, y), Arch.end_col(brass), 3.0))
+	Arch.pyramid(ci, -150, -66, -44, 20, -286, -360, roof, 4)
+	ci.draw_line(Vector2(Arch.cylinder_x(-108, -12), -360), Vector2(Arch.cylinder_x(-108, -12), -366), brass, 3.0)
+	for p in spire_windows:
+		_pwin(ci, p, 10.0, 4.0, jamb, glow, 1.0)
+	Arch.box(ci, -206, 4, -122, 0, -26, 22, stone, _face_msn(ci, stone, 12, 24), _end_msn(ci, stone, 12, 14))
+	for x in [-206.0, -138.0, -70.0]:
+		Arch.prism(ci, [Vector2(x, 0), Vector2(x, -110), Vector2(x + 14, -60), Vector2(x + 18, 0)], 22, 32, stone.darkened(0.12))
+	for p in hall_windows:
+		_pwin(ci, p, 22.0, 4.0, jamb, glow, 1.0)
+	# The side turret, standing on the hall's left corner.
+	Arch.cylinder(ci, -182, 2, 19, -200, -122, stone.darkened(0.04), 11, 12)
+	Arch.cone(ci, -182, 2, 25, -200, -244, roof, 4)
+	_pwin(ci, Vector2(-186, -170), 19.0, 4.0, jamb, glow, 1.0)
+	# The gate: a pointed arch in a brass frame.
+	var gate := Arch.arch_pts(-48, -6, 0, -60, 6, 20)
+	Arch.recess(ci, gate, 22.0, 16.0, jamb, Color(0.09, 0.07, 0.11))
+	Arch.on_front(ci, 22.0, func() -> void:
+		var stroke := PackedVector2Array(gate)
+		ci.draw_polyline(stroke, brass, 2.0)
+		ci.draw_rect(Rect2(-190, -60, 40, 20), team.darkened(0.1)))
 
 
 ## Elven tree-hall: a great tree that gains decks, halls, a white tower and silver spires with each

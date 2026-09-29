@@ -184,7 +184,7 @@ static func cone(ci: CanvasItem, cx: float, cz: float, r: float, y_base: float, 
 
 ## A vertical cylinder (a round tower): centre (cx, cz), radius r, y in [y0 (top), y1 (bottom)]. Lit on the left, in
 ## shadow on the right. `course` > 0 lays courses of masonry `block` wide whose joints squeeze toward the edges.
-static func cylinder(ci: CanvasItem, cx: float, cz: float, r: float, y0: float, y1: float, col: Color, course := 0.0, block := 12.0) -> void:
+static func cylinder(ci: CanvasItem, cx: float, cz: float, r: float, y0: float, y1: float, col: Color, course := 0.0, block := 12.0, flutes := 0) -> void:
 	var x := cylinder_x(cx, cz)
 	var n := 12
 	for i in n:
@@ -210,6 +210,10 @@ static func cylinder(ci: CanvasItem, cx: float, cz: float, r: float, y0: float, 
 					ci.draw_rect(Rect2(x + prev + 0.5, y + 0.6, u - prev - 1.0, course - 1.2), Color(1, 1, 1, 0.1) if tone > 0.0 else Color(0, 0, 0, 0.1))
 					prev = u
 				phi += step
+	for k in flutes:
+		# Flutes: grooves down the shaft, squeezed toward the edges like the joints.
+		var u := r * sin(lerpf(-PI * 0.42, PI * 0.42, (k + 0.5) / flutes))
+		ci.draw_line(Vector2(x + u, y0), Vector2(x + u, y1), Color(0, 0, 0, 0.16), 1.0)
 	ci.draw_line(Vector2(x - r, y0), Vector2(x - r, y1), EDGE, 1.0)
 	ci.draw_line(Vector2(x + r, y0), Vector2(x + r, y1), EDGE, 1.0)
 
@@ -262,3 +266,74 @@ static func bars(ci: CanvasItem, opening: Array, zf: float, depth: float, bar_de
 	for l in lines:
 		for piece in Geometry2D.intersect_polyline_with_polygon(l, outer):
 			ci.draw_polyline(piece, col, w)
+
+
+## The visible side faces of a silhouette `pts` (x, y on the front plane) extruded from z0 (back) to z1 (front): the
+## edges whose outward normal points toward the lane, each as {normal (unit, in x and y), quad (4 screen points)}.
+## While the camera is square-on none show. Works for convex and mildly concave outlines.
+static func prism_sides(pts: Array, z0: float, z1: float) -> Array:
+	var out: Array = []
+	if sin(yaw) <= 1e-4:
+		return out
+	var c := Vector2.ZERO
+	for p in pts:
+		c += p
+	c /= pts.size()
+	var v := {"yaw": yaw}
+	for i in pts.size():
+		var a: Vector2 = pts[i]
+		var b: Vector2 = pts[(i + 1) % pts.size()]
+		var e := b - a
+		if e.length() < 1e-4:
+			continue
+		var n := Vector2(e.y, -e.x).normalized()
+		if n.dot((a + b) * 0.5 - c) < 0.0:
+			n = -n
+		if n.x > 0.02:
+			out.append({"normal": n, "quad": [FkRig.project(Vector3(a.x, a.y, z1), v), FkRig.project(Vector3(b.x, b.y, z1), v),
+				FkRig.project(Vector3(b.x, b.y, z0), v), FkRig.project(Vector3(a.x, a.y, z0), v)]})
+	return out
+
+
+## A silhouette extruded in depth (a rock, a gable roof, a buttress, a tent, a stake): the lane-facing sides in shade
+## (lighter where they slope up), then the front. `ink` outlines every visible face.
+static func prism(ci: CanvasItem, pts: Array, z0: float, z1: float, col: Color, ink := Color(0, 0, 0, 0), ink_w := 1.0) -> void:
+	for s in prism_sides(pts, z0, z1):
+		var k := END * (0.9 + 0.35 * maxf(0.0, -s.normal.y))
+		FkPaint.shade_poly(ci, s.quad, _shade(col, k), Vector2(0.5, -0.8))
+		if ink.a > 0.0:
+			var q := PackedVector2Array(s.quad)
+			q.append(s.quad[0])
+			ci.draw_polyline(q, ink, ink_w)
+	on_front(ci, z1, func() -> void:
+		FkPaint.shade_poly(ci, pts, col, Vector2(0.5, -0.8))
+		if ink.a > 0.0:
+			var p := PackedVector2Array(pts)
+			p.append(pts[0])
+			ci.draw_polyline(p, ink, ink_w))
+
+
+## The visible faces of a tapered body (a sloped earthwork, a pylon): bottom rectangle x in [xb0, xb1], z in
+## [zb0, zb1] at y = 0, top rectangle x in [xt0, xt1], z in [zt0, zt1] at y_top. [front, lane-facing end]: each 4 screen
+## points, bottom-left, bottom-right, top-right, top-left as seen.
+static func frustum_faces(xb0: float, xb1: float, xt0: float, xt1: float, zb0: float, zb1: float, zt0: float, zt1: float, y_top: float) -> Array:
+	var v := {"yaw": yaw}
+	var front: Array = [FkRig.project(Vector3(xb0, 0, zb1), v), FkRig.project(Vector3(xb1, 0, zb1), v),
+		FkRig.project(Vector3(xt1, y_top, zt1), v), FkRig.project(Vector3(xt0, y_top, zt1), v)]
+	var end: Array = [FkRig.project(Vector3(xb1, 0, zb1), v), FkRig.project(Vector3(xb1, 0, zb0), v),
+		FkRig.project(Vector3(xt1, y_top, zt0), v), FkRig.project(Vector3(xt1, y_top, zt1), v)]
+	return [front, end]
+
+
+static func frustum(ci: CanvasItem, xb0: float, xb1: float, xt0: float, xt1: float, zb0: float, zb1: float, zt0: float, zt1: float, y_top: float, col: Color, ink := Color(0, 0, 0, 0), ink_w := 1.0) -> void:
+	var f := frustum_faces(xb0, xb1, xt0, xt1, zb0, zb1, zt0, zt1, y_top)
+	# The end slope leans away from the light more than the front, which leans up: shade both by their slope.
+	var slope := absf(xb1 - xt1) / maxf(1.0, absf(y_top))
+	if sin(yaw) > 1e-4:
+		FkPaint.shade_poly(ci, f[1], _shade(col, END * (1.0 + 0.4 * slope)), Vector2(0.5, -0.8))
+	FkPaint.shade_poly(ci, f[0], _shade(col, 1.0 + 0.1 * slope), Vector2(0.5, -0.8))
+	if ink.a > 0.0:
+		for i in (2 if sin(yaw) > 1e-4 else 1):
+			var q := PackedVector2Array(f[i])
+			q.append(f[i][0])
+			ci.draw_polyline(q, ink, ink_w)

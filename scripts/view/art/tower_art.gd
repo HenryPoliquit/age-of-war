@@ -151,64 +151,74 @@ static func _human(ci: CanvasItem, age: int, h: float, tm: Color, glow: Color) -
 	var gold := Color("d9b25c")
 	match age:
 		1:
-			# Lashed lookout: four poles, cross braces, hides over the rail, a torch and a totem.
+			# Lashed lookout in three dimensions: four tapered posts, cross braces, a plank platform with a rail, a hide
+			# draped over the front, a torch and an antler totem.
 			_rock(ci, Vector2(-15, 0), 6.0, Color("8a7a66"))
 			_rock(ci, Vector2(16, 0), 5.0, Color("7a6a58"))
-			for x in [-12.0, 12.0]:
-				_shape(ci, [Vector2(x - 2, 0), Vector2(x * 0.8 - 1.5, -h), Vector2(x * 0.8 + 1.5, -h), Vector2(x + 2, 0)], wood, 0.9)
-			ci.draw_line(Vector2(-11, -5), Vector2(9, -h + 7), _d(wood.darkened(0.15)), 2.2)
-			ci.draw_line(Vector2(11, -5), Vector2(-9, -h + 7), _d(wood.darkened(0.15)), 2.2)
-			for y in [-5.0, -h + 7]:
-				for x in [-11.0, 10.0]:
-					ci.draw_line(Vector2(x - 1.5, y - 1.5), Vector2(x + 1.5, y + 1.5), _d(Color("c9b28a")), 1.4)
-			_shape(ci, _rect(Rect2(-17, -h - 4, 34, 6)), wood.lightened(0.1))
-			for k in 5:
-				ci.draw_line(Vector2(-17 + k * 7, -h - 4), Vector2(-17 + k * 7, -h + 2), Color(0, 0, 0, 0.35), 0.8)
-			# Hide draped over the rail.
-			_shape(ci, [Vector2(-15, -h + 2), Vector2(-3, -h + 2), Vector2(-5, -h + 13), Vector2(-9, -h + 10), Vector2(-13, -h + 14)], Color("9a7048"), 0.9)
-			ci.draw_line(Vector2(15, -h + 2), Vector2(15, -h - 12), _d(wood), 1.6)
-			_flame(ci, Vector2(15, -h - 12), 0.9)
-			# Antler totem on the far post.
-			ci.draw_polyline(PackedVector2Array([Vector2(-14, -h - 4), Vector2(-18, -h - 11), Vector2(-17, -h - 15)]), _d(Color("e0d4b8")), 1.5)
-			ci.draw_polyline(PackedVector2Array([Vector2(-14, -h - 4), Vector2(-11, -h - 11), Vector2(-12, -h - 15)]), _d(Color("e0d4b8")), 1.5)
+			for z in [-8.0, 8.0]:
+				for x in [-12.0, 12.0]:
+					Arch.prism(ci, [Vector2(x - 2, 0), Vector2(x * 0.8 - 1.5, -h), Vector2(x * 0.8 + 1.5, -h), Vector2(x + 2, 0)], z - 2, z + 2, _d(wood), INK, 0.8)
+			Arch.on_front(ci, 10.0, func() -> void:
+				ci.draw_line(Vector2(-11, -5), Vector2(9, -h + 7), _d(wood.darkened(0.15)), 2.2)
+				ci.draw_line(Vector2(11, -5), Vector2(-9, -h + 7), _d(wood.darkened(0.15)), 2.2)
+				for y in [-5.0, -h + 7]:
+					for x in [-11.0, 10.0]:
+						ci.draw_line(Vector2(x - 1.5, y - 1.5), Vector2(x + 1.5, y + 1.5), _d(Color("c9b28a")), 1.4))
+			Arch.box(ci, -17, 17, -h - 4, -h + 2, -13, 13, _d(wood.lightened(0.1)),
+				func(r: Rect2) -> void:
+					for k in 5:
+						ci.draw_line(Vector2(-17 + k * 7, -h - 4), Vector2(-17 + k * 7, -h + 2), Color(0, 0, 0, 0.35), 0.8), Callable(), false, INK, 1.0)
+			Arch.on_front(ci, 13.0, func() -> void:
+				# Hide draped over the rail, and the torch beyond it.
+				_shape(ci, [Vector2(-15, -h + 2), Vector2(-3, -h + 2), Vector2(-5, -h + 13), Vector2(-9, -h + 10), Vector2(-13, -h + 14)], Color("9a7048"), 0.9)
+				ci.draw_line(Vector2(15, -h + 2), Vector2(15, -h - 12), _d(wood), 1.6)
+				_flame(ci, Vector2(15, -h - 12), 0.9)
+				ci.draw_polyline(PackedVector2Array([Vector2(-14, -h - 4), Vector2(-18, -h - 11), Vector2(-17, -h - 15)]), _d(Color("e0d4b8")), 1.5)
+				ci.draw_polyline(PackedVector2Array([Vector2(-14, -h - 4), Vector2(-11, -h - 11), Vector2(-12, -h - 15)]), _d(Color("e0d4b8")), 1.5))
 			_tufts(ci, [-22.0, 4.0, 21.0], Color("7a7a3a"))
 		2:
-			# Temple plinth: stepped base, fluted pilasters, bronze boss, dentil cornice, braziers.
+			# Temple plinth in three dimensions: stepped base, a marble shaft between two fluted pilaster columns, a bronze
+			# boss, a gilt cornice with dentils under a top slab, a braziers on the ground.
 			var marble := Color("e6dcc4")
-			_shape(ci, _rect(Rect2(-20, -5, 40, 5)), marble.darkened(0.12))
-			_shape(ci, _rect(Rect2(-17, -9, 34, 4)), marble.darkened(0.06))
-			_shape(ci, _rect(Rect2(-14, -h + 6, 28, h - 15)), marble)
-			for x in [-12.0, 8.0]:
-				_shape(ci, _rect(Rect2(x, -h + 6, 4, h - 15)), marble.lightened(0.05), 0.8)
-				for f in 2:
-					ci.draw_line(Vector2(x + 1.2 + f * 1.6, -h + 8), Vector2(x + 1.2 + f * 1.6, -11), Color(0, 0, 0, 0.18), 0.8)
-			_oval(ci, Vector2(0, -h * 0.5), Vector2(5.5, 5.5), Color("b07a3a"))
-			ci.draw_circle(Vector2(-1.5, -h * 0.5 - 1.5), 1.8, _d(Color("f0d090")))
-			_shape(ci, _rect(Rect2(-18, -h + 1, 36, 5)), Color("c9a060"))
-			for k in 8:
-				ci.draw_rect(Rect2(-17 + k * 4.4, -h + 4, 2.2, 2), Color(0, 0, 0, 0.3))
-			_shape(ci, _rect(Rect2(-17, -h - 3, 34, 4)), marble.darkened(0.04))
-			ci.draw_arc(Vector2(0, -h + 14), 7.0, 0.3, PI - 0.3, 10, tm, 1.6)
-			_brazier(ci, Vector2(-22, -9))
+			Arch.box(ci, -20, 20, -5, 0, -18, 18, _d(marble.darkened(0.12)), Callable(), Callable(), false, INK, 0.9)
+			Arch.box(ci, -17, 17, -9, -5, -15, 15, _d(marble.darkened(0.06)), Callable(), Callable(), false, INK, 0.9)
+			Arch.box(ci, -14, 14, -h + 6, -9, -11, 11, _d(marble), Callable(), Callable(), false, INK, 0.9)
+			for x in [-10.0, 10.0]:
+				Arch.cylinder(ci, x, 13.0, 2.6, -h + 6, -9, _d(marble.lightened(0.05)), 0.0, 12.0, 2)
+			Arch.on_front(ci, 11.0, func() -> void:
+				_oval(ci, Vector2(0, -h * 0.5), Vector2(5.5, 5.5), Color("b07a3a"))
+				ci.draw_circle(Vector2(-1.5, -h * 0.5 - 1.5), 1.8, _d(Color("f0d090")))
+				ci.draw_arc(Vector2(0, -h + 14), 7.0, 0.3, PI - 0.3, 10, tm, 1.6))
+			Arch.box(ci, -18, 18, -h + 1, -h + 6, -14, 14, _d(Color("c9a060")),
+				func(r: Rect2) -> void:
+					for k in 8:
+						ci.draw_rect(Rect2(-17 + k * 4.4, -h + 4, 2.2, 2), Color(0, 0, 0, 0.3)), Callable(), false, INK, 0.9)
+			Arch.box(ci, -17, 17, -h - 3, -h + 1, -13, 13, _d(marble.darkened(0.04)), Callable(), Callable(), false, INK, 0.9)
+			_brazier(ci, Vector2(-27, -9))
 			_tufts(ci, [18.0, 24.0], Color("8a8a4a"))
 		3:
-			# Roman watchtower: stone base with an arched door, timber upper frame, tiled skirt.
+			# Roman watchtower in three dimensions: a tufa base with an arched door, a timber frame of four posts with cross
+			# braces, a tiled skirt under a top slab, a legion shield and a torch.
 			var tufa := Color("c2b08e")
-			_blocks(ci, Rect2(-16, -h * 0.45, 32, h * 0.45), tufa)
-			_shape(ci, [Vector2(-5, 0), Vector2(-5, -9), Vector2(0, -13), Vector2(5, -9), Vector2(5, 0)], Color(0.12, 0.09, 0.07), 0.8)
-			for x in [-14.0, 14.0]:
-				_shape(ci, _rect(Rect2(x - 1.8, -h + 2, 3.6, h * 0.55)), wood, 0.8)
-			ci.draw_line(Vector2(-13, -h * 0.45), Vector2(13, -h + 4), _d(wood.darkened(0.2)), 2.2)
-			ci.draw_line(Vector2(13, -h * 0.45), Vector2(-13, -h + 4), _d(wood.darkened(0.25)), 2.2)
-			_shape(ci, [Vector2(-21, -h + 1), Vector2(21, -h + 1), Vector2(17, -h + 7), Vector2(-17, -h + 7)], Color("b0583a"))
-			for k in 7:
-				ci.draw_line(Vector2(-19 + k * 6, -h + 1), Vector2(-16 + k * 5.4, -h + 7), Color(0, 0, 0, 0.3), 0.8)
-			_shape(ci, _rect(Rect2(-17, -h - 3, 34, 4)), wood.lightened(0.1))
-			# Legion shield on the front and a torch bracket.
-			_shape(ci, [Vector2(-5, -h * 0.66), Vector2(5, -h * 0.66), Vector2(5.5, -h * 0.4), Vector2(-5.5, -h * 0.4)], tm, 0.9)
-			ci.draw_circle(Vector2(0, -h * 0.53), 1.6, _d(gold))
-			ci.draw_line(Vector2(16, -h * 0.35), Vector2(20, -h * 0.4), _d(wood), 1.4)
-			_flame(ci, Vector2(20, -h * 0.4), 0.7)
+			Arch.box(ci, -16, 16, -h * 0.45, 0, -14, 14, _d(tufa),
+				func(r: Rect2) -> void: _blocks(ci, r, tufa),
+				func(r: Rect2) -> void: _blocks(ci, r, Arch.end_col(tufa)), false, INK, 1.0)
+			Arch.recess(ci, Arch.arch_pts(-5, 5, 0, -9, 4), 14.0, 5.0, _d(tufa.darkened(0.4)), Color(0.12, 0.09, 0.07))
+			for z in [-11.0, 11.0]:
+				for x in [-14.0, 14.0]:
+					Arch.box(ci, x - 1.8, x + 1.8, -h + 2, -h * 0.45, z - 1.8, z + 1.8, _d(wood), Callable(), Callable(), false, INK, 0.8)
+			Arch.on_front(ci, 13.0, func() -> void:
+				ci.draw_line(Vector2(-13, -h * 0.45), Vector2(13, -h + 4), _d(wood.darkened(0.2)), 2.2)
+				ci.draw_line(Vector2(13, -h * 0.45), Vector2(-13, -h + 4), _d(wood.darkened(0.25)), 2.2)
+				_shape(ci, [Vector2(-5, -h * 0.66), Vector2(5, -h * 0.66), Vector2(5.5, -h * 0.4), Vector2(-5.5, -h * 0.4)], tm, 0.9)
+				ci.draw_circle(Vector2(0, -h * 0.53), 1.6, _d(gold))
+				ci.draw_line(Vector2(16, -h * 0.35), Vector2(20, -h * 0.4), _d(wood), 1.4)
+				_flame(ci, Vector2(20, -h * 0.4), 0.7))
+			Arch.prism(ci, [Vector2(-21, -h + 1), Vector2(21, -h + 1), Vector2(17, -h + 7), Vector2(-17, -h + 7)], -16, 16, _d(Color("b0583a")), INK, 0.9)
+			Arch.on_front(ci, 16.0, func() -> void:
+				for k in 7:
+					ci.draw_line(Vector2(-19 + k * 6, -h + 1), Vector2(-16 + k * 5.4, -h + 7), Color(0, 0, 0, 0.3), 0.8))
+			Arch.box(ci, -17, 17, -h - 3, -h + 1, -13, 13, _d(wood.lightened(0.1)), Callable(), Callable(), false, INK, 0.9)
 			_tufts(ci, [-20.0, 19.0], Color("6a7a3a"))
 		4:
 			# Stone tower in three dimensions: a square shaft, a machicolation ledge under crenellations, a recessed
@@ -230,49 +240,63 @@ static func _human(ci: CanvasItem, age: int, h: float, tm: Color, glow: Color) -
 					FkPaint.ellipse(ci, Vector2(-15 + (k % 2) * 3, -4 - k * 5), Vector2(3.5, 2.2), _d(Color("3e6a36")), 0.4))
 			_tufts(ci, [-10.0, 20.0], Color("5a7a3a"))
 		5:
-			# Earthwork bastion: sloped earth with stone quoins, brick cap, sandbags, gabions, barrels, lantern.
+			# Earthwork bastion in three dimensions: a sloped earth frustum with quoins, a brick cap with sandbags, gabion
+			# baskets and barrels at the foot, a hanging banner and a lantern post.
 			var earth := Color("8a7b66")
-			_shape(ci, [Vector2(-24, 0), Vector2(-16, -h + 9), Vector2(16, -h + 9), Vector2(24, 0)], earth)
-			for r in 4:
-				ci.draw_line(Vector2(-22 + r * 2, -6 - r * (h - 14) / 4.0), Vector2(22 - r * 2, -6 - r * (h - 14) / 4.0), Color(0, 0, 0, 0.18), 0.9)
-			for k in 4:
-				_shape(ci, _rect(Rect2(-23 + k * 2.2, -8 - k * 9, 6, 5)), Color("b0a490"), 0.7)
-				_shape(ci, _rect(Rect2(17 - k * 2.2, -8 - k * 9, 6, 5)), Color("a0947e"), 0.7)
-			_blocks(ci, Rect2(-18, -h, 36, 9), Color("8a5a44"), 4.5, 7)
-			for k in 4:
-				_oval(ci, Vector2(-12 + k * 8, -h - 1), Vector2(4.5, 2.5), Color("a89468"), 0.7)
-			for x in [-30.0, 30.0]:
-				_shape(ci, _rect(Rect2(x - 6, -14, 12, 14)), Color("7a6a48"))
-				for k in 3:
-					ci.draw_line(Vector2(x - 6, -12 + k * 4.5), Vector2(x + 6, -12 + k * 4.5), _d(Color("a88a5a")), 0.9)
-			_oval(ci, Vector2(-10, -4), Vector2(3.5, 4), Color("5a3a22"), 0.8)
-			ci.draw_line(Vector2(-13.5, -4), Vector2(-6.5, -4), _d(Color("3a3a3a")), 0.8)
-			_banner(ci, Vector2(0, -h * 0.75), 5.0, h * 0.3, tm, _d(Color("e6e2d6")))
-			ci.draw_line(Vector2(21, -h + 9), Vector2(21, -h - 6), _d(Color("3a3a3e")), 1.4)
-			_lantern(ci, Vector2(21, -h - 6), Color(1.0, 0.85, 0.5))
+			Arch.frustum(ci, -24, 24, -16, 16, -16, 16, -10, 10, -h + 9, _d(earth), INK, 1.0)
+			Arch.on_front(ci, 14.0, func() -> void:
+				for r in 4:
+					ci.draw_line(Vector2(-22 + r * 2, -6 - r * (h - 14) / 4.0), Vector2(22 - r * 2, -6 - r * (h - 14) / 4.0), Color(0, 0, 0, 0.18), 0.9)
+				for k in 4:
+					_shape(ci, _rect(Rect2(-23 + k * 2.2, -8 - k * 9, 6, 5)), Color("b0a490"), 0.7)
+					_shape(ci, _rect(Rect2(17 - k * 2.2, -8 - k * 9, 6, 5)), Color("a0947e"), 0.7))
+			Arch.box(ci, -18, 18, -h, -h + 9, -12, 12, _d(Color("8a5a44")),
+				func(r: Rect2) -> void: _blocks(ci, r, Color("8a5a44"), 4.5, 7),
+				func(r: Rect2) -> void: _blocks(ci, r, Arch.end_col(Color("8a5a44")), 4.5, 6), false, INK, 1.0)
+			Arch.on_front(ci, 12.0, func() -> void:
+				for k in 4:
+					_oval(ci, Vector2(-12 + k * 8, -h - 1), Vector2(4.5, 2.5), Color("a89468"), 0.7))
+			for x in [-32.0, 32.0]:
+				Arch.box(ci, x - 6, x + 6, -14, 0, -6, 6, _d(Color("7a6a48")),
+					func(r: Rect2) -> void:
+						for k in 3:
+							ci.draw_line(Vector2(r.position.x, -12 + k * 4.5), Vector2(r.end.x, -12 + k * 4.5), _d(Color("a88a5a")), 0.9), Callable(), false, INK, 1.0)
+			Arch.on_front(ci, 16.0, func() -> void:
+				_oval(ci, Vector2(-10, -4), Vector2(3.5, 4), Color("5a3a22"), 0.8)
+				ci.draw_line(Vector2(-13.5, -4), Vector2(-6.5, -4), _d(Color("3a3a3a")), 0.8))
+			Arch.on_front(ci, 14.0, func() -> void:
+				_banner(ci, Vector2(0, -h * 0.75), 5.0, h * 0.3, tm, _d(Color("e6e2d6")))
+				ci.draw_line(Vector2(21, -h + 9), Vector2(21, -h - 6), _d(Color("3a3a3e")), 1.4)
+				_lantern(ci, Vector2(21, -h - 6), Color(1.0, 0.85, 0.5)))
 		_:
-			# Arcane pylon: tapering violet stone, brass rings and filigree, a crystal core, orbiting runestones.
+			# Arcane pylon in three dimensions: a tapering violet-stone body on a plinth, brass rings, a crystal core, a
+			# brass capstone, orbiting runestones.
 			var stone := Color("6e6582")
 			var brass := Color("c9a45c")
-			_shape(ci, _rect(Rect2(-16, -6, 32, 6)), stone.darkened(0.15))
-			_shape(ci, [Vector2(-13, -6), Vector2(-9, -h + 4), Vector2(9, -h + 4), Vector2(13, -6)], stone)
+			Arch.box(ci, -16, 16, -6, 0, -16, 16, _d(stone.darkened(0.15)), Callable(), Callable(), false, INK, 1.0)
+			FkPaint.push(ci, Transform2D(0.0, Vector2(0, -6)))
+			Arch.frustum(ci, -13, 13, -9, 9, -13, 13, -9, 9, -(h - 10), _d(stone), INK, 1.0)
 			for k in 3:
-				var y := -12.0 - k * (h - 22) / 2.0
+				var y := -6.0 - k * (h - 22) / 2.0
 				var w := lerpf(12.5, 9.5, float(k) / 2.0)
-				_shape(ci, _rect(Rect2(-w - 1, y - 1.5, 2 * w + 2, 3)), brass, 0.8)
+				Arch.box(ci, -w - 1, w + 1, y - 1.5, y + 1.5, -w - 1, w + 1, _d(brass), Callable(), Callable(), false, INK, 0.8)
+			FkPaint.pop(ci)
 			var k := 0.6 + 0.4 * sin(_t * 2.2)
-			ci.draw_rect(Rect2(-7, -h * 0.72, 14, h * 0.34), Color(glow, 0.12 * k))
-			_shape(ci, [Vector2(0, -h * 0.72), Vector2(3.5, -h * 0.55), Vector2(0, -h * 0.38), Vector2(-3.5, -h * 0.55)], glow.lerp(Color.WHITE, 0.3), 0.8)
-			for s in [-1.0, 1.0]:
-				ci.draw_arc(Vector2(s * 6, -h * 0.25), 4.0, 0, PI, 8, _d(brass), 1.0)
-			_shape(ci, [Vector2(-15, -h + 4), Vector2(15, -h + 4), Vector2(12, -h - 2), Vector2(-12, -h - 2)], brass)
+			Arch.on_front(ci, 9.0, func() -> void:
+				ci.draw_rect(Rect2(-7, -h * 0.72, 14, h * 0.34), Color(glow, 0.12 * k))
+				_shape(ci, [Vector2(0, -h * 0.72), Vector2(3.5, -h * 0.55), Vector2(0, -h * 0.38), Vector2(-3.5, -h * 0.55)], glow.lerp(Color.WHITE, 0.3), 0.8)
+				for s2 in [-1.0, 1.0]:
+					ci.draw_arc(Vector2(s2 * 6, -h * 0.25), 4.0, 0, PI, 8, _d(brass), 1.0))
+			FkPaint.push(ci, Transform2D(0.0, Vector2(0, -h + 4)))
+			Arch.frustum(ci, -15, 15, -12, 12, -15, 15, -12, 12, -6, _d(brass), INK, 1.0)
+			FkPaint.pop(ci)
 			for n in 3:
 				var a := _t * 0.9 + n * TAU / 3.0
 				var p := Vector2(cos(a) * 22.0, -h * 0.55 + sin(a) * 6.0)
 				if sin(a) > 0.0:
 					_shape(ci, [p + Vector2(-2.5, 3), p + Vector2(-2.5, -3), p + Vector2(0, -5), p + Vector2(2.5, -3), p + Vector2(2.5, 3)], stone.lightened(0.1), 0.7)
 					ci.draw_line(p + Vector2(0, -2), p + Vector2(0, 2), Color(glow, 0.9), 1.0)
-			ci.draw_rect(Rect2(-7, -h * 0.24, 14, 7), tm)
+			Arch.on_front(ci, 10.0, func() -> void: ci.draw_rect(Rect2(-7, -h * 0.24, 14, 7), tm))
 
 
 # ---------------------------------------------------------------------------
