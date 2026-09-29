@@ -247,32 +247,109 @@ static func _rider(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, 
 	FkFigure.offset_humanoid(ci, st, pose, seed, at + Vector2(0, 27))
 
 
+## The camera's projection of the plane z = dz (see FkRig): the picture squeezed in x by cos(yaw) and shifted back
+## by dz · sin(yaw). Anything standing in that plane (a wheel, a panel, the centre line) is drawn through it.
+static func _plane(view: Dictionary, dz := 0.0) -> Transform2D:
+	var yaw: float = view.get("yaw", 0.0)
+	return Transform2D(Vector2(cos(yaw), 0.0), Vector2(0.0, 1.0), Vector2(-dz * sin(yaw), 0.0))
+
+
+## Chariot layers, back to front: the driver stands inside the car, its near panel hiding them below the thigh,
+## the near wheel over the panel.
+const CHARIOT_ORDER := ["pole", "far wheel", "car back", "driver", "car front", "near wheel", "yoke"]
+## Ground covered per radian of walk phase for a chariot (screen px), and the wheel's radius.
+const CHARIOT_PACE := 1.0 / 0.12
+const WHEEL_R := 13.0
+## Where the driver stands (x) in the car, and how far out of the centre line the wheels and the car's
+## panels stand (z), the near side toward the viewer.
+const DRIVER_X := -17.0
+const WHEEL_Z := 8.0
+const PANEL_Z := 6.0
+
+
+## Wheel joints (center = axle, top, bottom = ground contact) in the wheel's own plane (draw them under
+## _plane(view, ±WHEEL_Z)); the wheel's spin, which turns it by the ground covered over its radius as it looks
+## on the screen (a disc seen from a turned camera is foreshortened by cos(yaw), so it spins that much more per
+## px: no slipping); the car floor's height; and, on the screen, where the driver stands (bumped by the ride).
+static func chariot_joints(pose: Dictionary, view := {}) -> Dictionary:
+	var cy := cos(view.get("yaw", 0.0))
+	var center := Vector2(-18, -WHEEL_R)
+	var angle: float = pose.get("walk", 0.0) * CHARIOT_PACE / (WHEEL_R * cy)
+	var floor := -16.0
+	var bump := sin(angle * 6.0) * 0.6 * FkPaint.move_amount(pose)
+	return {"center": center, "top": center + Vector2(0, -WHEEL_R), "bottom": center + Vector2(0, WHEEL_R),
+		"angle": angle, "floor": floor, "driver": Vector2(DRIVER_X * cy, floor + bump)}
+
+
+## The car's side silhouette per kind (its bottom edge is the floor).
+static func _car_outline(kind: String) -> Array:
+	match kind:
+		"wood":
+			return [Vector2(-30, -16), Vector2(-6, -16), Vector2(0, -30), Vector2(-4, -40), Vector2(-12, -30), Vector2(-28, -28)]
+		"iron":
+			return [Vector2(-30, -14), Vector2(-4, -14), Vector2(-4, -32), Vector2(-30, -32)]
+		_:
+			return [Vector2(-30, -16), Vector2(-6, -16), Vector2(-4, -36), Vector2(-26, -34)]
+
+
 static func chariot(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int) -> void:
 	var pal: Array = st.palette
 	var team: Color = st.team
-	var p := pose.duplicate()
-	FkPaint.push(ci, Transform2D(0.0, Vector2(26, 0)) * Transform2D(0.0, Vector2(0.78, 0.78), 0.0, Vector2.ZERO))
-	quadruped(ci, st.get("beast", "horse"), team, p, seed, pal[2], st.get("view", {}))
+	var view: Dictionary = st.get("view", {})
+	var cj := chariot_joints(pose, view)
+	# The beast, scaled ahead of the car; its hooves keep pace with the wheels.
+	FkPaint.push(ci, Transform2D(0.0, Vector2(26.0 * cos(view.get("yaw", 0.0)), 0)) * Transform2D(0.0, Vector2(0.78, 0.78), 0.0, Vector2.ZERO))
+	quadruped(ci, st.get("beast", "horse"), team, pose.merged({"pace": CHARIOT_PACE / 0.78}, true), seed, pal[2], view)
 	FkPaint.pop(ci)
 	var wood := FkMachines.wood(pose)
 	var metal: Color = FkPaint.tint(pal[2], pose)
 	var tm := FkPaint.tint(team, pose)
-	var roll: float = pose.get("walk", 0.0) * 1.3
-	ci.draw_line(Vector2(-10, -18), Vector2(18, -24), wood.darkened(0.2), 3.0)
-	match st.get("car", "bronze"):
-		"wood":
-			# Elven car: a curved prow of pale wood, like a leaf.
-			FkPaint.shade_poly(ci, [Vector2(-30, -16), Vector2(-6, -16), Vector2(0, -30), Vector2(-4, -40), Vector2(-12, -30), Vector2(-28, -28)], FkPaint.tint(Color("b89a6a"), pose))
-			FkPaint.poly(ci, [Vector2(-26, -19), Vector2(-9, -19), Vector2(-6, -27), Vector2(-24, -26)], tm)
-			ci.draw_polyline(PackedVector2Array([Vector2(-6, -16), Vector2(0, -30), Vector2(-4, -40), Vector2(-8, -36)]), FkPaint.tint(Color("d9b25c"), pose), 1.4)
-		"iron":
-			# Dwarf car: an iron-bound box with a ram's-head prow.
-			FkPaint.shade_poly(ci, [Vector2(-30, -14), Vector2(-4, -14), Vector2(-4, -32), Vector2(-30, -32)], metal.darkened(0.2))
-			FkPaint.poly(ci, [Vector2(-27, -18), Vector2(-8, -18), Vector2(-8, -28), Vector2(-27, -28)], tm)
-			FkPaint.rivets(ci, Vector2(-29, -31), Vector2(-5, -31), 6, metal.lightened(0.3))
-			ci.draw_arc(Vector2(-3, -30), 4.0, -2.0, 2.0, 8, FkPaint.tint(Color("c9b48a"), pose), 2.2)
-		_:
-			FkPaint.shade_poly(ci, [Vector2(-30, -16), Vector2(-6, -16), Vector2(-4, -36), Vector2(-26, -34)], metal)
-			FkPaint.poly(ci, [Vector2(-28, -19), Vector2(-8, -19), Vector2(-7, -31), Vector2(-25, -30)], tm)
-	FkPaint.wheel(ci, Vector2(-18, -13), 13, roll, wood, metal)
-	FkFigure.offset_humanoid(ci, FkFigure.dress(st, {"helmet": st.get("crew", "crest"), "weapon": st.get("weapon", "spear")}), pose, seed, Vector2(-16, 4))
+	var kind: String = st.get("car", "bronze")
+	var body_col: Color = FkPaint.tint(Color("b89a6a"), pose) if kind == "wood" else (metal.darkened(0.2) if kind == "iron" else metal)
+	var parts := {}
+	parts["pole"] = func() -> void:
+		FkPaint.push(ci, _plane(view))
+		ci.draw_line(Vector2(-10, -18), Vector2(18, -24), wood.darkened(0.2), 3.0)
+		FkPaint.pop(ci)
+	parts["far wheel"] = func() -> void:
+		FkPaint.push(ci, _plane(view, -WHEEL_Z))
+		FkPaint.wheel(ci, cj.center, WHEEL_R, cj.angle, wood.darkened(0.35), metal.darkened(0.35))
+		FkPaint.pop(ci)
+	parts["car back"] = func() -> void:
+		# The far wall's rim, seen behind the driver.
+		FkPaint.push(ci, _plane(view, -PANEL_Z))
+		FkPaint.shade_poly(ci, _car_outline(kind), body_col.darkened(0.4))
+		FkPaint.pop(ci)
+	parts["driver"] = func() -> void:
+		FkPaint.push(ci, Transform2D(0.0, cj.driver))
+		FkFigure.humanoid(ci, FkFigure.dress(st, {"helmet": st.get("crew", "crest"), "weapon": st.get("weapon", "spear")}),
+			pose.merged({"move": 0.0, "moving": false, "shadow": false}, true), seed)
+		FkPaint.pop(ci)
+	parts["car front"] = func() -> void:
+		FkPaint.push(ci, _plane(view, PANEL_Z))
+		match kind:
+			"wood":
+				# Elven car: a curved prow of pale wood, like a leaf.
+				FkPaint.shade_poly(ci, _car_outline(kind), body_col)
+				FkPaint.poly(ci, [Vector2(-26, -19), Vector2(-9, -19), Vector2(-6, -27), Vector2(-24, -26)], tm)
+				ci.draw_polyline(PackedVector2Array([Vector2(-6, -16), Vector2(0, -30), Vector2(-4, -40), Vector2(-8, -36)]), FkPaint.tint(Color("d9b25c"), pose), 1.4)
+			"iron":
+				# Dwarf car: an iron-bound box with a ram's-head prow.
+				FkPaint.shade_poly(ci, _car_outline(kind), body_col)
+				FkPaint.poly(ci, [Vector2(-27, -18), Vector2(-8, -18), Vector2(-8, -28), Vector2(-27, -28)], tm)
+				FkPaint.rivets(ci, Vector2(-29, -31), Vector2(-5, -31), 6, metal.lightened(0.3))
+				ci.draw_arc(Vector2(-3, -30), 4.0, -2.0, 2.0, 8, FkPaint.tint(Color("c9b48a"), pose), 2.2)
+			_:
+				FkPaint.shade_poly(ci, _car_outline(kind), body_col)
+				FkPaint.poly(ci, [Vector2(-28, -19), Vector2(-8, -19), Vector2(-7, -31), Vector2(-25, -30)], tm)
+		FkPaint.pop(ci)
+	parts["near wheel"] = func() -> void:
+		FkPaint.push(ci, _plane(view, WHEEL_Z))
+		FkPaint.wheel(ci, cj.center, WHEEL_R, cj.angle, wood, metal)
+		FkPaint.pop(ci)
+	parts["yoke"] = func() -> void:
+		FkPaint.push(ci, _plane(view))
+		ci.draw_line(Vector2(15, -27), Vector2(19, -21), wood.darkened(0.1), 2.5)
+		FkPaint.pop(ci)
+	for name in CHARIOT_ORDER:
+		(parts[name] as Callable).call()

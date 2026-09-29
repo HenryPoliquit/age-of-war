@@ -71,3 +71,43 @@ func test_rider_bob_matches_the_beast() -> void:
 		var p := FkMounts.rider_pose(j, pose)
 		check_near(p.ride_bob, j.bob, 1e-5, "walk %.1f" % w)
 		check_eq(p.move, 0.0, "the rider doesn't walk")
+
+
+func test_chariot_wheel_rolls_without_slipping() -> void:
+	var a := FkMounts.chariot_joints({"walk": 0.0})
+	check_near(a.bottom.y, 0.0, 1e-4, "wheel on the ground")
+	check_near(a.center.y, -FkMounts.WHEEL_R, 1e-4, "axle one radius up")
+	check_near(a.top.y, -2.0 * FkMounts.WHEEL_R, 1e-4, "top of the wheel")
+	var b := FkMounts.chariot_joints({"walk": 1.0, "move": 1.0})
+	check_near(b.angle - a.angle, FkMounts.CHARIOT_PACE / FkMounts.WHEEL_R, 1e-4, "turns by ground covered / radius")
+	check_near(FkMounts.chariot_joints({"walk": 1.0, "move": 0.0}).angle, b.angle, 1e-6, "the spin depends only on distance travelled")
+
+
+func test_chariot_wheel_rolls_without_slipping_seen_from_the_game_camera() -> void:
+	# A wheel is a disc in the vertical plane: from a turned camera it is squeezed by cos(yaw), so it must spin
+	# that much more per px for its rim to keep pace with the ground on the screen.
+	var view := {"yaw": 0.4363}
+	var a := FkMounts.chariot_joints({"walk": 0.0}, view)
+	var b := FkMounts.chariot_joints({"walk": 1.0, "move": 1.0}, view)
+	var on_screen: float = (b.angle - a.angle) * FkMounts.WHEEL_R * cos(0.4363)
+	check_near(on_screen, FkMounts.CHARIOT_PACE, 1e-3, "the rim's speed on the screen is the ground's")
+
+
+func test_chariot_driver_stands_on_the_floor_inside_the_car() -> void:
+	var cj := FkMounts.chariot_joints({"atk": -1.0})
+	check_eq(cj.driver, Vector2(FkMounts.DRIVER_X, cj.floor), "feet on the car floor")
+	check(cj.floor > cj.center.y - 5.0 and cj.floor < 0.0, "floor at axle height")
+	var order: Array = FkMounts.CHARIOT_ORDER
+	check(order.find("driver") < order.find("car front") and order.find("car front") < order.find("near wheel"),
+		"the near panel covers the driver's legs, the near wheel over the panel")
+	check(order.find("far wheel") < order.find("car back") and order.find("car back") < order.find("driver"), "the far side is behind the driver")
+
+
+func test_chariot_planes_spread_with_the_camera() -> void:
+	var flat := FkMounts._plane({}, FkMounts.WHEEL_Z)
+	var turned := FkMounts._plane({"yaw": 0.4363}, FkMounts.WHEEL_Z)
+	check_eq(flat, Transform2D.IDENTITY.translated(Vector2.ZERO), "square-on, a plane is the picture itself")
+	var near_x: float = (turned * Vector2(0, 0)).x
+	var far_x: float = (FkMounts._plane({"yaw": 0.4363}, -FkMounts.WHEEL_Z) * Vector2(0, 0)).x
+	check_near(far_x - near_x, 2.0 * FkMounts.WHEEL_Z * sin(0.4363), 1e-4, "the far wheel stands further forward on the screen than the near one")
+	check_near(turned.x.x, cos(0.4363), 1e-5, "a plane is squeezed by cos(yaw)")

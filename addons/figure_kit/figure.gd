@@ -125,7 +125,8 @@ static func _parts(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, 
 		pass
 
 	var draw_shadow := func() -> void:
-		if legs:
+		# (A figure standing on something, like a chariot's floor, casts no ground shadow.)
+		if legs and pose.get("shadow", true):
 			FkPaint.shadow(ci, 12 * bb.x)
 	add.call("shadow", -100.0, draw_shadow)
 	# Far leg (darker), then the near one; a rider shows only the near leg, its foot in the stirrup.

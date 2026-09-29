@@ -1,5 +1,7 @@
 # Mount rig and chariot: design
 
+> **Revised 2026-09-29 for the 3D core** (`2026-09-29-3d-rig-side-view-design.md`): legs are `Vector3` chains in the plane of their side (z = ±0.3 L) solved with `FkRig.ik3`, everything is projected through the camera's yaw, and "planted" is judged on the screen. The rest of this design stands; the changes are listed in `docs/superpowers/plans/2026-09-29-mount-rig-3d.md`.
+
 Follows `docs/superpowers/handoffs/2026-09-27-unit-body-rig.md` item 5 and the humanoid rig (`2026-09-27-humanoid-body-rig-design.md`), whose patterns it reuses.
 
 ## Why
