@@ -61,3 +61,13 @@ func test_giants_are_right_handed_from_both_sides() -> void:
 	check_eq(ours, ["left leg", "right leg", "left arm", "body", "right arm"], "ours: left side far, right side near")
 	var theirs := FkMachines.giant_order({"mirrored": true})
 	check_eq(theirs, ["right leg", "left leg", "right arm", "body", "left arm"], "theirs: turned around")
+
+
+func test_rider_bob_matches_the_beast() -> void:
+	# The rider's spine absorbs the beast's real bob, so the head stays level.
+	for w in [0.3, 1.1, 2.4]:
+		var pose := {"walk": w, "move": 1.0, "t": 0.0}
+		var j := FkQuadruped.solve(FkMounts.BEASTS["horse"], pose)
+		var p := FkMounts.rider_pose(j, pose)
+		check_near(p.ride_bob, j.bob, 1e-5, "walk %.1f" % w)
+		check_eq(p.move, 0.0, "the rider doesn't walk")

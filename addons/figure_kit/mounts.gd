@@ -19,10 +19,14 @@ const BEASTS := {
 }
 
 
-static func quadruped(ci: CanvasItem, kind: String, team: Color, pose: Dictionary, seed: int, metal := Color("a5a9ae")) -> Vector2:
+## Beast drawn on the quadruped skeleton (FkQuadruped): folding knees and hocks, planted hooves, a nodding head.
+## Everything on the beast's centre plane (body, neck, head, tail, cover) is drawn under the camera's squeeze of
+## that plane; the legs, each in the plane of its side, are drawn from their projected joints, so a turned camera
+## shows the near and far legs apart. `view` is the camera ({yaw}). Returns the skeleton's joints.
+static func quadruped(ci: CanvasItem, kind: String, team: Color, pose: Dictionary, seed: int, metal := Color("a5a9ae"), view := {}) -> Dictionary:
 	var bp: Dictionary = BEASTS.get(kind, BEASTS["horse"])
+	var j := FkQuadruped.solve(bp, pose, seed, view)
 	var mv := FkPaint.move_amount(pose)
-	var walk: float = pose.get("walk", 0.0)
 	var t: float = pose.get("t", 0.0)
 	var atk: float = pose.get("atk", -1.0)
 	var head_kind: String = bp.head
@@ -34,143 +38,147 @@ static func quadruped(ci: CanvasItem, kind: String, team: Color, pose: Dictionar
 	var H: float = bp.H
 	var slim: bool = bp.get("slim", false)
 	var heavy := head_kind in ["boar", "bear", "ram"]
-	var bob := lerpf(sin(t * 1.5 + seed) * 0.5, absf(sin(walk * 2.0)) * 2.0, mv)
-	var lunge := maxf(0.0, FkUnits.swing(atk)) * 5.0
-	var c := Vector2(lunge, -H - 10 + bob)
+	var c: Vector2 = j.c
+	var lunge: float = j.lunge
+	var squeeze := Transform2D(Vector2(j.cy, 0.0), Vector2(0.0, 1.0), Vector2.ZERO)
+	FkPaint.push(ci, squeeze)
 	FkPaint.shadow(ci, L + 8)
-	# Legs: far pair first (darker), then near pair. Front legs bend forward at the knee, hind legs
-	# bend back at the hock; each ends in a fetlock and hoof (or a paw).
+	FkPaint.pop(ci)
+	# Legs: shoulder or hip down to the elbow or stifle (carried by the body), the knee folding forward or the
+	# hock back, the fetlock and a planted hoof (or a paw). The far side is shaded darker.
 	var w0 := 9.0 if heavy else (6.8 if slim else 8.0)
 	var w1 := 5.2 if not slim else 3.8
 	if head_kind == "bear":
 		w0 = 12.0
 		w1 = 8.0
-	for pass_i in 2:
-		for front in [false, true]:
-			var near := pass_i == 1
-			var ph: float = walk + (0.0 if near else PI) + (PI * 0.5 if front else 0.0)
-			var swing_a := lerpf(0.05, sin(ph) * 0.5, mv)
-			# Collected four-beat walk: high knee and hock flexion as each hoof swings through.
-			var lift := maxf(0.0, cos(ph)) * (1.5 if front else 1.1) * mv
-			var top := c + Vector2(L * (0.62 if front else -0.62), 5)
-			var lc := col.darkened(0.28 if not near else 0.0)
-			var upper := top + Vector2(0, H * 0.42).rotated(-swing_a)
-			var lower_dir := -swing_a + (lift if front else -lift * 0.7) + (0.0 if front else 0.35)
-			var fet := upper + Vector2(0, H * 0.42).rotated(lower_dir)
-			var hoof := fet + Vector2(1.5, H * 0.14).rotated(lower_dir * 0.5)
-			FkPaint.seg(ci, top, upper, w0, w1, lc)
-			FkPaint.seg(ci, upper, fet, w1 * 0.88, w1 * 0.66, lc)
-			if bp.get("paws", false):
-				FkPaint.ellipse(ci, fet + Vector2(3, 3), Vector2(6, 3.2), lc.darkened(0.15))
+	var draw_leg := func(leg: String) -> void:
+		var g: Dictionary = j.legs[leg]
+		var lc := col.darkened(0.28 if j.z[leg] < 0.0 else 0.0)
+		FkPaint.seg(ci, g.root, g.top, w0, w0 * 0.9, lc)
+		FkPaint.seg(ci, g.top, g.mid, w0 * 0.9, w1, lc)
+		ci.draw_circle(g.mid, w1 * 0.5, lc.darkened(0.08))
+		FkPaint.seg(ci, g.mid, g.fetlock, w1 * 0.88, w1 * 0.66, lc)
+		if bp.get("paws", false):
+			FkPaint.ellipse(ci, (g.hoof as Vector2) + Vector2(2, -2), Vector2(6, 3.2), lc.darkened(0.15))
+		else:
+			FkPaint.seg(ci, g.fetlock, g.hoof, w1 * 0.66, w1 * 0.72, lc.darkened(0.1))
+			ci.draw_rect(Rect2((g.hoof as Vector2) + Vector2(-2.5, -2.6), Vector2(5.5, 2.8)), Color(0.12, 0.1, 0.08))
+	var far_legs: Array = FkQuadruped.LEGS.keys().filter(func(l: String) -> bool: return j.z[l] < 0.0)
+	var near_legs: Array = FkQuadruped.LEGS.keys().filter(func(l: String) -> bool: return j.z[l] > 0.0)
+	for leg in far_legs:
+		draw_leg.call(leg)
+	FkPaint.push(ci, squeeze)
+	# Tail behind the far legs.
+	match head_kind:
+		"horse":
+			for k in 5:
+				var sway := sin(t * 2.5 + k * 0.4) * 3.0 + mv * 4.0
+				ci.draw_polyline(PackedVector2Array([c + Vector2(-L - 2, -6 + k), c + Vector2(-L - 9 - sway * 0.5, 2 + k), c + Vector2(-L - 12 - sway, 14 + k * 1.5)]), dark.darkened(0.1 * (k % 2)), 2.0)
+		"deer":
+			FkPaint.ellipse(ci, c + Vector2(-L - 4, -7 + sin(t * 5.0)), Vector2(3, 4.5), Color("efe6d4"), -0.5)
+		"boar":
+			ci.draw_polyline(PackedVector2Array([c + Vector2(-L - 2, -4), c + Vector2(-L - 6, -2 + sin(t * 6.0)), c + Vector2(-L - 5, 3)]), dark, 1.5)
+		_:
+			ci.draw_circle(c + Vector2(-L - 4, -4), 3.5, dark)
+	# Barrel: chest, withers, back, croup, hindquarters, belly.
+	var top_y := -12.0
+	if head_kind == "boar":
+		top_y = -15.0
+	elif head_kind == "bear":
+		top_y = -19.0
+	var body := [c + Vector2(L + 6, -2), c + Vector2(L - 2, -11), c + Vector2(L * 0.2, top_y), c + Vector2(-L * 0.6, -11),
+		c + Vector2(-L - 5, -6), c + Vector2(-L - 6, 4), c + Vector2(-L * 0.5, 10), c + Vector2(L * 0.4, 10), c + Vector2(L + 5, 6)]
+	FkPaint.shade_poly(ci, body, col)
+	if bp.get("wool", false):
+		# Fleece: a scalloped outline of curls.
+		for k in 9:
+			var wp := c + Vector2(-L - 2 + k * (2 * L + 6) / 8.0, -10 - 2 * sin(k * 1.3))
+			ci.draw_circle(wp, 4.2, col.lightened(0.08))
+			ci.draw_arc(wp, 2.4, 0.5, 3.6, 6, col.darkened(0.15), 0.8)
+		for k in 5:
+			ci.draw_circle(c + Vector2(-L + k * L * 0.45, 7), 3.6, col.darkened(0.06))
+	FkPaint.push(ci, Transform2D(0.0, j.poll) * Transform2D(j.head_angle, Vector2.ZERO) * Transform2D(0.0, -(j.poll as Vector2)))
+	match head_kind:
+		"horse", "deer":
+			var deer := head_kind == "deer"
+			# Neck up to the head.
+			var hd: Vector2 = j.poll
+			var neck_top := hd - Vector2(4, -1)
+			FkPaint.shade_poly(ci, [c + Vector2(L - 4, -10), c + Vector2(L + 6, -4), neck_top + Vector2(5 if not deer else 3.5, 4), neck_top + Vector2(-2, -1)], col)
+			if deer:
+				FkPaint.shade_poly(ci, [hd + Vector2(-4, -3.5), hd + Vector2(3, -5), hd + Vector2(11, 2), hd + Vector2(10.5, 5), hd + Vector2(5, 5.5), hd + Vector2(-3, 3)], col)
+				FkPaint.ellipse(ci, hd + Vector2(-3.5, -5.5), Vector2(3.8, 1.6), dark, -0.7)
+				ci.draw_circle(hd + Vector2(10.4, 3.4), 1.2, Color(0.1, 0.07, 0.06))
+				_antlers(ci, hd + Vector2(-0.5, -4), int(bp.get("antlers", 1)), FkPaint.tint(Color("d9c9a6"), pose))
 			else:
-				FkPaint.seg(ci, fet, hoof, w1 * 0.66, w1 * 0.72, lc.darkened(0.1))
-				ci.draw_rect(Rect2(hoof + Vector2(-2.5, -1.2), Vector2(5.5, 2.8)), Color(0.12, 0.1, 0.08))
-		if pass_i == 1 and atk >= 0.3 and atk < 0.8:
-			# Dust kicking up from the hooves on the charge.
-			var du := (atk - 0.3) / 0.5
-			for k in 4:
-				var dp := c + Vector2(-L * 0.6 + k * L * 0.45 - du * 10.0, H + 8.0 - du * 6.0 - k % 2 * 3.0)
-				ci.draw_circle(dp, 2.5 + du * 5.0, Color(0.72, 0.64, 0.5, 0.4 * (1.0 - du)))
-		if pass_i == 0:
-			# Tail behind the far legs.
-			match head_kind:
-				"horse":
-					for k in 5:
-						var sway := sin(t * 2.5 + k * 0.4) * 3.0 + mv * 4.0
-						ci.draw_polyline(PackedVector2Array([c + Vector2(-L - 2, -6 + k), c + Vector2(-L - 9 - sway * 0.5, 2 + k), c + Vector2(-L - 12 - sway, 14 + k * 1.5)]), dark.darkened(0.1 * (k % 2)), 2.0)
-				"deer":
-					FkPaint.ellipse(ci, c + Vector2(-L - 4, -7 + sin(t * 5.0)), Vector2(3, 4.5), Color("efe6d4"), -0.5)
-				"boar":
-					ci.draw_polyline(PackedVector2Array([c + Vector2(-L - 2, -4), c + Vector2(-L - 6, -2 + sin(t * 6.0)), c + Vector2(-L - 5, 3)]), dark, 1.5)
-				_:
-					ci.draw_circle(c + Vector2(-L - 4, -4), 3.5, dark)
-			# Barrel: chest, withers, back, croup, hindquarters, belly.
-			var top_y := -12.0
-			if head_kind == "boar":
-				top_y = -15.0
-			elif head_kind == "bear":
-				top_y = -19.0
-			var body := [c + Vector2(L + 6, -2), c + Vector2(L - 2, -11), c + Vector2(L * 0.2, top_y), c + Vector2(-L * 0.6, -11),
-				c + Vector2(-L - 5, -6), c + Vector2(-L - 6, 4), c + Vector2(-L * 0.5, 10), c + Vector2(L * 0.4, 10), c + Vector2(L + 5, 6)]
-			FkPaint.shade_poly(ci, body, col)
-			if bp.get("wool", false):
-				# Fleece: a scalloped outline of curls.
-				for k in 9:
-					var wp := c + Vector2(-L - 2 + k * (2 * L + 6) / 8.0, -10 - 2 * sin(k * 1.3))
-					ci.draw_circle(wp, 4.2, col.lightened(0.08))
-					ci.draw_arc(wp, 2.4, 0.5, 3.6, 6, col.darkened(0.15), 0.8)
-				for k in 5:
-					ci.draw_circle(c + Vector2(-L + k * L * 0.45, 7), 3.6, col.darkened(0.06))
-			match head_kind:
-				"horse", "deer":
-					var deer := head_kind == "deer"
-					# Neck up to the head.
-					var neck_top := c + Vector2(L + (6.0 if deer else 8.0), -28.0 if deer else -24.0) + Vector2(lunge * 0.4, 0)
-					FkPaint.shade_poly(ci, [c + Vector2(L - 4, -10), c + Vector2(L + 6, -4), neck_top + Vector2(5 if not deer else 3.5, 4), neck_top + Vector2(-2, -1)], col)
-					var hd := neck_top + Vector2(4, -1)
-					if deer:
-						FkPaint.shade_poly(ci, [hd + Vector2(-4, -3.5), hd + Vector2(3, -5), hd + Vector2(11, 2), hd + Vector2(10.5, 5), hd + Vector2(5, 5.5), hd + Vector2(-3, 3)], col)
-						FkPaint.ellipse(ci, hd + Vector2(-3.5, -5.5), Vector2(3.8, 1.6), dark, -0.7)
-						ci.draw_circle(hd + Vector2(10.4, 3.4), 1.2, Color(0.1, 0.07, 0.06))
-						_antlers(ci, hd + Vector2(-0.5, -4), int(bp.get("antlers", 1)), FkPaint.tint(Color("d9c9a6"), pose))
-					else:
-						FkPaint.shade_poly(ci, [hd + Vector2(-4, -4), hd + Vector2(3, -6), hd + Vector2(13, 3), hd + Vector2(12, 7), hd + Vector2(6, 7), hd + Vector2(-3, 3)], col)
-						ci.draw_colored_polygon(PackedVector2Array([hd + Vector2(-2, -4), hd + Vector2(0, -10), hd + Vector2(2, -5)]), dark)
-						ci.draw_circle(hd + Vector2(11.5, 4.5), 0.9, Color(0.1, 0.07, 0.06))
-					ci.draw_circle(hd + Vector2(2.5, -1.5), 1.2, Color(0.05, 0.04, 0.04))
-					# Bridle and reins in team colour.
-					ci.draw_polyline(PackedVector2Array([hd + Vector2(-1, -3), hd + Vector2(8, 3), hd + Vector2(9, 6)]), tm.darkened(0.2), 1.2)
-					ci.draw_line(hd + Vector2(8, 3), c + Vector2(4, -14), Color(0.25, 0.18, 0.12), 1.0)
-					if not deer:
-						# Mane strands lag behind (secondary motion); elven steeds get a long silver mane.
-						var mane := dark if kind != "elfsteed" else FkPaint.tint(Color("c9d2dc"), pose)
-						for k in 6:
-							var mp := (c + Vector2(L - 4, -11)).lerp(neck_top + Vector2(-2, -2), k / 5.0)
-							ci.draw_line(mp, mp + Vector2(-5 - mv * 2.0, 3 + sin(t * 4.0 + k) * 1.5) * (1.5 if kind == "elfsteed" else 1.0), mane, 2.2)
-						if kind in ["barded", "elfsteed"]:
-							# Chanfron.
-							FkPaint.poly(ci, [hd + Vector2(-2, -4), hd + Vector2(4, -6), hd + Vector2(11, 1), hd + Vector2(8, 3)], mt)
-							if kind == "elfsteed":
-								ci.draw_line(hd + Vector2(1, -5), hd + Vector2(-2, -12), mt.lightened(0.3), 1.6)
-				"boar":
-					# Boar head: heavy snout, tusks, bristled back.
-					var hd := c + Vector2(L + 4, -2) + Vector2(lunge * 0.5, 0)
-					FkPaint.shade_poly(ci, [hd + Vector2(-4, -9), hd + Vector2(6, -6), hd + Vector2(14, 1), hd + Vector2(13, 6), hd + Vector2(2, 7), hd + Vector2(-4, 4)], col)
-					ci.draw_rect(Rect2(hd + Vector2(12, 0), Vector2(3, 5)), col.darkened(0.3))
-					ci.draw_polyline(PackedVector2Array([hd + Vector2(10, 5), hd + Vector2(15, 2), hd + Vector2(14, -3)]), Color("efe6cf"), 2.4)
-					ci.draw_circle(hd + Vector2(4, -3), 1.1, Color(0.05, 0.04, 0.04))
-					ci.draw_colored_polygon(PackedVector2Array([hd + Vector2(-2, -8), hd + Vector2(-1, -13), hd + Vector2(2, -8)]), dark)
-					for k in 8:
-						var bpk := c + Vector2(-L * 0.6 + k * 4.5, -12 - (2 if k % 2 == 0 else 0))
-						ci.draw_line(bpk, bpk + Vector2(-2, -4), dark, 1.6)
-					if kind == "warboar":
-						FkPaint.poly(ci, [hd + Vector2(-3, -9), hd + Vector2(7, -6), hd + Vector2(10, -1), hd + Vector2(-2, -2)], mt)
-						ci.draw_line(hd + Vector2(2, -8), hd + Vector2(4, -14), mt.lightened(0.2), 1.8)
-				"ram":
-					# Ram head: short muzzle and a heavy curled horn.
-					var hd := c + Vector2(L + 5, -8) + Vector2(lunge * 0.6, 0)
-					FkPaint.shade_poly(ci, [c + Vector2(L - 2, -10), c + Vector2(L + 4, -2), hd + Vector2(2, 6), hd + Vector2(-2, -4)], col)
-					FkPaint.shade_poly(ci, [hd + Vector2(-4, -5), hd + Vector2(4, -6), hd + Vector2(11, 1), hd + Vector2(10, 5), hd + Vector2(3, 6), hd + Vector2(-3, 2)], FkPaint.tint(Color("b8ab92"), pose))
-					ci.draw_circle(hd + Vector2(4, -2), 1.1, Color(0.05, 0.04, 0.04))
-					var horn := PackedVector2Array()
-					for k in 16:
-						var a := -1.2 + k * 0.38
-						horn.append(hd + Vector2(-1, -1) + Vector2(cos(a), sin(a)) * (7.5 - k * 0.32))
-					ci.draw_polyline(horn, FkPaint.tint(Color("c9b48a"), pose), 3.4)
-					ci.draw_polyline(horn, FkPaint.tint(Color("8a7656"), pose), 1.0)
-					if kind == "warram":
-						FkPaint.poly(ci, [hd + Vector2(-2, -6), hd + Vector2(5, -7), hd + Vector2(10, 0), hd + Vector2(3, 0)], mt)
-				"bear":
-					# Bear: shoulder hump, round head, small ears, short snout.
-					var hd := c + Vector2(L + 6, -8) + Vector2(lunge * 0.6, 0)
-					FkPaint.shade_poly(ci, FkPaint.ellipse_pts(hd, Vector2(8.5, 7.5)), col)
-					FkPaint.shade_poly(ci, [hd + Vector2(4, -2), hd + Vector2(13, 0), hd + Vector2(13, 5), hd + Vector2(5, 6)], col.lightened(0.12))
-					ci.draw_circle(hd + Vector2(13, 1.2), 1.6, Color(0.06, 0.05, 0.05))
-					ci.draw_circle(hd + Vector2(-3, -7), 3.0, col.darkened(0.1))
-					ci.draw_circle(hd + Vector2(3.5, -2.5), 1.1, Color(0.05, 0.04, 0.04))
-					if atk >= 0.0 and atk < 0.6:
-						ci.draw_line(hd + Vector2(6, 5), hd + Vector2(12, 7), Color(0.6, 0.2, 0.2), 2.0)
-	# Cover: tack or barding in team colour.
+				FkPaint.shade_poly(ci, [hd + Vector2(-4, -4), hd + Vector2(3, -6), hd + Vector2(13, 3), hd + Vector2(12, 7), hd + Vector2(6, 7), hd + Vector2(-3, 3)], col)
+				ci.draw_colored_polygon(PackedVector2Array([hd + Vector2(-2, -4), hd + Vector2(0, -10), hd + Vector2(2, -5)]), dark)
+				ci.draw_circle(hd + Vector2(11.5, 4.5), 0.9, Color(0.1, 0.07, 0.06))
+			ci.draw_circle(hd + Vector2(2.5, -1.5), 1.2, Color(0.05, 0.04, 0.04))
+			# Bridle and reins in team colour.
+			ci.draw_polyline(PackedVector2Array([hd + Vector2(-1, -3), hd + Vector2(8, 3), hd + Vector2(9, 6)]), tm.darkened(0.2), 1.2)
+			ci.draw_line(hd + Vector2(8, 3), c + Vector2(4, -14), Color(0.25, 0.18, 0.12), 1.0)
+			if not deer:
+				# Mane strands lag behind (secondary motion); elven steeds get a long silver mane.
+				var mane := dark if kind != "elfsteed" else FkPaint.tint(Color("c9d2dc"), pose)
+				for k in 6:
+					var mp := (c + Vector2(L - 4, -11)).lerp(neck_top + Vector2(-2, -2), k / 5.0)
+					ci.draw_line(mp, mp + Vector2(-5 - mv * 2.0, 3 + sin(t * 4.0 + k) * 1.5) * (1.5 if kind == "elfsteed" else 1.0), mane, 2.2)
+				if kind in ["barded", "elfsteed"]:
+					# Chanfron.
+					FkPaint.poly(ci, [hd + Vector2(-2, -4), hd + Vector2(4, -6), hd + Vector2(11, 1), hd + Vector2(8, 3)], mt)
+					if kind == "elfsteed":
+						ci.draw_line(hd + Vector2(1, -5), hd + Vector2(-2, -12), mt.lightened(0.3), 1.6)
+		"boar":
+			# Boar head: heavy snout, tusks, bristled back.
+			var hd: Vector2 = j.poll
+			FkPaint.shade_poly(ci, [hd + Vector2(-4, -9), hd + Vector2(6, -6), hd + Vector2(14, 1), hd + Vector2(13, 6), hd + Vector2(2, 7), hd + Vector2(-4, 4)], col)
+			ci.draw_rect(Rect2(hd + Vector2(12, 0), Vector2(3, 5)), col.darkened(0.3))
+			ci.draw_polyline(PackedVector2Array([hd + Vector2(10, 5), hd + Vector2(15, 2), hd + Vector2(14, -3)]), Color("efe6cf"), 2.4)
+			ci.draw_circle(hd + Vector2(4, -3), 1.1, Color(0.05, 0.04, 0.04))
+			ci.draw_colored_polygon(PackedVector2Array([hd + Vector2(-2, -8), hd + Vector2(-1, -13), hd + Vector2(2, -8)]), dark)
+			for k in 8:
+				var bpk := c + Vector2(-L * 0.6 + k * 4.5, -12 - (2 if k % 2 == 0 else 0))
+				ci.draw_line(bpk, bpk + Vector2(-2, -4), dark, 1.6)
+			if kind == "warboar":
+				FkPaint.poly(ci, [hd + Vector2(-3, -9), hd + Vector2(7, -6), hd + Vector2(10, -1), hd + Vector2(-2, -2)], mt)
+				ci.draw_line(hd + Vector2(2, -8), hd + Vector2(4, -14), mt.lightened(0.2), 1.8)
+		"ram":
+			# Ram head: short muzzle and a heavy curled horn.
+			var hd: Vector2 = j.poll
+			FkPaint.shade_poly(ci, [c + Vector2(L - 2, -10), c + Vector2(L + 4, -2), hd + Vector2(2, 6), hd + Vector2(-2, -4)], col)
+			FkPaint.shade_poly(ci, [hd + Vector2(-4, -5), hd + Vector2(4, -6), hd + Vector2(11, 1), hd + Vector2(10, 5), hd + Vector2(3, 6), hd + Vector2(-3, 2)], FkPaint.tint(Color("b8ab92"), pose))
+			ci.draw_circle(hd + Vector2(4, -2), 1.1, Color(0.05, 0.04, 0.04))
+			var horn := PackedVector2Array()
+			for k in 16:
+				var a := -1.2 + k * 0.38
+				horn.append(hd + Vector2(-1, -1) + Vector2(cos(a), sin(a)) * (7.5 - k * 0.32))
+			ci.draw_polyline(horn, FkPaint.tint(Color("c9b48a"), pose), 3.4)
+			ci.draw_polyline(horn, FkPaint.tint(Color("8a7656"), pose), 1.0)
+			if kind == "warram":
+				FkPaint.poly(ci, [hd + Vector2(-2, -6), hd + Vector2(5, -7), hd + Vector2(10, 0), hd + Vector2(3, 0)], mt)
+		"bear":
+			# Bear: shoulder hump, round head, small ears, short snout.
+			var hd: Vector2 = j.poll
+			FkPaint.shade_poly(ci, FkPaint.ellipse_pts(hd, Vector2(8.5, 7.5)), col)
+			FkPaint.shade_poly(ci, [hd + Vector2(4, -2), hd + Vector2(13, 0), hd + Vector2(13, 5), hd + Vector2(5, 6)], col.lightened(0.12))
+			ci.draw_circle(hd + Vector2(13, 1.2), 1.6, Color(0.06, 0.05, 0.05))
+			ci.draw_circle(hd + Vector2(-3, -7), 3.0, col.darkened(0.1))
+			ci.draw_circle(hd + Vector2(3.5, -2.5), 1.1, Color(0.05, 0.04, 0.04))
+			if atk >= 0.0 and atk < 0.6:
+				ci.draw_line(hd + Vector2(6, 5), hd + Vector2(12, 7), Color(0.6, 0.2, 0.2), 2.0)
+	FkPaint.pop(ci)
+	FkPaint.pop(ci)
+	for leg in near_legs:
+		draw_leg.call(leg)
+	if atk >= 0.3 and atk < 0.8:
+		# Dust kicking up from the hooves on the charge.
+		var du := (atk - 0.3) / 0.5
+		for k in 4:
+			var dp := c * Vector2(j.cy, 1.0) + Vector2((-L * 0.6 + k * L * 0.45) * j.cy - du * 10.0, H + 8.0 - du * 6.0 - k % 2 * 3.0)
+			ci.draw_circle(dp, 2.5 + du * 5.0, Color(0.72, 0.64, 0.5, 0.4 * (1.0 - du)))
+	# Cover: tack or barding in team colour, on the centre plane.
+	FkPaint.push(ci, squeeze)
 	match bp.cover:
 		"caparison":
 			var trim := FkPaint.tint(Color("d9c27a") if kind != "elfsteed" else Color("dfe6ee"), pose)
@@ -195,7 +203,8 @@ static func quadruped(ci: CanvasItem, kind: String, team: Color, pose: Dictionar
 			# Saddle blanket.
 			FkPaint.shade_poly(ci, [c + Vector2(-9, -13), c + Vector2(8, -13), c + Vector2(9, -4), c + Vector2(-10, -4)], tm)
 			ci.draw_rect(Rect2(c + Vector2(-6, -15), Vector2(12, 3)), Color(0.3, 0.2, 0.12))
-	return c + Vector2(-2, -10 - (5.0 if head_kind == "bear" else 0.0))
+	FkPaint.pop(ci)
+	return j
 
 
 static func _antlers(ci: CanvasItem, at: Vector2, kind: int, col: Color) -> void:
@@ -215,21 +224,22 @@ static func _antlers(ci: CanvasItem, at: Vector2, kind: int, col: Color) -> void
 		ci.draw_polyline(PackedVector2Array([at + Vector2(1, 0), at + Vector2(1, -7), at + Vector2(4, -14)]), col.darkened(0.2), 1.4)
 
 
-static func mounted(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int) -> void:
-	var pal: Array = st.palette
-	var team: Color = st.team
-	var saddle := quadruped(ci, st.get("beast", "horse"), team, pose, seed, pal[2])
-	# The rider doesn't walk; it rides the mount's gait (hip sway, level head over the bob).
-	var mv := FkPaint.move_amount(pose)
-	var walk: float = pose.get("walk", 0.0)
-	var t: float = pose.get("t", 0.0)
+## A rider's pose on a beast: it doesn't walk, it rides the gait: hips sway with the stride and its spine
+## absorbs the beast's bob, so the head stays level.
+static func rider_pose(j: Dictionary, pose: Dictionary) -> Dictionary:
 	var p := pose.duplicate()
 	p["moving"] = false
 	p["move"] = 0.0
-	p["ride_walk"] = walk
-	p["ride_mv"] = mv
-	p["ride_bob"] = lerpf(sin(t * 1.5 + seed) * 0.5, absf(sin(walk * 2.0)) * 2.0, mv)
-	_rider(ci, st, p, seed, saddle)
+	p["ride_walk"] = pose.get("walk", 0.0)
+	p["ride_mv"] = FkPaint.move_amount(pose)
+	p["ride_bob"] = j.bob
+	return p
+
+
+static func mounted(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int) -> void:
+	var pal: Array = st.palette
+	var j := quadruped(ci, st.get("beast", "horse"), st.team, pose, seed, pal[2], st.get("view", {}))
+	_rider(ci, st, rider_pose(j, pose), seed, j.saddle)
 
 
 static func _rider(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, at: Vector2) -> void:
@@ -242,7 +252,7 @@ static func chariot(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int)
 	var team: Color = st.team
 	var p := pose.duplicate()
 	FkPaint.push(ci, Transform2D(0.0, Vector2(26, 0)) * Transform2D(0.0, Vector2(0.78, 0.78), 0.0, Vector2.ZERO))
-	quadruped(ci, st.get("beast", "horse"), team, p, seed, pal[2])
+	quadruped(ci, st.get("beast", "horse"), team, p, seed, pal[2], st.get("view", {}))
 	FkPaint.pop(ci)
 	var wood := FkMachines.wood(pose)
 	var metal: Color = FkPaint.tint(pal[2], pose)
