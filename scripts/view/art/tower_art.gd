@@ -164,17 +164,30 @@ static func _human(ci: CanvasItem, age: int, h: float, tm: Color, glow: Color) -
 				for y in [-5.0, -h + 7]:
 					for x in [-11.0, 10.0]:
 						ci.draw_line(Vector2(x - 1.5, y - 1.5), Vector2(x + 1.5, y + 1.5), _d(Color("c9b28a")), 1.4))
-			Arch.box(ci, -17, 17, -h - 4, -h + 2, -13, 13, _d(wood.lightened(0.1)),
+			Arch.box(ci, -21, 21, -h - 4, -h + 2, -14, 14, _d(wood.lightened(0.1)),
 				func(r: Rect2) -> void:
-					for k in 5:
-						ci.draw_line(Vector2(-17 + k * 7, -h - 4), Vector2(-17 + k * 7, -h + 2), Color(0, 0, 0, 0.35), 0.8), Callable(), false, INK, 1.0)
-			Arch.on_front(ci, 13.0, func() -> void:
-				# Hide draped over the rail, and the torch beyond it.
-				_shape(ci, [Vector2(-15, -h + 2), Vector2(-3, -h + 2), Vector2(-5, -h + 13), Vector2(-9, -h + 10), Vector2(-13, -h + 14)], Color("9a7048"), 0.9)
+					for k in 6:
+						ci.draw_line(Vector2(-21 + k * 7, -h - 4), Vector2(-21 + k * 7, -h + 2), Color(0, 0, 0, 0.35), 0.8), Callable(), false, INK, 1.0)
+			# A rim of pointed stakes at the platform's ends, either side of the turret.
+			for x in [-19.5, -16.0, 19.5]:
+				Arch.prism(ci, [Vector2(x - 1.6, -h - 4), Vector2(x - 1.6, -h - 13), Vector2(x, -h - 17), Vector2(x + 1.6, -h - 13), Vector2(x + 1.6, -h - 4)], 9, 12, _d(wood.lightened(0.05)), INK, 0.7)
+			Arch.on_front(ci, 10.0, func() -> void:
+				# Rope lashings up the legs, and a skull where the braces cross.
+				for y in [-h * 0.35, -h * 0.7]:
+					for x in [-11.0, 11.0]:
+						ci.draw_rect(Rect2(x - 2.4, y - 1.2, 4.8, 2.4), _d(Color("c9b28a")))
+				ci.draw_circle(Vector2(0, -h * 0.48), 3.2, _d(Color("e0d4b8")))
+				ci.draw_rect(Rect2(-1.4, -h * 0.48, 2.8, 3.0), _d(Color("e0d4b8")))
+				ci.draw_circle(Vector2(-1.1, -h * 0.48), 0.7, Color(0.1, 0.08, 0.06))
+				ci.draw_circle(Vector2(1.1, -h * 0.48), 0.7, Color(0.1, 0.08, 0.06)))
+			Arch.on_front(ci, 14.0, func() -> void:
+				# A team-coloured hide banner hanging from the platform, a hide draped over the rail, and the torch beyond it.
+				_shape(ci, [Vector2(5, -h + 2), Vector2(13, -h + 2), Vector2(12, -h + 15), Vector2(9, -h + 12), Vector2(6, -h + 15)], tm, 0.8)
+				_shape(ci, [Vector2(-17, -h + 2), Vector2(-5, -h + 2), Vector2(-7, -h + 13), Vector2(-11, -h + 10), Vector2(-15, -h + 14)], Color("9a7048"), 0.9)
 				ci.draw_line(Vector2(15, -h + 2), Vector2(15, -h - 12), _d(wood), 1.6)
 				_flame(ci, Vector2(15, -h - 12), 0.9)
-				ci.draw_polyline(PackedVector2Array([Vector2(-14, -h - 4), Vector2(-18, -h - 11), Vector2(-17, -h - 15)]), _d(Color("e0d4b8")), 1.5)
-				ci.draw_polyline(PackedVector2Array([Vector2(-14, -h - 4), Vector2(-11, -h - 11), Vector2(-12, -h - 15)]), _d(Color("e0d4b8")), 1.5))
+				ci.draw_polyline(PackedVector2Array([Vector2(-12, -h - 4), Vector2(-16, -h - 12), Vector2(-15, -h - 17)]), _d(Color("e0d4b8")), 1.5)
+				ci.draw_polyline(PackedVector2Array([Vector2(-12, -h - 4), Vector2(-9, -h - 12), Vector2(-10, -h - 17)]), _d(Color("e0d4b8")), 1.5))
 			_tufts(ci, [-22.0, 4.0, 21.0], Color("7a7a3a"))
 		2:
 			# Temple plinth in three dimensions: stepped base, a marble shaft between two fluted pilaster columns, a bronze
@@ -401,6 +414,9 @@ static func _elf(ci: CanvasItem, age: int, h: float, tm: Color, glow: Color) -> 
 			# Mossy standing stone lashed with vines, a spiral carving, a twig nest with a feather: the stone a slab with
 			# thickness, the nest a woven bowl.
 			_lathe(ci, [[-9.0, 18.0], [0.0, 21.0]], stone.darkened(0.1))
+			# Two small standing stones make a circle with the great one.
+			Arch.prism(ci, [Vector2(-29, 0), Vector2(-28, -22), Vector2(-23, -25), Vector2(-20, -18), Vector2(-20, 0)], -16.0, -8.0, _d(stone.darkened(0.1)), INK, 0.9)
+			Arch.prism(ci, [Vector2(20, 0), Vector2(20, -16), Vector2(25, -19), Vector2(28, -12), Vector2(28, 0)], -18.0, -10.0, _d(stone.darkened(0.16)), INK, 0.9)
 			_rock3(ci, Vector2(-18, 0), 6.0, stone.darkened(0.12), -6.0, 6.0)
 			Arch.prism(ci, [Vector2(-12, -8), Vector2(-11, -h + 12), Vector2(-5, -h + 5), Vector2(7, -h + 7), Vector2(12, -h + 16), Vector2(12, -8)], -8.0, 9.0, _d(stone), INK, 1.1)
 			Arch.on_front(ci, 9.0, func() -> void:
@@ -610,10 +626,13 @@ static func _dwarf(ci: CanvasItem, age: int, h: float, tm: Color, glow: Color) -
 	if age <= 1:
 		# Stone cairn: stacked, individually outlined stones in rings (back ones first), moss, a rune-scratched capstone
 		# slab, a torch.
+		# A drystone plinth with a rune slab leaning on it.
+		Arch.box(ci, -28, 28, -8, 0, -15, 15, _d(stone.darkened(0.1)), func(r: Rect2) -> void: _blocks(ci, r, stone.darkened(0.1), 4.0, 9.0), func(r: Rect2) -> void: _blocks(ci, r, Arch.end_col(stone.darkened(0.1)), 4.0, 9.0), false, INK, 0.9)
+		Arch.prism(ci, [Vector2(-26, -8), Vector2(-25, -21), Vector2(-20, -24), Vector2(-16, -20), Vector2(-16, -8)], 8.0, 14.0, _d(stone.lightened(0.08)), INK, 0.8)
 		var stones: Array = []
 		for k in 5:
 			var w := 21.0 - k * 2.0
-			var y := -4.0 - k * (h - 8) / 5.0
+			var y := -11.0 - k * (h - 17) / 5.0
 			for n in 5:
 				var th := TAU * n / 5.0 + k * 0.9
 				stones.append({"x": w * 0.46 * sin(th), "y": y - (n % 2), "z": w * 0.46 * cos(th), "w": w * 0.36, "tone": ((n + k) % 3), "k": k})

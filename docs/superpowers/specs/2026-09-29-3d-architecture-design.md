@@ -44,6 +44,13 @@ Units are 3D bodies seen through a 25° camera; the bases and towers are flat fr
 - **Towers.** The cairn is rings of stones in depth under a capstone slab; the keep is a box on a battered plinth (a frustum) with a cornice, thick merlons and metal bands that wrap the body; the door is a recess; the steam stack is a cylinder; the rune tower's slit and doorway are recesses with the glow on their inner plane.
 - Empty turret pads are a low box with two posts.
 
+## Revisions after the owner's first review
+
+- **Human Stone Age:** the hide tent on a rock became a stockade camp: a log palisade (pointed logs lashed with rails, skulls), a tall lashed gate with a horned skull, hide tents behind the wall, and a leaning-post watchtower with a ladder, a stake rim and a hide roof on a rock outcrop.
+- **Human Bronze:** the colonnade is five columns re-spaced so the doorway stands clear (the sixth column used to stand in the door bay).
+- **Dwarves:** the mountain is craggy (ridges from the peak splitting it into lit and shadowed faces, jagged strata, scree), no longer one smooth blob. Stone Age is a mine camp (timber-framed mine mouth, drystone wall, stone lookout cairn with a brazier, ore cart, anvil, rune stone). From Bronze on the hall has a gatehouse standing out in front of it with the door recessed in it and a roundel above; the carved towers rise from the hall's roof either side of the peak.
+- **Stone Age towers:** the human lookout gains a stake rim, lashings, a skull and a team hide banner; the elf standing stone gains two small standing stones; the dwarf cairn sits on a drystone plinth with a rune slab.
+
 All three races are converted. Not converted: the turrets themselves (`draw_turret`) stay flat.
 
 Each step ends with a before and after gallery (`tools/base_gallery.gd`, with `--towers` and `--night=1`) for the owner to review; visual work cannot be verified in the cloud.

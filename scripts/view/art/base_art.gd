@@ -181,44 +181,96 @@ static func _window(ci: CanvasItem, r: Rect2, warm := Color(1.0, 0.72, 0.35)) ->
 
 
 static func _stone(ci: CanvasItem, team: Color, t: float) -> void:
-	# The tent's door: a dark flap on the front slope of the pyramid.
-	var door := PackedVector2Array()
-	var apex := Vector3(-102, -176, -4)
-	for p in [Vector3(-114, -100, 14), Vector3(-86, -100, 14), Vector3(-100, -100, 14).lerp(apex, 0.44)]:
-		door.append(FkRig.project(p, {"yaw": Arch.yaw}))
+	# A stockade camp: a log palisade with a tall lashed gate, hide tents behind it, a lashed timber watchtower on a
+	# rock outcrop at the far end, a fire pit in front. The gate stands at x = 0.
 	if dynamic_pass:
 		if night > 0.05:
-			ci.draw_colored_polygon(door, Color(1.0, 0.6, 0.25, 0.6 * night))
-		# Fire pit, in front of the rock.
-		Arch.on_front(ci, 44.0, func() -> void:
+			# Firelight inside the gate.
+			Arch.on_front(ci, 4.0, func() -> void:
+				ci.draw_rect(Rect2(-28, -88, 30, 88), Color(1.0, 0.6, 0.25, 0.3 * night)))
+		# The fire pit, in front of the wall.
+		Arch.on_front(ci, 40.0, func() -> void:
 			var fl := 0.7 + 0.3 * sin(t * 11.0)
-			ci.draw_circle(Vector2(-150, -6), 14, Color(1.0, 0.55, 0.2, 0.18 + 0.2 * night))
+			ci.draw_circle(Vector2(-96, -6), 14, Color(1.0, 0.55, 0.2, 0.18 + 0.2 * night))
 			for k in 3:
-				ci.draw_colored_polygon(PackedVector2Array([Vector2(-158 + k * 6, -2), Vector2(-152 + k * 6, -2), Vector2(-155 + k * 6, -14 * fl - k * 2)]), Color(1.0, 0.6 + k * 0.1, 0.2)))
-		_banner(ci, Vector2(Arch.cylinder_x(-102, -4), -222), team, t)
+				ci.draw_colored_polygon(PackedVector2Array([Vector2(-104 + k * 6, -2), Vector2(-98 + k * 6, -2), Vector2(-101 + k * 6, -14 * fl - k * 2)]), Color(1.0, 0.6 + k * 0.1, 0.2)))
+		_banner(ci, Vector2(Arch.cylinder_x(-186, 0), -258), team, t)
 		return
-	# A rock outcrop with a hide tent on a timber ledge cut into it, a stake palisade bound with rope in front, a
-	# fire pit: the rock a solid mass, the tent a pyramid, the stakes thin pointed slabs.
-	var rock := Color("7d6a58")
-	var rock_pts := [Vector2(-205, 0), Vector2(-196, -72), Vector2(-160, -118), Vector2(-104, -142), Vector2(-52, -124), Vector2(-20, -84), Vector2(-4, -30), Vector2(10, 0)]
-	Arch.prism(ci, rock_pts, -44, 18, rock)
-	Arch.on_front(ci, 18.0, func() -> void:
-		_sp(ci, [Vector2(-160, -118), Vector2(-104, -142), Vector2(-80, -132), Vector2(-128, -104)], rock.lightened(0.12))
-		for k in 6:
-			var a := Vector2(-190 + k * 28, -50 - (k % 3) * 22)
-			ci.draw_polyline(PackedVector2Array([a, a + Vector2(9, 8), a + Vector2(4, 18)]), Color(0, 0, 0, 0.3), 1.5))
 	var wood := Color("6b4a2b")
-	Arch.box(ci, -156, -48, -100, -94, 6, 50, wood.lightened(0.05), func(r: Rect2) -> void: _planks(ci, r, wood.lightened(0.05), 9), Callable())
+	var rock := Color("7d6a58")
 	var hide := Color("8a6440")
-	Arch.pyramid(ci, -148, -56, -22, 14, -100, -176, hide, 4)
-	ci.draw_colored_polygon(door, Color(0.12, 0.08, 0.05))
-	for k in 10:
-		var x := -4.0 - k * 13.0
-		var h := 40.0 + (k % 3) * 5.0
-		Arch.prism(ci, [Vector2(x - 4.5, 0), Vector2(x - 4.5, -h), Vector2(x, -h - 9), Vector2(x + 4.5, -h), Vector2(x + 4.5, 0)], 24, 32, wood.lightened(0.04 * (k % 2)))
-	Arch.on_front(ci, 32.0, func() -> void:
-		for y in [-20.0, -32.0]:
-			ci.draw_line(Vector2(-134, y), Vector2(0, y + 2), Color("b09060"), 2.0))
+	var rope := Color("b09060")
+	var bone := Color("d8cbb0")
+	# The rock the watchtower stands against, behind everything.
+	Arch.prism(ci, [Vector2(-236, 0), Vector2(-230, -48), Vector2(-206, -78), Vector2(-178, -64), Vector2(-154, -30), Vector2(-144, 0)], -44, -6, rock)
+	# Hide tents behind the wall, showing above it.
+	Arch.pyramid(ci, -158, -84, -44, -6, -40, -128, hide, 5)
+	Arch.pyramid(ci, -92, -38, -38, -8, -40, -104, hide.darkened(0.08), 4)
+	# The palisade: a dark backing with a visible thick end, then pointed logs lashed with rails.
+	var dark := wood.darkened(0.28)
+	Arch.box(ci, -158, -36, -64, 0, -6, 8, dark, Callable(), func(r: Rect2) -> void: _planks(ci, r, Arch.end_col(dark), 8))
+	for k in 15:
+		var x := -153.0 + k * 8.0
+		var h := 58.0 + fposmod(k * 7.0, 5.0) * 3.0
+		Arch.prism(ci, [Vector2(x - 4, 0), Vector2(x - 4, -h), Vector2(x, -h - 8), Vector2(x + 4, -h), Vector2(x + 4, 0)], 8, 15, wood.lightened(0.05 * (k % 3)), Color(0, 0, 0, 0.3), 0.8)
+	Arch.on_front(ci, 15.0, func() -> void:
+		for y in [-22.0, -44.0]:
+			_sp(ci, _rect_pts(Rect2(-158, y - 3, 122, 6)), wood.lightened(0.16))
+			for x in range(-150, -38, 16):
+				ci.draw_line(Vector2(x, y - 4), Vector2(x, y + 4), rope, 1.6)
+		# Skulls hung on the wall.
+		for x in [-120.0, -70.0]:
+			ci.draw_circle(Vector2(x, -52), 3.6, bone)
+			ci.draw_rect(Rect2(x - 1.6, -52, 3.2, 3.5), bone)
+			ci.draw_circle(Vector2(x - 1.3, -52), 0.8, Color(0.1, 0.08, 0.06))
+			ci.draw_circle(Vector2(x + 1.3, -52), 0.8, Color(0.1, 0.08, 0.06)))
+	# The gate: an opening onto the camp's dark inside, two tall posts, a lintel with a skull and horns.
+	Arch.on_front(ci, 4.0, func() -> void:
+		_sp(ci, _rect_pts(Rect2(-28, -90, 30, 90)), Color(0.09, 0.06, 0.05)))
+	for gx in [[-40.0, -28.0], [2.0, 14.0]]:
+		Arch.box(ci, gx[0], gx[1], -104, 0, 5, 19, wood.lightened(0.04), func(r: Rect2) -> void: _planks(ci, r, wood.lightened(0.04), 6), func(r: Rect2) -> void: _planks(ci, r, Arch.end_col(wood), 6))
+	Arch.box(ci, -46, 20, -100, -88, 4, 20, wood.darkened(0.06), func(r: Rect2) -> void: _planks(ci, r, wood.darkened(0.06), 9), func(r: Rect2) -> void: _planks(ci, r, Arch.end_col(wood), 9))
+	Arch.on_front(ci, 20.0, func() -> void:
+		for gx in [-34.0, 8.0]:
+			for y in [-30.0, -62.0, -82.0]:
+				ci.draw_line(Vector2(gx - 6.5, y), Vector2(gx + 6.5, y), rope, 2.2)
+		# A horned skull over the gate.
+		ci.draw_polyline(PackedVector2Array([Vector2(-19, -104), Vector2(-33, -114), Vector2(-30, -128)]), bone, 3.0)
+		ci.draw_polyline(PackedVector2Array([Vector2(-7, -104), Vector2(7, -114), Vector2(4, -128)]), bone, 3.0)
+		ci.draw_circle(Vector2(-13, -106), 8.0, bone)
+		ci.draw_rect(Rect2(-17.5, -106, 9, 8), bone)
+		ci.draw_circle(Vector2(-16, -107), 2.0, Color(0.1, 0.08, 0.06))
+		ci.draw_circle(Vector2(-10, -107), 2.0, Color(0.1, 0.08, 0.06)))
+	# The watchtower: four leaning lashed posts, cross-braces and a ladder, a plank platform with a stake rim, a hide roof.
+	var lean := 6.0
+	for zr in [[-15.0, -8.0], [8.0, 15.0]]:
+		for xs in [[-212.0, -212.0 + lean], [-160.0, -160.0 - lean]]:
+			var xb: float = xs[0]
+			var xt: float = xs[1]
+			Arch.prism(ci, [Vector2(xb - 3.5, 0), Vector2(xt - 3.5, -150), Vector2(xt + 3.5, -150), Vector2(xb + 3.5, 0)], zr[0], zr[1], wood, Color(0, 0, 0, 0.3), 0.8)
+	Arch.on_front(ci, 15.0, func() -> void:
+		for y in [-46.0, -98.0]:
+			_sp(ci, _rect_pts(Rect2(-208, y - 2.5, 48, 5)), wood.lightened(0.1))
+		ci.draw_line(Vector2(-208, -10), Vector2(-166, -92), wood.darkened(0.15), 4.0)
+		ci.draw_line(Vector2(-166, -10), Vector2(-208, -92), wood.darkened(0.15), 4.0)
+		for pr in [Vector2(-208, -46), Vector2(-166, -46), Vector2(-206, -98), Vector2(-168, -98), Vector2(-187, -51)]:
+			ci.draw_circle(pr, 2.4, rope)
+		# A ladder up the middle.
+		for x in [-196.0, -186.0]:
+			ci.draw_line(Vector2(x, 0), Vector2(x, -142), wood.darkened(0.3), 2.2)
+		for k in 11:
+			ci.draw_line(Vector2(-196, -8 - k * 12.0), Vector2(-186, -8 - k * 12.0), rope, 1.6))
+	Arch.box(ci, -218, -154, -152, -142, -17, 18, wood.lightened(0.05), func(r: Rect2) -> void: _planks(ci, r, wood.lightened(0.05), 8), func(r: Rect2) -> void: _planks(ci, r, Arch.end_col(wood), 8))
+	Arch.crenellate(ci, -218, -154, -17, 18, -152, 20, 5, 8.5, wood.darkened(0.06), 3.0)
+	for x in [-216.0, -158.0]:
+		Arch.box(ci, x - 1.5, x + 1.5, -180, -152, 14, 17, wood.darkened(0.15), Callable(), Callable(), false)
+	Arch.pyramid(ci, -226, -146, -24, 26, -180, -214, hide, 5)
+	# Boulders at the gate, a ring of stones round the fire pit.
+	for k in 3:
+		Arch.blob(ci, 22 + k * 9, -7 - (k % 2) * 4, 22 + k * 3, Vector2(9, 7), rock.lightened(0.05 * k), 0.0, 10)
+	for k in 6:
+		var a := TAU * k / 6.0
+		Arch.blob(ci, -96 + cos(a) * 14, -4.0, 38 + sin(a) * 6, Vector2(5, 3.6), rock.lightened(0.06 * (k % 2)), 0.0, 8)
 
 
 static func _bronze(ci: CanvasItem, team: Color, t: float) -> void:
@@ -236,7 +288,7 @@ static func _bronze(ci: CanvasItem, team: Color, t: float) -> void:
 		# (The colonnade stands 16 nearer the camera than this wall, so a shield that reads as between two columns from
 		# the camera sits 16 · tan(yaw) further back along the wall.)
 		for k in 4:
-			var c := Vector2(-160 + k * 30 - 16.0 * tan(Arch.yaw), -84)
+			var c := Vector2(-158.5 + k * 27 - 16.0 * tan(Arch.yaw), -84)
 			ci.draw_circle(c, 9, Color("8a5a24"))
 			ci.draw_circle(c, 7, Color("c28c3e"))
 			ci.draw_circle(c, 2, Color("f0d090")))
@@ -244,11 +296,12 @@ static func _bronze(ci: CanvasItem, team: Color, t: float) -> void:
 	var door := Arch.arch_pts(-42, -8, 0, -34, 14)
 	Arch.recess(ci, door, 44.0, 14.0, stone.darkened(0.4), Color("5b3f24"))
 	Arch.bars(ci, door, 44.0, 14.0, 14.0, [-36, -30, -24, -18, -12], [], Color(0, 0, 0, 0.4), 1.2)
-	for k in 6:
-		var cx := -175.0 + k * 30.0
+	# Five columns, the last one well clear of the doorway (the sixth used to stand in it).
+	for k in 5:
+		var cx := -172.0 + k * 27.0
 		Arch.cylinder(ci, cx, 24, 7, -126, -34, cream, 0.0, 12.0, 3)
-	for k in 6:
-		var cx := -175.0 + k * 30.0
+	for k in 5:
+		var cx := -172.0 + k * 27.0
 		Arch.box(ci, cx - 10, cx + 10, -132, -126, 14, 34, Color("d8c8a4"), Callable(), Callable(), false)
 	Arch.box(ci, -198, 4, -142, -132, -28, 34, Color("cdb88c"), Callable(), Callable())
 	Arch.prism(ci, [Vector2(-204, -142), Vector2(8, -142), Vector2(-98, -196)], -28, 34, Color("c9a060"))
@@ -623,9 +676,42 @@ static func _band(pts: Array, y_top: float, y_bottom: float) -> Array:
 	return Array(clipped[0]) if not clipped.is_empty() else []
 
 
-## Dwarven hold carved into a mountain: cave → carved door → fortified gate → towered hold → forge-fort
-## → rune-hold. The mountain is stacked slabs (each shows its lane-facing side, the higher ones shallower); the hold
-## is a masonry hall built against it with a recessed door, and the towers rise from the hall's roof.
+## Draws a polygon clipped to a silhouette (a facet of a mountain).
+static func _clip_sp(ci: CanvasItem, poly: Array, silhouette: Array, col: Color) -> void:
+	for c in Geometry2D.intersect_polygons(PackedVector2Array(poly), PackedVector2Array(silhouette)):
+		_sp(ci, Array(c), col)
+
+
+## A craggy mountain front on the current plane: ridges from the peak splitting it into lit and shadowed faces, jagged
+## strata, a few chevron cracks.
+static func _crags(ci: CanvasItem, silhouette: Array, rock: Color) -> void:
+	var peak := Vector2(-150, -270)
+	_sp(ci, silhouette, rock)
+	_clip_sp(ci, [Vector2(-300, -300), peak, Vector2(-172, -190), Vector2(-196, -110), Vector2(-214, 0), Vector2(-300, 0)], silhouette, rock.lightened(0.1))
+	_clip_sp(ci, [peak, Vector2(-112, -200), Vector2(-84, -130), Vector2(-60, 0), Vector2(-118, 0), Vector2(-124, -90), Vector2(-138, -170)], silhouette, rock.darkened(0.1))
+	_clip_sp(ci, [peak, Vector2(100, -300), Vector2(100, 0), Vector2(-60, 0), Vector2(-84, -130), Vector2(-112, -200)], silhouette, rock.darkened(0.24))
+	_clip_sp(ci, [Vector2(-176, -214), Vector2(-204, -190), Vector2(-200, -140), Vector2(-178, -160)], silhouette, rock.lightened(0.16))
+	for row in 6:
+		var y := -34.0 - row * 38.0
+		var line := PackedVector2Array()
+		for i in 20:
+			var x := -250.0 + i * 14.0
+			line.append(Vector2(x, y + (_hash(x, y) - 0.5) * 9.0))
+		for piece in Geometry2D.intersect_polyline_with_polygon(line, PackedVector2Array(silhouette)):
+			ci.draw_polyline(piece, Color(0, 0, 0, 0.13), 1.4)
+			var lit := PackedVector2Array()
+			for v in piece:
+				lit.append(v + Vector2(0, 1.6))
+			ci.draw_polyline(lit, Color(1, 1, 1, 0.05), 1.0)
+	for k in 7:
+		var a := Vector2(-214 + k * 30, -60 - (k % 3) * 50)
+		ci.draw_polyline(PackedVector2Array([a, a + Vector2(10, 12), a + Vector2(4, 26)]), Color(0, 0, 0, 0.24), 1.5)
+
+
+## Dwarven hold in a mountain: mine camp → carved hall behind a gatehouse → towered hold → forge-fort → rune-hold. The
+## mountain is craggy faces with slabs stacked behind them (each shows its lane-facing side, the higher ones
+## shallower); the hold is masonry built against it: a hall, a gatehouse in front of it with the door recessed in it,
+## and (Medieval on) two towers rising from the hall's roof.
 static func _dwarf(ci: CanvasItem, age: int, team: Color, t: float) -> void:
 	var glow: Color = RaceLook.look(&"dwarf").glow
 	var rock := Color("6e6a64") if age != 2 else Color("8a5a40")
@@ -633,14 +719,24 @@ static func _dwarf(ci: CanvasItem, age: int, team: Color, t: float) -> void:
 		rock = Color("4a4a58")
 	var stone := rock.lightened(0.12)
 	var iron := Color("4a4c52")
-	# Depths: the mountain's front, the hall's front and lintel, the towers' front, the peak.
+	# Depths: the mountain's front, the hall's front, the gatehouse's front and lintel, the towers' front, the peak.
 	var rock_z := -4.0
-	var hall_z := 30.0
-	var lintel_z := 36.0
+	var hall_z := 28.0
+	var gate_z := 50.0
+	var lintel_z := 54.0
 	var tower_z := 14.0
 	var peak_z := -22.0
-	var windows := [[Rect2(-186, -150, 12, 10), tower_z], [Rect2(-150, -150, 12, 10), rock_z], [Rect2(-86, -210, 12, 10), tower_z]]
+	var windows := [[Rect2(-186, -150, 12, 10), tower_z], [Rect2(-150, -150, 12, 10), rock_z], [Rect2(-114, -210, 12, 10), tower_z]]
 	if dynamic_pass:
+		if age == 1:
+			# A brazier on the cairn, a lantern over the mine mouth.
+			var fl := 0.7 + 0.3 * sin(t * 11.0)
+			var c := Arch.pt(-150, -124, 0)
+			ci.draw_circle(c + Vector2(0, -6), 12.0, Color(1.0, 0.6, 0.25, 0.15 + 0.25 * night))
+			for k in 3:
+				ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-5 + k * 3, 0), c + Vector2(-2 + k * 3, 0), c + Vector2(-3.5 + k * 3, -12 * fl - k * 2)]), Color(1.0, 0.6, 0.25).lightened(0.2 * k))
+			Arch.on_front(ci, 10.0, func() -> void:
+				ci.draw_circle(Vector2(-34, -66), 9.0, Color(1.0, 0.75, 0.4, 0.12 + 0.3 * night)))
 		if age >= 3:
 			Arch.on_front(ci, lintel_z, func() -> void:
 				for x in [-58.0, 10.0]:
@@ -667,7 +763,7 @@ static func _dwarf(ci: CanvasItem, age: int, team: Color, t: float) -> void:
 			var k := 0.55 + 0.45 * sin(t * 1.6)
 			Arch.on_front(ci, hall_z, func() -> void:
 				for i in 4:
-					var p := Vector2(-190 + i * 40, -40 - (i % 2) * 70)
+					var p := Vector2(-190 + i * 32, -40 - (i % 2) * 70)
 					ci.draw_polyline(PackedVector2Array([p, p + Vector2(8, -14), p + Vector2(16, 0), p + Vector2(24, -14)]), Color(glow, 0.8 * k), 2.0))
 			Arch.on_front(ci, lintel_z, func() -> void:
 				ci.draw_polyline(PackedVector2Array([Vector2(-48, -76), Vector2(-26, -96), Vector2(-4, -76)]), Color(glow, 0.9 * k), 2.5))
@@ -683,81 +779,138 @@ static func _dwarf(ci: CanvasItem, age: int, team: Color, t: float) -> void:
 		var sway := sin(t * 2.4) * 1.2
 		ci.draw_colored_polygon(PackedVector2Array([top + Vector2(0, 4), top + Vector2(24, 4), top + Vector2(24 + sway, 34), top + Vector2(18 + sway, 28), top + Vector2(12 + sway, 34), top + Vector2(6 + sway, 28), top + Vector2(0 + sway, 34)]), team)
 		return
-	# The mountain: one front, and slabs behind it whose lane-facing sides show, the higher ones shallower.
-	var mountain := [Vector2(-230, 0), Vector2(-224, -120), Vector2(-200, -214), Vector2(-150, -272), Vector2(-112, -258), Vector2(-72, -206), Vector2(-34, -160), Vector2(-4, -126), Vector2(12, -80), Vector2(16, 0)]
+	# The mountain: craggy faces on one front, slabs behind it whose lane-facing sides show, the higher ones shallower.
+	var mountain := [Vector2(-234, 0), Vector2(-230, -64), Vector2(-216, -112), Vector2(-224, -150), Vector2(-204, -190), Vector2(-190, -172), Vector2(-176, -214), Vector2(-150, -270), Vector2(-134, -252), Vector2(-120, -264), Vector2(-102, -238), Vector2(-90, -210), Vector2(-70, -216), Vector2(-52, -182), Vector2(-34, -150), Vector2(-8, -118), Vector2(10, -80), Vector2(16, 0)]
 	for slab in [[0.0, -80.0, -30.0], [-80.0, -150.0, -24.0], [-150.0, -210.0, -18.0], [-210.0, -290.0, -12.0]]:
 		Arch.prism(ci, _band(mountain, slab[1], slab[0]), slab[2], rock_z, rock, Color(0, 0, 0, 0), 1.0, false)
 	Arch.on_front(ci, rock_z, func() -> void:
-		_sp(ci, mountain, rock)
-		_sp(ci, [Vector2(-150, -272), Vector2(-112, -258), Vector2(-90, -230), Vector2(-132, -226)], rock.lightened(0.14))
-		for k in 7:
-			var a := Vector2(-214 + k * 30, -60 - (k % 3) * 50)
-			ci.draw_polyline(PackedVector2Array([a, a + Vector2(10, 12), a + Vector2(4, 26)]), Color(0, 0, 0, 0.28), 1.5)
+		_crags(ci, mountain, rock)
 		if age == 1 or age == 3:
-			_sp(ci, [Vector2(-166, -256), Vector2(-150, -272), Vector2(-112, -258), Vector2(-122, -246), Vector2(-146, -250)], Color("eef2f6")))
-	match age:
-		1:
-			# Cave mouth cut into the rock with a hide flap, a stacked-stone wall and a cairn.
-			var mouth := [Vector2(-60, 0), Vector2(-56, -52), Vector2(-34, -72), Vector2(-10, -54), Vector2(-6, 0)]
-			Arch.recess(ci, mouth, rock_z, 26.0, rock.darkened(0.45), Color(0.08, 0.06, 0.05))
-			Arch.on_front(ci, rock_z - 6.0, func() -> void:
-				_sp(ci, [Vector2(-56, -48), Vector2(-40, -66), Vector2(-40, 0), Vector2(-56, 0)], Color("8a6440")))
-			for k in 4:
-				Arch.blob(ci, -110, -126 - k * 12, rock_z + 2.0, Vector2(12 - k * 2, 6), stone.darkened(0.05 * k), 0.0, 10)
-			for k in 9:
-				Arch.blob(ci, -200 + k * 15, -10 - (k % 2) * 8, 16.0 + (k % 3) * 3.0, Vector2(9, 7), stone, 0.0, 10)
-		_:
-			# Carved facade: a masonry hall built against the rock, with a ledge for the turret mounts (Iron on: crenellated).
-			Arch.box(ci, -196, 4, -122, 0, -8, hall_z, stone, _face_msn(ci, stone, 16, 34), _end_msn(ci, stone, 16, 14))
-			Arch.box(ci, -200, 8, -130, -122, -12, hall_z + 4.0, stone.darkened(0.2))
-			if age >= 3:
-				Arch.crenellate(ci, -196, 4, -6, hall_z + 2.0, -130, 14, 14, 24, stone.darkened(0.08), 6.0)
-			# The door, recessed: a carved lintel (Bronze), then iron-bound double doors.
-			var door := Arch.rect_pts(-54, -70, 2, 0)
-			var inner := Arch.recess(ci, door, hall_z, 12.0, stone.darkened(0.4), Color(0.08, 0.07, 0.06))
-			Arch.on_front(ci, inner + 4.0, func() -> void:
-				if age >= 3:
-					for x in [-52.0, -25.0]:
-						_sp(ci, _rect_pts(Rect2(x, -68, 25, 68)), iron if age != 5 else Color("8a6a3a"))
-						for r in 3:
-							_rivets_line(ci, Vector2(x + 3, -60 + r * 22), Vector2(x + 22, -60 + r * 22), 4, Color("9aa0a6"))
-					ci.draw_circle(Vector2(-26, -34), 4.0, Color("c9a45c"))
-				else:
-					_planks(ci, Rect2(-52, -68, 52, 68), Color("5b3f24"), 8)
-					for k in 3:
-						ci.draw_line(Vector2(-54, -56 + k * 22), Vector2(2, -56 + k * 22), Color("b87a3a"), 3.0))
-			var lintel := stone.darkened(0.12) if age != 2 else Color("b87a3a")
-			Arch.box(ci, -62, 10, -84, -70, hall_z - 4.0, lintel_z, lintel)
-			# A guardian face carved beside the door.
+			_clip_sp(ci, [Vector2(-170, -250), Vector2(-150, -272), Vector2(-118, -264), Vector2(-128, -246), Vector2(-146, -252)], mountain, Color("eef2f6")))
+	# Scree at the foot.
+	for k in 6:
+		Arch.blob(ci, -232 + k * 9, -5.0 - (k % 2) * 3, 4.0 + (k % 3) * 2, Vector2(8, 6), rock.darkened(0.04 * (k % 3)), 0.0, 9)
+	if age == 1:
+		_dwarf_camp(ci, rock, stone)
+	else:
+		# The hall: masonry built against the rock, a ledge for the turret mounts (Iron on: crenellated).
+		Arch.box(ci, -196, -56, -122, 0, -8, hall_z, stone, _face_msn(ci, stone, 16, 34), _end_msn(ci, stone, 16, 14))
+		Arch.box(ci, -200, -52, -130, -122, -12, hall_z + 4.0, stone.darkened(0.2))
+		if age >= 3:
+			Arch.crenellate(ci, -196, -56, -6, hall_z + 2.0, -130, 14, 14, 24, stone.darkened(0.08), 6.0)
+		# A guardian face carved in the hall wall.
+		Arch.on_front(ci, hall_z, func() -> void:
+			var x := -130.0
+			_sp(ci, FkPaint.ellipse_pts(Vector2(x, -84), Vector2(16, 18), 0.0, 12), stone.lightened(0.05))
+			_sp(ci, [Vector2(x - 14, -80), Vector2(x + 14, -80), Vector2(x + 6, -34), Vector2(x, -26), Vector2(x - 6, -34)], stone.darkened(0.08))
+			ci.draw_line(Vector2(x - 8, -90), Vector2(x - 2, -90), Color(0, 0, 0, 0.5), 2.0)
+			ci.draw_line(Vector2(x + 2, -90), Vector2(x + 8, -90), Color(0, 0, 0, 0.5), 2.0))
+		if age >= 4:
+			# Towers carved from the rock, rising from the hall's roof either side of the peak.
+			for r in [Rect2(-204, -214, 40, 92), Rect2(-128, -246, 44, 124)]:
+				var tc := stone.darkened(0.04)
+				Arch.box(ci, r.position.x, r.end.x, r.position.y, r.end.y, -14.0, tower_z, tc, _face_msn(ci, tc, 12, 14), _end_msn(ci, tc, 12, 14))
+				Arch.crenellate(ci, r.position.x, r.end.x, -12.0, tower_z, r.position.y, 10, 10, 16, tc.darkened(0.1), 4.0)
+			for w in windows:
+				_slit(ci, w[0], w[1], 8.0, stone.darkened(0.45))
+		if age == 5:
+			# Chimney stack and brass pipes; a gear housing.
+			Arch.cylinder(ci, -183, -14, 9, -300, -212, iron)
+			for k in 3:
+				Arch.cylinder(ci, -183, -14, 11, -290 + k * 26, -286 + k * 26, Color("8a6a3a"))
+			Arch.on_front(ci, -2.0, func() -> void:
+				ci.draw_polyline(PackedVector2Array([Vector2(-174, -236), Vector2(-150, -236), Vector2(-150, -126)]), Color("b8914a"), 5.0))
 			Arch.on_front(ci, hall_z, func() -> void:
-				var x := -86.0
-				_sp(ci, FkPaint.ellipse_pts(Vector2(x, -84), Vector2(16, 18), 0.0, 12), stone.lightened(0.05))
-				_sp(ci, [Vector2(x - 14, -80), Vector2(x + 14, -80), Vector2(x + 6, -34), Vector2(x, -26), Vector2(x - 6, -34)], stone.darkened(0.08))
-				ci.draw_line(Vector2(x - 8, -90), Vector2(x - 2, -90), Color(0, 0, 0, 0.5), 2.0)
-				ci.draw_line(Vector2(x + 2, -90), Vector2(x + 8, -90), Color(0, 0, 0, 0.5), 2.0))
-	if age >= 4:
-		# Towers carved from the rock, rising from the hall's roof.
-		for r in [Rect2(-204, -214, 40, 92), Rect2(-104, -246, 44, 124)]:
-			var tc := stone.darkened(0.04)
-			Arch.box(ci, r.position.x, r.end.x, r.position.y, r.end.y, -14.0, tower_z, tc, _face_msn(ci, tc, 12, 14), _end_msn(ci, tc, 12, 14))
-			Arch.crenellate(ci, r.position.x, r.end.x, -12.0, tower_z, r.position.y, 10, 10, 16, tc.darkened(0.1), 4.0)
-		for w in windows:
-			_slit(ci, w[0], w[1], 8.0, stone.darkened(0.45))
-	if age == 5:
-		# Chimney stack and brass pipes; a gear housing.
-		Arch.cylinder(ci, -183, -14, 9, -300, -212, iron)
-		for k in 3:
-			Arch.cylinder(ci, -183, -14, 11, -290 + k * 26, -286 + k * 26, Color("8a6a3a"))
-		Arch.on_front(ci, -2.0, func() -> void:
-			ci.draw_polyline(PackedVector2Array([Vector2(-174, -236), Vector2(-150, -236), Vector2(-150, -126)]), Color("b8914a"), 5.0))
-		Arch.on_front(ci, hall_z, func() -> void:
-			ci.draw_circle(Vector2(-120, -60), 18.0, iron)
-			ci.draw_circle(Vector2(-120, -60), 6.0, Color("c9a45c")))
-	if age == 6:
-		Arch.on_front(ci, hall_z, func() -> void:
-			for i in 4:
-				var p := Vector2(-190 + i * 40, -40 - (i % 2) * 70)
-				ci.draw_polyline(PackedVector2Array([p, p + Vector2(8, -14), p + Vector2(16, 0), p + Vector2(24, -14)]), Color(0, 0, 0, 0.4), 3.0))
+				ci.draw_circle(Vector2(-120, -60), 18.0, iron)
+				ci.draw_circle(Vector2(-120, -60), 6.0, Color("c9a45c")))
+		if age == 6:
+			Arch.on_front(ci, hall_z, func() -> void:
+				for i in 4:
+					var p := Vector2(-190 + i * 32, -40 - (i % 2) * 70)
+					ci.draw_polyline(PackedVector2Array([p, p + Vector2(8, -14), p + Vector2(16, 0), p + Vector2(24, -14)]), Color(0, 0, 0, 0.4), 3.0))
+		# The gatehouse: a taller block standing out in front of the hall, the door recessed in it under a carved lintel
+		# (Bronze: copper; Iron on: crenellated).
+		Arch.box(ci, -66, 12, -152, 0, 6, gate_z, stone.lightened(0.03), _face_msn(ci, stone.lightened(0.03), 14, 30), _end_msn(ci, stone.lightened(0.03), 14, 14))
+		var cap := Color("b87a3a") if age == 2 else stone.darkened(0.2)
+		Arch.box(ci, -70, 16, -160, -152, 2, gate_z + 4.0, cap)
+		if age >= 3:
+			Arch.crenellate(ci, -70, 16, 4, gate_z + 4.0, -160, 12, 12, 22, stone.darkened(0.06), 5.0)
+		# A roundel over the door: a gilt ring round an iron boss (copper in Bronze).
+		Arch.on_front(ci, gate_z, func() -> void:
+			var ring := Color("b87a3a") if age == 2 else Color("c9a45c")
+			ci.draw_circle(Vector2(-26, -118), 14.0, ring.darkened(0.3))
+			ci.draw_circle(Vector2(-26, -118), 12.0, ring)
+			ci.draw_circle(Vector2(-26, -118), 9.0, iron.darkened(0.1))
+			for k in 8:
+				var a := TAU * k / 8.0
+				ci.draw_line(Vector2(-26, -118) + Vector2(cos(a), sin(a)) * 3.0, Vector2(-26, -118) + Vector2(cos(a), sin(a)) * 8.0, ring.darkened(0.15), 1.6))
+		var door := Arch.rect_pts(-54, -70, 2, 0)
+		var inner := Arch.recess(ci, door, gate_z, 12.0, stone.darkened(0.4), Color(0.08, 0.07, 0.06))
+		Arch.on_front(ci, inner + 4.0, func() -> void:
+			if age >= 3:
+				for x in [-52.0, -25.0]:
+					_sp(ci, _rect_pts(Rect2(x, -68, 25, 68)), iron if age != 5 else Color("8a6a3a"))
+					for r in 3:
+						_rivets_line(ci, Vector2(x + 3, -60 + r * 22), Vector2(x + 22, -60 + r * 22), 4, Color("9aa0a6"))
+				ci.draw_circle(Vector2(-26, -34), 4.0, Color("c9a45c"))
+			else:
+				_planks(ci, Rect2(-52, -68, 52, 68), Color("5b3f24"), 8)
+				for k in 3:
+					ci.draw_line(Vector2(-54, -56 + k * 22), Vector2(2, -56 + k * 22), Color("b87a3a"), 3.0))
+		var lintel := stone.darkened(0.12) if age != 2 else Color("b87a3a")
+		Arch.box(ci, -62, 10, -84, -70, gate_z - 4.0, lintel_z, lintel)
+
+
+## The Stone-age dwarf camp: a timber-framed mine mouth in the rock, a drystone wall, a stone lookout cairn with a brazier,
+## an ore cart, an anvil and a rune stone.
+static func _dwarf_camp(ci: CanvasItem, rock: Color, stone: Color) -> void:
+	var timber := Color("6b4a2b")
+	var rock_z := -4.0
+	# The mine mouth: a dark adit cut into the rock, framed by two posts and a heavy lintel with a lantern.
+	var mouth := Arch.rect_pts(-60, -74, -8, 0)
+	Arch.recess(ci, mouth, rock_z, 28.0, rock.darkened(0.45), Color(0.06, 0.05, 0.05))
+	for px in [-68.0, -8.0]:
+		Arch.box(ci, px, px + 8.0, -84, 0, 0, 12, timber, func(r: Rect2) -> void: _planks(ci, r, timber, 5), func(r: Rect2) -> void: _planks(ci, r, Arch.end_col(timber), 5))
+	Arch.box(ci, -74, 4, -90, -78, -2, 14, timber.lightened(0.05), func(r: Rect2) -> void: _planks(ci, r, timber.lightened(0.05), 9), func(r: Rect2) -> void: _planks(ci, r, Arch.end_col(timber), 9))
+	Arch.on_front(ci, 12.0, func() -> void:
+		ci.draw_line(Vector2(-34, -78), Vector2(-34, -70), Color("3a2c20"), 1.2)
+		_sp(ci, _rect_pts(Rect2(-37, -70, 6, 8)), Color("c9a45c"))
+		for y in [-30.0, -60.0]:
+			ci.draw_line(Vector2(-68, y), Vector2(-60, y), Color("b09060"), 2.0)
+			ci.draw_line(Vector2(-8, y), Vector2(0, y), Color("b09060"), 2.0))
+	# A drystone wall along the front with big rough blocks and coping stones.
+	var wall := stone.darkened(0.06)
+	Arch.box(ci, -224, -84, -36, 0, 10, 26, wall, _face_msn(ci, wall, 12, 22), _end_msn(ci, wall, 12, 12))
+	for k in 7:
+		Arch.blob(ci, -216 + k * 19, -38.0, 18.0, Vector2(11, 5), wall.lightened(0.05 * (k % 2)), 0.0, 9)
+	# The lookout cairn: rings of stones narrowing upward, a slab on top for a brazier.
+	var stones: Array = []
+	for k in 6:
+		var r := 22.0 - k * 1.8
+		for n in 6:
+			var th := TAU * n / 6.0 + k * 0.6
+			stones.append({"x": -150.0 + r * 0.72 * sin(th), "y": -8.0 - k * 19.0, "z": r * 0.72 * cos(th), "w": r * 0.5, "k": k, "tone": (n + k) % 3})
+	stones.sort_custom(func(p: Dictionary, q: Dictionary) -> bool: return p.k < q.k or (p.k == q.k and p.z < q.z))
+	for st in stones:
+		Arch.blob(ci, st.x, st.y, st.z, Vector2(st.w, 10.0), stone.darkened(0.06 * st.tone), 0.0, 9)
+	Arch.box(ci, -168, -132, -122, -112, -16, 16, stone.darkened(0.12), func(r: Rect2) -> void: _masonry(ci, r, stone.darkened(0.12), 5, 12), Callable())
+	# An ore cart with a heap of ore, an anvil on a stump, a rune stone.
+	var cart := timber.lightened(0.06)
+	Arch.prism(ci, [Vector2(-52, -12), Vector2(-16, -12), Vector2(-10, -32), Vector2(-58, -32)], 34, 46, cart, Color(0, 0, 0, 0.3), 0.8)
+	Arch.on_front(ci, 46.0, func() -> void:
+		for wx in [-46.0, -22.0]:
+			ci.draw_circle(Vector2(wx, -6), 6.5, Color("3a3a3e"))
+			ci.draw_circle(Vector2(wx, -6), 2.2, Color("8a8e96"))
+		for y in [-18.0, -26.0]:
+			ci.draw_line(Vector2(-54, y), Vector2(-14, y), Color("4a4c52"), 1.6))
+	for k in 5:
+		Arch.blob(ci, -46 + k * 6, -34.0 - (k % 2) * 3, 40.0, Vector2(7, 5), Color("3e3a3a").lightened(0.05 * (k % 3)), 0.0, 8)
+	Arch.cylinder(ci, -186, 36, 9, -18, 0, timber)
+	Arch.prism(ci, [Vector2(-200, -18), Vector2(-172, -18), Vector2(-176, -26), Vector2(-196, -26), Vector2(-212, -30)], 30, 42, Color("55575e"), Color(0, 0, 0, 0.3), 0.8)
+	Arch.prism(ci, [Vector2(-116, 0), Vector2(-118, -44), Vector2(-110, -54), Vector2(-100, -46), Vector2(-100, 0)], 32, 44, stone.lightened(0.08), Color(0, 0, 0, 0.3), 0.8)
+	Arch.on_front(ci, 44.0, func() -> void:
+		var p := Vector2(-114, -30)
+		ci.draw_polyline(PackedVector2Array([p, p + Vector2(4, -8), p + Vector2(8, 0), p + Vector2(12, -8)]), Color(0, 0, 0, 0.4), 1.6))
 
 
 static func _rivets_line(ci: CanvasItem, a: Vector2, b: Vector2, n: int, col: Color) -> void:
