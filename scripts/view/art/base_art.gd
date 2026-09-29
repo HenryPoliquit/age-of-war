@@ -88,7 +88,7 @@ const TEX_SIZE := Vector2i(350, 500)
 
 
 static func static_texture(age: int, team: Color, host: Node, race: StringName = &"human") -> Texture2D:
-	var key := "%s_%d_%s" % [race, age, team.to_html()]
+	var key := "%s_%d_%s_%d" % [race, age, team.to_html(), roundi(rad_to_deg(UnitArt.view_yaw))]
 	if _cache.has(key) and is_instance_valid(_cache[key]):
 		return _cache[key].get_texture()
 	var vp := SubViewport.new()
@@ -108,6 +108,7 @@ static func static_texture(age: int, team: Color, host: Node, race: StringName =
 
 
 static func _art(ci: CanvasItem, race: StringName, age: int, team: Color, t: float) -> void:
+	Arch.yaw = UnitArt.view_yaw
 	match race:
 		&"elf":
 			_elf(ci, age, team, t)
@@ -239,32 +240,64 @@ static func _bronze(ci: CanvasItem, team: Color, t: float) -> void:
 		ci.draw_circle(Vector2(-35 + (k % 2) * 22, -60 + (k / 2) * 30), 1.8, Color("d9b25e"))
 
 
-static func _medieval(ci: CanvasItem, team: Color, t: float) -> void:
+## A recessed slit (or window) on a face: dark by day, lit warm at night on its inner plane.
+static func _slit(ci: CanvasItem, r: Rect2, zf: float, depth: float, jamb: Color) -> void:
+	var opening := Arch.rect_pts(r.position.x, r.position.y, r.end.x, r.end.y)
 	if dynamic_pass:
-		for p in [Vector2(-180, -96), Vector2(-160, -96), Vector2(-104, -200), Vector2(-86, -200), Vector2(-104, -160), Vector2(-86, -160)]:
-			_window(ci, Rect2(p, Vector2(5, 16)))
-		_banner(ci, Vector2(-98, -344), team, t, 32)
-		return
-	# Curtain wall and keep in masonry, crenellations, arrow slits, slate cone roof, portcullis.
+		Arch.on_front(ci, zf - depth, func() -> void: _window(ci, r))
+	else:
+		Arch.recess(ci, opening, zf, depth, jamb, Color(0.06, 0.05, 0.05))
+
+
+static func _medieval(ci: CanvasItem, team: Color, t: float) -> void:
+	# A curtain wall with a projecting gatehouse and a round corner bastion, the keep set back behind it under a
+	# slate pyramid roof: bodies in depth (wall front z = 22, keep front z = 6, gatehouse front z = 32), seen
+	# through the units' camera.
 	var stone := Color("8d8e8a")
-	_masonry(ci, Rect2(-204, -122, 208, 122), stone, 11, 24)
-	_masonry(ci, Rect2(-136, -232, 76, 110), stone.darkened(0.06), 11, 20)
-	for k in 6:
-		_masonry(ci, Rect2(-204 + k * 38, -138, 22, 16), stone, 8, 11)
-	for k in 5:
-		_sp(ci, _rect_pts(Rect2(-136 + k * 16, -244, 10, 12)), stone.darkened(0.06))
-	_sp(ci, [Vector2(-142, -244), Vector2(-54, -244), Vector2(-98, -300)], Color("4b5058"))
-	for k in 5:
-		ci.draw_line(Vector2(-98, -300), Vector2(-138 + k * 20, -244), Color(0, 0, 0, 0.25), 1.0)
-	for p in [Vector2(-180, -96), Vector2(-160, -96), Vector2(-104, -200), Vector2(-86, -200), Vector2(-104, -160), Vector2(-86, -160)]:
-		_window(ci, Rect2(p, Vector2(5, 16)))
-	ci.draw_rect(Rect2(-112, -210, 28, 36), team)
-	ci.draw_rect(Rect2(-112, -210, 28, 36), Color(0, 0, 0, 0.3), false, 1.5)
-	_sp(ci, [Vector2(-48, 0), Vector2(-48, -60), Vector2(-24, -80), Vector2(0, -60), Vector2(0, 0)], Color(0.14, 0.1, 0.07))
-	for k in 5:
-		ci.draw_line(Vector2(-45 + k * 10, -64), Vector2(-45 + k * 10, 0), Color(0.35, 0.33, 0.3), 2.0)
-	for k in 5:
-		ci.draw_line(Vector2(-48, -56 + k * 12), Vector2(0, -56 + k * 12), Color(0.35, 0.33, 0.3), 2.0)
+	var keep_col := stone.darkened(0.06)
+	var slate := Color("4b5058")
+	var jamb := stone.darkened(0.35)
+	var keep_slits := [Rect2(-104, -200, 5, 16), Rect2(-86, -200, 5, 16), Rect2(-104, -160, 5, 16), Rect2(-86, -160, 5, 16)]
+	var wall_slits := [Rect2(-150, -96, 5, 16), Rect2(-128, -96, 5, 16)]
+	if dynamic_pass:
+		for r in keep_slits:
+			_slit(ci, r, 6.0, 4.0, jamb)
+		for r in wall_slits:
+			_slit(ci, r, 22.0, 4.0, jamb)
+		_banner(ci, Vector2(Arch.cylinder_x(-98.0, -19.0), -350), team, t, 32)
+		return
+	# The keep, set back: its lower part is hidden by the wall in front of it.
+	Arch.box(ci, -136, -60, -232, 0, -44, 6, keep_col,
+		func(r: Rect2) -> void: _masonry(ci, r, keep_col, 11, 20),
+		func(r: Rect2) -> void: _masonry(ci, r, Arch.end_col(keep_col), 11, 14))
+	Arch.crenellate(ci, -136, -60, -44, 6, -232, 12, 10, 16, keep_col, 4)
+	Arch.pyramid(ci, -144, -52, -52, 14, -244, -304, slate, 5)
+	for r in keep_slits:
+		_slit(ci, r, 6.0, 4.0, jamb)
+	Arch.on_front(ci, 6.0, func() -> void:
+		ci.draw_rect(Rect2(-112, -210, 28, 36), team)
+		ci.draw_rect(Rect2(-112, -210, 28, 36), Color(0, 0, 0, 0.3), false, 1.5))
+	# The curtain wall with its parapet.
+	Arch.box(ci, -200, 4, -122, 0, -22, 22, stone,
+		func(r: Rect2) -> void: _masonry(ci, r, stone, 11, 24),
+		func(r: Rect2) -> void: _masonry(ci, r, Arch.end_col(stone), 11, 14))
+	Arch.crenellate(ci, -200, 4, -22, 22, -122, 16, 22, 38, stone, 6)
+	for r in wall_slits:
+		_slit(ci, r, 22.0, 4.0, jamb)
+	# The gatehouse, projecting from the wall, its arch a deep recess with the portcullis inside.
+	Arch.box(ci, -72, 8, -150, 0, -22, 32, stone.darkened(0.03),
+		func(r: Rect2) -> void: _masonry(ci, r, stone.darkened(0.03), 11, 22),
+		func(r: Rect2) -> void: _masonry(ci, r, Arch.end_col(stone.darkened(0.03)), 11, 14))
+	Arch.crenellate(ci, -72, 8, -22, 32, -150, 14, 14, 22, stone.darkened(0.03), 5)
+	var gate := Arch.arch_pts(-52, -4, 0, -56, 24)
+	Arch.recess(ci, gate, 32.0, 30.0, jamb, Color(0.13, 0.09, 0.06))
+	Arch.bars(ci, gate, 32.0, 30.0, 14.0, [-46, -36, -26, -16, -10], [-70, -56, -42, -28, -14], Color(0.38, 0.35, 0.31), 2.0)
+	# The round corner bastion, standing proud of the wall, under a slate cone.
+	Arch.cylinder(ci, -192, 12, 22, -176, 0, stone.darkened(0.03), 11, 14)
+	Arch.cone(ci, -192, 12, 27, -176, -220, slate, 4)
+	var tx := Arch.cylinder_x(-192, 12)
+	ci.draw_rect(Rect2(tx - 1.5, -128, 3, 14), Color(0.06, 0.05, 0.05))
+	ci.draw_rect(Rect2(tx - 1.5, -84, 3, 14), Color(0.06, 0.05, 0.05))
 
 
 static func _gunpowder(ci: CanvasItem, team: Color, t: float) -> void:

@@ -18,6 +18,7 @@ static var _dim := 0.0
 static func draw(ci: CanvasItem, race: StringName, age: int, h: float, team: Color, t: float, dim := 0.0) -> void:
 	_t = t
 	_dim = dim
+	Arch.yaw = UnitArt.view_yaw
 	var glow: Color = RaceLook.look(race).glow
 	var tm := team.darkened(dim)
 	FkPaint.ellipse(ci, Vector2(0, 2), Vector2(26, 5), Color(0, 0, 0, 0.32))
@@ -210,19 +211,23 @@ static func _human(ci: CanvasItem, age: int, h: float, tm: Color, glow: Color) -
 			_flame(ci, Vector2(20, -h * 0.4), 0.7)
 			_tufts(ci, [-20.0, 19.0], Color("6a7a3a"))
 		4:
-			# Stone tower: masonry, crenellations, arrow slit, hoarding brackets, hanging banner, ivy.
+			# Stone tower in three dimensions: a square shaft, a machicolation ledge under crenellations, a recessed
+			# arrow slit, hoarding brackets, a hanging banner and ivy, seen through the units' camera.
 			var stone := Color("8d8e8a")
-			_rock(ci, Vector2(-18, 0), 5.0, stone.darkened(0.15))
-			_blocks(ci, Rect2(-17, -h + 2, 34, h - 2), stone)
-			for k in 3:
-				_shape(ci, _rect(Rect2(-19 + k * 14, -h - 5, 10, 7)), stone.darkened(0.05))
-			_shape(ci, _rect(Rect2(-19, -h + 1, 38, 3)), stone.darkened(0.2), 0.8)
-			for x in [-15.0, -5.0, 5.0, 15.0]:
-				ci.draw_line(Vector2(x, -h + 4), Vector2(x, -h + 8), _d(Color("3a2c20")), 1.4)
-			_shape(ci, _rect(Rect2(-1.5, -h * 0.72, 3, 9)), Color(0.06, 0.05, 0.05), 0.6)
-			_banner(ci, Vector2(0, -h * 0.55), 6.0, h * 0.35, tm, _d(gold))
-			for k in 6:
-				FkPaint.ellipse(ci, Vector2(-15 + (k % 2) * 3, -4 - k * 5), Vector2(3.5, 2.2), _d(Color("3e6a36")), 0.4)
+			_rock(ci, Vector2(-27, 0), 5.0, stone.darkened(0.15))
+			Arch.box(ci, -17, 17, -h + 2, 0, -15, 15, _d(stone),
+				func(r: Rect2) -> void: _blocks(ci, r, stone),
+				func(r: Rect2) -> void: _blocks(ci, r, Arch.end_col(stone), 7.0, 8.0), false, INK)
+			Arch.box(ci, -19, 19, -h + 1, -h + 4, -17, 17, _d(stone.darkened(0.2)), Callable(), Callable(), false, INK, 0.9)
+			Arch.crenellate(ci, -19, 19, -17, 17, -h + 1, 7, 10, 14, _d(stone.darkened(0.05)), 4, INK)
+			Arch.on_front(ci, 17.0, func() -> void:
+				for x in [-15.0, -5.0, 5.0, 15.0]:
+					ci.draw_line(Vector2(x, -h + 4), Vector2(x, -h + 8), _d(Color("3a2c20")), 1.4))
+			Arch.recess(ci, Arch.rect_pts(-1.5, -h * 0.72, 1.5, -h * 0.72 + 9.0), 15.0, 4.0, _d(stone.darkened(0.4)), Color(0.06, 0.05, 0.05))
+			Arch.on_front(ci, 15.0, func() -> void:
+				_banner(ci, Vector2(0, -h * 0.55), 6.0, h * 0.35, tm, _d(gold))
+				for k in 6:
+					FkPaint.ellipse(ci, Vector2(-15 + (k % 2) * 3, -4 - k * 5), Vector2(3.5, 2.2), _d(Color("3e6a36")), 0.4))
 			_tufts(ci, [-10.0, 20.0], Color("5a7a3a"))
 		5:
 			# Earthwork bastion: sloped earth with stone quoins, brick cap, sandbags, gabions, barrels, lantern.

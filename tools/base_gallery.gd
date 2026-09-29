@@ -6,6 +6,7 @@ extends SceneTree
 var out := "reports/base_gallery.png"
 var night := 0.0
 ## --towers: close-up of every race × age turret tower instead of the bases.
+## --yaw=DEG: the camera (the game uses 25; 0 = square-on).
 var towers := false
 var vp := SubViewport.new()
 
@@ -18,6 +19,8 @@ func _initialize() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--out="):
 			out = a.get_slice("=", 1)
+		elif a.begins_with("--yaw="):
+			UnitArt.view_yaw = deg_to_rad(float(a.get_slice("=", 1)))
 		elif a == "--towers":
 			towers = true
 		elif a.begins_with("--night="):
