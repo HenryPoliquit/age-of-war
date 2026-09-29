@@ -602,21 +602,22 @@ func _iron() -> void:
 
 func _medieval() -> void:
 	var p := palette
+	# Overcast countryside: blue-grey hills far off, then patchwork fields, woods and hamlets. No castles here:
+	# the walled castle is the player's base, and the land around it is farmed and quiet.
 	for x: float in _xs(600, 200):
 		_massif(0, x, 630, rng.randf_range(220, 320), rng.randf_range(260, 380), _haze(Color("7a8898"), 0.4), Color("e8eef4"), 0.28)
 	_ridge(0, 610, 60, 300, _haze(p.far, 0.4), 3)
+	# Far hills: strip fields (light and dark bands laid across the slope) and dark forest belts.
 	_ridge(1, 670, 40, 260, _haze(p.mid, 0.2), 3)
+	for x: float in _xs(520, 160):
+		_fields(1, x, 690, rng.randf_range(220, 340), rng.randf_range(34, 52), _haze(Color("8c9a5a"), 0.3), _haze(Color("b5a866"), 0.3))
+	for x: float in _xs(360, 120):
+		_wood(1, x, 676, rng.randi_range(5, 9), _haze(Color("3c5a3a"), 0.25))
+	# An abbey on a hill: long church with a tower and cloister, no battlements.
 	for x: float in _xs(1500, 300):
-		_castle(1, x, 640, _haze(Color("55585c"), 0.2))
+		_abbey(1, x, 672, _haze(Color("c4bdae"), 0.22))
 	_ridge(2, 725, 18, 180, p.mid.darkened(0.1), 2)
-	for x: float in _xs(700, 200):
-		var w := rng.randf_range(160, 300)
-		for k in int(w / 18):
-			_rect(3, Rect2(x + k * 18, 738 - (k % 2) * 3, 17, 14 + (k % 2) * 3), p.near.darkened(0.04 * (k % 3)))
-	for x: float in _xs(560, 160):
-		_line(3, Vector2(x, 752), Vector2(x, 660), 3, Color("4a3a2a"))
-		anims.append({"type": "flag", "layer": 3, "pos": Vector2(x, 662), "col": Color("8b2d2d") if rng.randf() < 0.5 else Color("2d4a8b")})
-	# Villages under the castles: thatched houses, a church, windmills turning, dark woods.
+	# The river, a stone bridge, and boats' sails are left out on purpose: the lane is dry land.
 	for x: float in _xs(1300, 320):
 		_village(2, x, 726, rng.randi_range(4, 6), Color("8a6a3a"), Color("d8ccb0"))
 		_church(2, x + 300, 726, rng.randf_range(0.9, 1.15), Color("bcb8ac"))
@@ -624,25 +625,94 @@ func _medieval() -> void:
 		_windmill(2, x, 726, rng.randf_range(0.9, 1.25), Color("cfc4a8"))
 	for x: float in _xs(420, 140):
 		_pine(2, x, 728, rng.randf_range(0.8, 1.2), Color("2f4a34"))
+	# Nearer fields with haystacks, sheep, and fences along the road.
+	for x: float in _xs(760, 220):
+		_fields(2, x, 738, rng.randf_range(200, 320), 12, Color("82944e"), Color("b3a460"))
+	for x: float in _xs(640, 200):
+		_haystack(2, x, 730, rng.randf_range(0.8, 1.2))
+	for x: float in _xs(560, 180):
+		_sheep(2, x, 730, rng.randi_range(3, 6))
+	for x: float in _xs(700, 200):
+		var w := rng.randf_range(160, 300)
+		for k in int(w / 18):
+			_rect(3, Rect2(x + k * 18, 738 - (k % 2) * 3, 17, 14 + (k % 2) * 3), p.near.darkened(0.04 * (k % 3)))
+	for x: float in _xs(560, 160):
+		_line(3, Vector2(x, 752), Vector2(x, 660), 3, Color("4a3a2a"))
+		anims.append({"type": "flag", "layer": 3, "pos": Vector2(x, 662), "col": Color("8b2d2d") if rng.randf() < 0.5 else Color("2d4a8b")})
 
 
-func _castle(layer: int, x: float, y: float, col: Color) -> void:
-	_rect(layer, Rect2(x - 90, y - 70, 180, 70), col)
-	for r in 6:
-		_line(layer, Vector2(x - 90, y - 64 + r * 11), Vector2(x + 90, y - 64 + r * 11), 1, col.darkened(0.12))
-	for i in 3:
-		var tx := x - 90 + i * 90
-		_rect(layer, Rect2(tx - 16, y - 120, 32, 120), col.darkened(0.06))
-		for r in 9:
-			_line(layer, Vector2(tx - 16, y - 114 + r * 12), Vector2(tx + 16, y - 114 + r * 12), 1, col.darkened(0.16))
-		for k in 3:
-			_rect(layer, Rect2(tx - 16 + k * 12, y - 128, 8, 8), col.darkened(0.06))
-		_tri(layer, Vector2(tx - 19, y - 120), Vector2(tx + 19, y - 120), Vector2(tx, y - 152), col.darkened(0.25))
-		_rect(layer, Rect2(tx - 2, y - 100, 4, 12), col.darkened(0.45))
-		_rect(layer, Rect2(tx - 2, y - 70, 4, 12), col.darkened(0.45))
-	for k in 12:
-		_rect(layer, Rect2(x - 90 + k * 15, y - 78, 9, 8), col)
-	_rect(layer, Rect2(x - 14, y - 34, 28, 34), col.darkened(0.4))
+# Strip fields on a hillside: alternating light and dark furrow bands that narrow toward the horizon.
+func _fields(layer: int, x: float, y: float, w: float, h: float, a: Color, b: Color) -> void:
+	var rows := maxi(3, int(h / 8.0))
+	for r in rows:
+		var t0 := float(r) / rows
+		var t1 := float(r + 1) / rows
+		var col := a if r % 2 == 0 else b
+		var sk := rng.randf_range(-0.12, 0.12) * w
+		# Each row is a slanted band, wider toward the viewer (larger y).
+		var y0 := y - h + t0 * h
+		var y1 := y - h + t1 * h
+		var inset0 := (1.0 - t0) * w * 0.12
+		var inset1 := (1.0 - t1) * w * 0.12
+		_add(layer, {"poly": PackedVector2Array([Vector2(x + inset0 + sk, y0), Vector2(x + w - inset0 + sk, y0), Vector2(x + w - inset1, y1), Vector2(x + inset1, y1)]), "col": col})
+
+
+# A belt of round-headed trees (oak, beech): trunk stub, dark crown, a lit side.
+func _wood(layer: int, x: float, y: float, n: int, col: Color) -> void:
+	for k in n:
+		var tx := x + k * rng.randf_range(16, 24)
+		var s := rng.randf_range(0.8, 1.25)
+		_line(layer, Vector2(tx, y), Vector2(tx, y - 12 * s), 3.0 * s, Color("4a3a2a"))
+		_add(layer, {"poly": _blob(Vector2(tx, y - 24 * s), Vector2(15 * s, 15 * s), 10), "col": col.darkened(rng.randf() * 0.12)})
+		_add(layer, {"poly": _blob(Vector2(tx - 4 * s, y - 28 * s), Vector2(8 * s, 8 * s), 8), "col": col.lightened(0.1)})
+
+
+# An abbey: a long nave under a steep slate roof, a square tower with a small spire, a cloister range, a rose window.
+func _abbey(layer: int, x: float, y: float, col: Color) -> void:
+	var slate := col.darkened(0.42)
+	# Cloister range in front, low and long.
+	_rect(layer, Rect2(x - 150, y - 26, 110, 26), col.darkened(0.05))
+	_tri(layer, Vector2(x - 156, y - 26), Vector2(x - 34, y - 26), Vector2(x - 95, y - 44), slate)
+	for k in 6:
+		_rect(layer, Rect2(x - 142 + k * 18, y - 16, 6, 12), col.darkened(0.42))
+	# Nave: walls, buttresses, a steep roof.
+	_rect(layer, Rect2(x - 40, y - 52, 130, 52), col)
+	_rect(layer, Rect2(x + 50, y - 52, 40, 52), col.darkened(0.1))
+	for k in 5:
+		_rect(layer, Rect2(x - 40 + k * 28, y - 52, 5, 52), col.darkened(0.14))
+		_add(layer, {"poly": PackedVector2Array([Vector2(x - 28 + k * 28, y - 22), Vector2(x - 28 + k * 28, y - 38), Vector2(x - 24 + k * 28, y - 43), Vector2(x - 20 + k * 28, y - 38), Vector2(x - 20 + k * 28, y - 22)]), "col": Color(0.14, 0.15, 0.2)})
+	_add(layer, {"poly": PackedVector2Array([Vector2(x - 46, y - 52), Vector2(x - 20, y - 84), Vector2(x + 70, y - 84), Vector2(x + 96, y - 52)]), "col": slate})
+	_add(layer, {"poly": PackedVector2Array([Vector2(x + 70, y - 84), Vector2(x + 96, y - 52), Vector2(x + 84, y - 52), Vector2(x + 64, y - 80)]), "col": slate.darkened(0.15)})
+	# Crossing tower with a needle spire.
+	_rect(layer, Rect2(x + 4, y - 128, 34, 76), col.lightened(0.03))
+	_rect(layer, Rect2(x + 26, y - 128, 12, 76), col.darkened(0.12))
+	for k in 2:
+		_rect(layer, Rect2(x + 11 + k * 12, y - 112, 6, 18), Color(0.14, 0.15, 0.2))
+	_tri(layer, Vector2(x + 1, y - 128), Vector2(x + 41, y - 128), Vector2(x + 21, y - 178), slate)
+	_tri(layer, Vector2(x + 21, y - 128), Vector2(x + 41, y - 128), Vector2(x + 21, y - 178), slate.darkened(0.15))
+	_line(layer, Vector2(x + 21, y - 178), Vector2(x + 21, y - 190), 2.0, Color("d9b25c"))
+	_line(layer, Vector2(x + 16, y - 186), Vector2(x + 26, y - 186), 2.0, Color("d9b25c"))
+	# Rose window on the west gable and a small door.
+	_circle(layer, Vector2(x + 78, y - 66), 6.0, Color(0.5, 0.6, 0.8, 0.8))
+	_rect(layer, Rect2(x + 72, y - 20, 12, 20), Color(0.16, 0.12, 0.1))
+	# A wall and orchard round the close.
+	_rect(layer, Rect2(x - 190, y - 8, 380, 8), col.darkened(0.16))
+
+
+func _haystack(layer: int, x: float, y: float, s: float) -> void:
+	_add(layer, {"poly": PackedVector2Array([Vector2(x - 16 * s, y), Vector2(x - 12 * s, y - 16 * s), Vector2(x, y - 24 * s), Vector2(x + 12 * s, y - 16 * s), Vector2(x + 16 * s, y)]), "col": Color("c8aa5c")})
+	_add(layer, {"poly": PackedVector2Array([Vector2(x + 4 * s, y - 22 * s), Vector2(x + 12 * s, y - 16 * s), Vector2(x + 16 * s, y), Vector2(x + 2 * s, y)]), "col": Color("a98a42")})
+
+
+# A flock: woolly cream bodies, dark heads and legs.
+func _sheep(layer: int, x: float, y: float, n: int) -> void:
+	for k in n:
+		var sx := x + k * rng.randf_range(12, 20)
+		var sy := y - rng.randf_range(0, 4)
+		_line(layer, Vector2(sx - 3, sy), Vector2(sx - 3, sy - 5), 1.4, Color("2e2a26"))
+		_line(layer, Vector2(sx + 3, sy), Vector2(sx + 3, sy - 5), 1.4, Color("2e2a26"))
+		_add(layer, {"poly": _blob(Vector2(sx, sy - 9), Vector2(8, 5.5), 8), "col": Color("ece6d6")})
+		_add(layer, {"poly": _blob(Vector2(sx + 8, sy - 10), Vector2(3, 3.2), 6), "col": Color("2e2a26")})
 
 
 func _gunpowder() -> void:
