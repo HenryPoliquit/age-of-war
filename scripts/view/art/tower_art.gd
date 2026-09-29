@@ -608,92 +608,115 @@ static func _dwarf(ci: CanvasItem, age: int, h: float, tm: Color, glow: Color) -
 	var brass := Color("b8914a")
 	var gold := Color("d9b25c")
 	if age <= 1:
-		# Stone cairn: stacked, individually outlined stones, moss, a rune-scratched capstone, a torch.
+		# Stone cairn: stacked, individually outlined stones in rings (back ones first), moss, a rune-scratched capstone
+		# slab, a torch.
+		var stones: Array = []
 		for k in 5:
 			var w := 21.0 - k * 2.0
 			var y := -4.0 - k * (h - 8) / 5.0
-			for n in 3:
-				_oval(ci, Vector2(-w * 0.62 + n * w * 0.62, y), Vector2(w * 0.36, 4.2), stone.darkened(0.06 * ((n + k) % 3)), 0.8)
-		_moss(ci, Vector2(-10, -7), Vector2(6, 2.5))
-		_shape(ci, _rect(Rect2(-15, -h - 3, 30, 5)), stone.lightened(0.05))
-		ci.draw_polyline(PackedVector2Array([Vector2(-6, -h - 1), Vector2(-3, -h + 1), Vector2(0, -h - 1), Vector2(3, -h + 1)]), Color(0, 0, 0, 0.45), 0.9)
-		ci.draw_line(Vector2(17, 0), Vector2(17, -h + 2), _d(Color("5a3a22")), 1.8)
-		_flame(ci, Vector2(17, -h + 2), 0.9)
-		_pennant(ci, Vector2(-15, -h - 3), tm, 12.0)
-		_tufts(ci, [-22.0, 22.0], Color("7a7a4a"))
+			for n in 5:
+				var th := TAU * n / 5.0 + k * 0.9
+				stones.append({"x": w * 0.46 * sin(th), "y": y - (n % 2), "z": w * 0.46 * cos(th), "w": w * 0.36, "tone": ((n + k) % 3), "k": k})
+		stones.sort_custom(func(p: Dictionary, q: Dictionary) -> bool: return p.k < q.k or (p.k == q.k and p.z < q.z))
+		for st in stones:
+			_oval(ci, Arch.pt(st.x, st.y, st.z), Vector2(st.w, 4.6), stone.darkened(0.06 * st.tone), 0.8)
+		_moss(ci, Arch.pt(-10, -7, 8), Vector2(6, 2.5))
+		Arch.box(ci, -15, 15, -h - 3, -h + 2, -9, 9, _d(stone.lightened(0.05)), func(r: Rect2) -> void:
+			ci.draw_polyline(PackedVector2Array([Vector2(-6, -h - 1), Vector2(-3, -h + 1), Vector2(0, -h - 1), Vector2(3, -h + 1)]), Color(0, 0, 0, 0.45), 0.9), Callable(), false, INK, 1.1)
+		ci.draw_line(Arch.pt(17, 0, 6), Arch.pt(17, -h + 2, 6), _d(Color("5a3a22")), 1.8)
+		_flame(ci, Arch.pt(17, -h + 2, 6), 0.9)
+		_pennant(ci, Arch.pt(-15, -h - 3, 0), tm, 12.0)
+		_tufts(ci, [Arch.pt(-22, 0, 8).x, Arch.pt(22, 0, 8).x], Color("7a7a44"))
 		return
-	# A squat keep on a battered plinth.
-	_shape(ci, [Vector2(-26, 0), Vector2(-23, -8), Vector2(23, -8), Vector2(26, 0)], stone.darkened(0.12))
-	_blocks(ci, Rect2(-22, -h, 44, h - 8), stone, 8.0, 13.0)
-	for k in 4:
-		_shape(ci, _rect(Rect2(-24 + k * 13, -h - 7, 9, 7)), stone.darkened(0.06), 0.9)
-	_shape(ci, _rect(Rect2(-24, -h - 1, 48, 3)), stone.darkened(0.2), 0.8)
+	# A squat keep on a battered plinth: a box with a visible end, thick merlons, a cornice.
+	var body := _d(stone)
+	var hz := 18.0
+	Arch.frustum(ci, -26, 26, -23, 23, -hz - 2.0, hz + 2.0, -hz + 1.0, hz - 1.0, -8, _d(stone.darkened(0.12)), INK, 1.0)
+	Arch.box(ci, -22, 22, -h, -8, -hz, hz, body, func(r: Rect2) -> void: _blocks(ci, r, stone, 8.0, 13.0), func(r: Rect2) -> void: _blocks(ci, r, Arch.end_col(stone), 8.0, 13.0), false, INK, 1.1)
+	Arch.box(ci, -24, 24, -h - 1, -h + 2, -hz - 2.0, hz + 2.0, _d(stone.darkened(0.2)), Callable(), Callable(), false, INK, 0.8)
+	Arch.crenellate(ci, -24, 24, -hz - 2.0, hz + 2.0, -h - 1, 7, 9, 13, _d(stone.darkened(0.06)), 5.0, INK)
 	match age:
 		2:
 			# Copper bands and a carved dwarf face over the door.
 			for y in [-h * 0.3, -h * 0.75]:
-				_shape(ci, _rect(Rect2(-23, y - 1.5, 46, 3)), Color("b87a3a"), 0.7)
-				for n in 6:
-					ci.draw_circle(Vector2(-20 + n * 8, y), 0.8, _d(Color("f0c080")))
-			_face(ci, Vector2(0, -h * 0.6), stone)
-			_brazier(ci, Vector2(-26, -8))
+				Arch.box(ci, -23, 23, y - 1.5, y + 1.5, -hz - 1.0, hz + 1.0, _d(Color("b87a3a")), func(r: Rect2) -> void:
+					for n in 6:
+						ci.draw_circle(Vector2(-20 + n * 8, y), 0.8, _d(Color("f0c080"))), Callable(), false, INK, 0.7)
+			Arch.on_front(ci, hz, func() -> void:
+				_face(ci, Vector2(0, -h * 0.6), stone))
+			_brazier(ci, Arch.pt(-26, -8, 14))
 		3, 4:
-			# Iron bands with rivets, a door, braziers on the corners, a shield (Iron) or a long banner (Medieval).
-			_shape(ci, _rect(Rect2(-23, -h * 0.3 - 1.5, 46, 3)), iron, 0.7)
-			for n in 7:
-				ci.draw_circle(Vector2(-20 + n * 6.7, -h * 0.3), 0.8, _d(Color("aab0b8")))
-			_shape(ci, [Vector2(-5, -8), Vector2(-5, -17), Vector2(5, -17), Vector2(5, -8)], iron.darkened(0.2), 0.8)
-			for y in [-10.0, -14.0]:
-				ci.draw_line(Vector2(-5, y), Vector2(5, y), _d(Color("8a8e96")), 0.8)
-			if age == 3:
-				_oval(ci, Vector2(0, -h * 0.66), Vector2(7.5, 7.5), iron)
-				_oval(ci, Vector2(0, -h * 0.66), Vector2(6, 6), tm.lerp(Color.BLACK, 0.0), 0.6)
-				_shape(ci, [Vector2(-3.5, -h * 0.66 - 1), Vector2(3.5, -h * 0.66 - 1), Vector2(2, -h * 0.66 + 1.5), Vector2(-2, -h * 0.66 + 1.5)], Color("c8ccd2"), 0.5)
-			else:
-				_banner(ci, Vector2(0, -h * 0.9), 7.0, h * 0.5, tm, _d(gold), true)
-				_shape(ci, [Vector2(-2.5, -h * 0.72), Vector2(2.5, -h * 0.72), Vector2(1.2, -h * 0.64), Vector2(-1.2, -h * 0.64)], Color("c8ccd2"), 0.5)
-				ci.draw_line(Vector2(0, -h * 0.64), Vector2(0, -h * 0.56), _d(Color("6a4a2b")), 1.2)
-			_brazier(ci, Vector2(-22, -h - 7))
-			_brazier(ci, Vector2(22, -h - 7))
+			# Iron bands with rivets, a recessed door, braziers on the corners, a shield (Iron) or a long banner (Medieval).
+			Arch.box(ci, -23, 23, -h * 0.3 - 1.5, -h * 0.3 + 1.5, -hz - 1.0, hz + 1.0, _d(iron), func(r: Rect2) -> void:
+				for n in 7:
+					ci.draw_circle(Vector2(-20 + n * 6.7, -h * 0.3), 0.8, _d(Color("aab0b8"))), Callable(), false, INK, 0.7)
+			var door := Arch.rect_pts(-5, -17, 5, -8)
+			var inner := Arch.recess(ci, door, hz, 5.0, iron.darkened(0.5), iron.darkened(0.2))
+			Arch.on_front(ci, inner + 0.5, func() -> void:
+				for y in [-10.0, -14.0]:
+					ci.draw_line(Vector2(-5, y), Vector2(5, y), _d(Color("8a8e96")), 0.8))
+			Arch.on_front(ci, hz, func() -> void:
+				if age == 3:
+					_oval(ci, Vector2(0, -h * 0.66), Vector2(7.5, 7.5), iron)
+					_oval(ci, Vector2(0, -h * 0.66), Vector2(6, 6), tm.lerp(Color.BLACK, 0.0), 0.6)
+					_shape(ci, [Vector2(-3.5, -h * 0.66 - 1), Vector2(3.5, -h * 0.66 - 1), Vector2(2, -h * 0.66 + 1.5), Vector2(-2, -h * 0.66 + 1.5)], Color("c8ccd2"), 0.5)
+				else:
+					_banner(ci, Vector2(0, -h * 0.9), 7.0, h * 0.5, tm, _d(gold), true)
+					_shape(ci, [Vector2(-2.5, -h * 0.72), Vector2(2.5, -h * 0.72), Vector2(1.2, -h * 0.64), Vector2(-1.2, -h * 0.64)], Color("c8ccd2"), 0.5)
+					ci.draw_line(Vector2(0, -h * 0.64), Vector2(0, -h * 0.56), _d(Color("6a4a2b")), 1.2))
+			_brazier(ci, Arch.pt(-22, -h - 7, hz - 4.0))
+			_brazier(ci, Arch.pt(22, -h - 7, hz - 4.0))
 		5:
 			# Steam tower: riveted iron plates, brass pipes with a valve wheel and gauge, a smoking stack.
 			for r in 3:
-				ci.draw_line(Vector2(-22, -8 - r * (h - 8) / 3.0), Vector2(22, -8 - r * (h - 8) / 3.0), _d(iron), 2.2)
-				for n in 8:
-					ci.draw_circle(Vector2(-19 + n * 5.4, -9.5 - r * (h - 8) / 3.0), 0.8, _d(Color("aab0b8")))
-			ci.draw_polyline(PackedVector2Array([Vector2(24, -2), Vector2(24, -h * 0.6), Vector2(17, -h * 0.6)]), INK, 4.4)
-			ci.draw_polyline(PackedVector2Array([Vector2(24, -2), Vector2(24, -h * 0.6), Vector2(17, -h * 0.6)]), _d(brass), 3.0)
-			_oval(ci, Vector2(24, -h * 0.35), Vector2(4, 4), brass, 0.8)
-			for n in 4:
-				var a := n * PI / 4.0 + _t * 0.3
-				ci.draw_line(Vector2(24, -h * 0.35) - Vector2(cos(a), sin(a)) * 3.5, Vector2(24, -h * 0.35) + Vector2(cos(a), sin(a)) * 3.5, _d(iron), 0.8)
-			_oval(ci, Vector2(-8, -h * 0.55), Vector2(4, 4), Color("e8e0c8"), 0.8)
-			var needle := -2.4 + 0.6 * sin(_t * 1.3)
-			ci.draw_line(Vector2(-8, -h * 0.55), Vector2(-8, -h * 0.55) + Vector2(cos(needle), sin(needle)) * 3.0, Color(0.6, 0.1, 0.1), 0.9)
-			_shape(ci, _rect(Rect2(-19, -h - 18, 6, 12)), iron.darkened(0.1))
+				var y := -8 - r * (h - 8) / 3.0
+				Arch.box(ci, -22.5, 22.5, y - 1.1, y + 1.1, -hz - 0.5, hz + 0.5, _d(iron), func(rc: Rect2) -> void:
+					for n in 8:
+						ci.draw_circle(Vector2(-19 + n * 5.4, y - 1.5), 0.8, _d(Color("aab0b8"))), Callable(), false, Color(0, 0, 0, 0), 0.5)
+			Arch.cylinder(ci, -16, -8, 3.5, -h - 18, -h - 6, iron.darkened(0.1))
 			for n in 3:
 				var u := fmod(_t * 0.5 + n / 3.0, 1.0)
-				ci.draw_circle(Vector2(-16 - u * 8, -h - 20 - u * 18), 2.5 + u * 5.0, Color(0.85, 0.85, 0.82, 0.45 * (1.0 - u)))
-			_shape(ci, [Vector2(-5, -8), Vector2(-5, -17), Vector2(5, -17), Vector2(5, -8)], iron.darkened(0.2), 0.8)
+				ci.draw_circle(Arch.pt(-16, 0, -8) + Vector2(-u * 8, -h - 20 - u * 18), 2.5 + u * 5.0, Color(0.85, 0.85, 0.82, 0.45 * (1.0 - u)))
+			var door := Arch.rect_pts(-5, -17, 5, -8)
+			Arch.recess(ci, door, hz, 5.0, iron.darkened(0.5), iron.darkened(0.2))
+			Arch.on_front(ci, hz + 3.0, func() -> void:
+				ci.draw_polyline(PackedVector2Array([Vector2(24, -2), Vector2(24, -h * 0.6), Vector2(17, -h * 0.6)]), INK, 4.4)
+				ci.draw_polyline(PackedVector2Array([Vector2(24, -2), Vector2(24, -h * 0.6), Vector2(17, -h * 0.6)]), _d(brass), 3.0)
+				_oval(ci, Vector2(24, -h * 0.35), Vector2(4, 4), brass, 0.8)
+				for n in 4:
+					var a := n * PI / 4.0 + _t * 0.3
+					ci.draw_line(Vector2(24, -h * 0.35) - Vector2(cos(a), sin(a)) * 3.5, Vector2(24, -h * 0.35) + Vector2(cos(a), sin(a)) * 3.5, _d(iron), 0.8))
+			Arch.on_front(ci, hz, func() -> void:
+				_oval(ci, Vector2(-8, -h * 0.55), Vector2(4, 4), Color("e8e0c8"), 0.8)
+				var needle := -2.4 + 0.6 * sin(_t * 1.3)
+				ci.draw_line(Vector2(-8, -h * 0.55), Vector2(-8, -h * 0.55) + Vector2(cos(needle), sin(needle)) * 3.0, Color(0.6, 0.1, 0.1), 0.9))
 			for n in 3:
-				_oval(ci, Vector2(-26 + n * 4, -2 - (n % 2) * 2), Vector2(3, 2.2), Color("2a2a2e"), 0.5)
-			_pennant(ci, Vector2(18, -h - 7), tm, 12.0)
+				_oval(ci, Arch.pt(-26 + n * 4, -2 - (n % 2) * 2, 12), Vector2(3, 2.2), Color("2a2a2e"), 0.5)
+			_pennant(ci, Arch.pt(18, -h - 7, hz - 4.0), tm, 12.0)
 		_:
 			# Rune tower: glowing rune lines, a forge-glow slit, gold trim, a floating runestone.
 			var k := 0.55 + 0.45 * sin(_t * 1.6)
-			ci.draw_line(Vector2(-22, -h * 0.5), Vector2(22, -h * 0.5), _d(gold), 1.4)
-			for p in [Vector2(-15, -12), Vector2(6, -12), Vector2(-15, -h * 0.72)]:
-				ci.draw_polyline(PackedVector2Array([p, p + Vector2(3, -6), p + Vector2(6, 0), p + Vector2(9, -6)]), Color(glow, 0.25 * k), 4.0)
-				ci.draw_polyline(PackedVector2Array([p, p + Vector2(3, -6), p + Vector2(6, 0), p + Vector2(9, -6)]), Color(glow, 0.9 * k), 1.3)
-			ci.draw_rect(Rect2(8, -h * 0.8, 3, 9), Color(glow, 0.6 + 0.3 * k))
-			_shape(ci, [Vector2(-5, -8), Vector2(-5, -17), Vector2(0, -20), Vector2(5, -17), Vector2(5, -8)], iron.darkened(0.2), 0.8)
-			ci.draw_polyline(PackedVector2Array([Vector2(-3, -12), Vector2(0, -16), Vector2(3, -12)]), Color(glow, 0.9 * k), 1.0)
-			var fp := Vector2(-17, -h - 20 + sin(_t * 1.4) * 2.5)
+			Arch.box(ci, -22.5, 22.5, -h * 0.5 - 0.7, -h * 0.5 + 0.7, -hz - 0.5, hz + 0.5, _d(gold), Callable(), Callable(), false, Color(0, 0, 0, 0), 0.5)
+			Arch.on_front(ci, hz, func() -> void:
+				for p in [Vector2(-15, -12), Vector2(6, -12), Vector2(-15, -h * 0.72)]:
+					ci.draw_polyline(PackedVector2Array([p, p + Vector2(3, -6), p + Vector2(6, 0), p + Vector2(9, -6)]), Color(glow, 0.25 * k), 4.0)
+					ci.draw_polyline(PackedVector2Array([p, p + Vector2(3, -6), p + Vector2(6, 0), p + Vector2(9, -6)]), Color(glow, 0.9 * k), 1.3))
+			var slit := Arch.rect_pts(8, -h * 0.8, 11, -h * 0.8 + 9)
+			var s_in := Arch.recess(ci, slit, hz, 4.0, stone.darkened(0.5), Color(0.06, 0.05, 0.05))
+			Arch.on_front(ci, s_in, func() -> void:
+				ci.draw_rect(Rect2(8, -h * 0.8, 3, 9), Color(glow, 0.6 + 0.3 * k)))
+			var door := Arch.arch_pts(-5, 5, -8, -17, 3)
+			var d_in := Arch.recess(ci, door, hz, 5.0, iron.darkened(0.5), iron.darkened(0.2))
+			Arch.on_front(ci, d_in, func() -> void:
+				ci.draw_polyline(PackedVector2Array([Vector2(-3, -12), Vector2(0, -16), Vector2(3, -12)]), Color(glow, 0.9 * k), 1.0))
+			# The team's mark, over the door.
+			Arch.on_front(ci, hz, func() -> void:
+				_oval(ci, Vector2(0, -h * 0.3), Vector2(6, 6), tm, 0.8))
+			var fp := Arch.pt(-17, -h - 20 + sin(_t * 1.4) * 2.5, -4)
 			ci.draw_circle(fp, 8.0, Color(glow, 0.12 * k))
 			_shape(ci, [fp + Vector2(-4, 5), fp + Vector2(-4.5, -4), fp + Vector2(0, -7), fp + Vector2(4.5, -3.5), fp + Vector2(4, 5.5)], stone.lightened(0.1), 0.8)
 			ci.draw_polyline(PackedVector2Array([fp + Vector2(-2, -2), fp + Vector2(0, 2), fp + Vector2(2, -2)]), Color(glow, k), 1.2)
-			_oval(ci, Vector2(0, -h * 0.3), Vector2(6, 6), tm, 0.8)
-	_tufts(ci, [-28.0, 28.0], Color("6a6a44"))
+	_tufts(ci, [Arch.pt(-28, 0, 6).x, Arch.pt(28, 0, 6).x], Color("6a6a44"))
 
 
 ## A stern carved dwarf face: brow, eyes, nose and a braided beard.

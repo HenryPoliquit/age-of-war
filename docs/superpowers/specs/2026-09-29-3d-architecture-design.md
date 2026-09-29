@@ -38,9 +38,13 @@ Units are 3D bodies seen through a 25° camera; the bases and towers are flat fr
 - **Bases.** The trunk is a solid of revolution (`Arch.lathe`) with a root flare, bark grooves and two root fins; the decks and hall are timber boxes wrapped round it, the hall under a hipped leaf roof with real eaves (an eave shadow on the wall); the canopy is layers of foliage at different depths (`Arch.blob`) that shift against each other as the camera turns; the gate is a bark-clad frame with a pointed doorway recessed into it; the white gate-tower is a masonry cylinder with a cone roof and two vines winding round it (`Arch.helix`); the silver spire is an extruded slab behind the trunk.
 - **Towers.** Standing stone (a slab with thickness, a woven nest bowl with twigs), wicker cone with a leaf collar all the way round, three braided roots that really pass over and under each other (drawn in camera-depth order as mitred quads), fluted white column with a vine and a leaf balcony, moon-mushroom (stalk, ring, shelf fungi, domed cap with spots), hexagonal crystal pillar (`Arch.faceted`) with shards at its foot.
 
-## Rollout (not built)
+## Dwarves (built): stacked rock and iron-banded stone
 
-1. **Dwarves:** mountain holds as stacked rock slabs with side faces and a stone hall at the foot; iron-banded towers as boxes and cylinders with rivet lines.
+- **Bases.** The mountain is one front with slabs stacked behind it whose lane-facing sides show (the higher, the shallower), so the right slope steps like strata; the cave mouth is a recess cut into it. The hold is a masonry hall built against the rock: a recessed door with the iron or plank leaves set inside, a lintel box, crenellations, a ledge; the two carved towers are boxes rising from the hall's roof with merlons and recessed windows (lit on their inner plane); the chimney and its brass bands are cylinders; the guardian face, gear housing and rune glyphs are drawn on the hall's front plane. The banner pole and the smoke follow the peak's depth.
+- **Towers.** The cairn is rings of stones in depth under a capstone slab; the keep is a box on a battered plinth (a frustum) with a cornice, thick merlons and metal bands that wrap the body; the door is a recess; the steam stack is a cylinder; the rune tower's slit and doorway are recesses with the glow on their inner plane.
+- Empty turret pads are a low box with two posts.
+
+All three races are converted. Not converted: the turrets themselves (`draw_turret`) stay flat.
 
 Each step ends with a before and after gallery (`tools/base_gallery.gd`, with `--towers` and `--night=1`) for the owner to review; visual work cannot be verified in the cloud.
 

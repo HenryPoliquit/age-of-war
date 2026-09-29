@@ -415,8 +415,9 @@ static func prism_sides(pts: Array, z0: float, z1: float) -> Array:
 
 
 ## A silhouette extruded in depth (a rock, a gable roof, a buttress, a tent, a stake): the lane-facing sides in shade
-## (lighter where they slope up), then the front. `ink` outlines every visible face.
-static func prism(ci: CanvasItem, pts: Array, z0: float, z1: float, col: Color, ink := Color(0, 0, 0, 0), ink_w := 1.0) -> void:
+## (lighter where they slope up), then the front (unless `front` is false: the sides alone, for slabs that share one
+## front). `ink` outlines every visible face.
+static func prism(ci: CanvasItem, pts: Array, z0: float, z1: float, col: Color, ink := Color(0, 0, 0, 0), ink_w := 1.0, front := true) -> void:
 	for s in prism_sides(pts, z0, z1):
 		var k := END * (0.9 + 0.35 * maxf(0.0, -s.normal.y))
 		FkPaint.shade_poly(ci, s.quad, _shade(col, k), Vector2(0.5, -0.8))
@@ -424,6 +425,8 @@ static func prism(ci: CanvasItem, pts: Array, z0: float, z1: float, col: Color, 
 			var q := PackedVector2Array(s.quad)
 			q.append(s.quad[0])
 			ci.draw_polyline(q, ink, ink_w)
+	if not front:
+		return
 	on_front(ci, z1, func() -> void:
 		FkPaint.shade_poly(ci, pts, col, Vector2(0.5, -0.8))
 		if ink.a > 0.0:

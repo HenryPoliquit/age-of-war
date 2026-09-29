@@ -30,7 +30,7 @@ timeout 90 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolu
 # Role review sheet (rows = ages; walk ×4, guard, wind-up, strike, recover) for one race — the skeleton review loop.
 # --yaw=DEG turns the camera toward the side the figures face (the game uses 25, UnitArt.VIEW_YAW_DEG; 0 = square-on); unit_gallery.gd and unit_anim.gd take it too:
 timeout 90 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --rendering-method gl_compatibility --path . --resolution 1920x1080 -s tools/unit_sheet.gd -- --role=vanguard --race=human --out=reports/sheet_vanguard_human.png
-# Base gallery (every race × age base with its turret towers in front; --towers for a close-up of the towers; --night=1 lights the windows; --yaw=DEG the camera, 25 by default):
+# Base gallery (every race × age base with its turret towers in front; --towers for a close-up of the towers; --solo=elf:3 for one base big; --night=1 lights the windows; --yaw=DEG the camera, 25 by default):
 timeout 90 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolution 1920x1080 -s tools/base_gallery.gd -- --out=reports/base_gallery.png
 ```
 
