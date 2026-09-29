@@ -68,6 +68,8 @@ const FAMILY := {
 ##         arm straightens through a change of sign, so the elbow crosses over without snapping
 ##   rim  shield top-rim position (the far hand then grips the shield below it, by the shield's size)
 ##   turn  how open the shield face is to the camera (its drawn width, 0..1; 0.5 = braced toward the enemy)
+##   pelvis_yaw / chest_yaw  the pelvis and the chest turned about the vertical (rad; + swings the near side
+##         forward, the far side back), on top of the walk's counter-rotation: the hips lead a strike, the chest follows
 ## path: "line" (the near hand travels straight between keys) or "arc" (around the shoulder, overhead chops).
 const STANCES := {
 	"idle": {"guard": {"h": Vector2(3, 16)}, "wind": {"h": Vector2(3, 16)}, "hit": {"h": Vector2(3, 16)}},
@@ -77,9 +79,9 @@ const STANCES := {
 	"blade": {"path": "arc",
 		"guard": {"h": Vector2(13, 3), "a": -0.5, "f": Vector2(4, 6), "crouch": 1.0, "lean": 0.03},
 		"wind": {"h": Vector2(-2, -10), "a": -2.3, "f": Vector2(3, 6), "s": Vector2(-1, -2),
-			"crouch": 2.5, "lean": -0.05, "lunge": -1.0},
-		"hit": {"h": Vector2(22, 5), "a": 0.02, "f": Vector2(-1, 8), "s": Vector2(2, 1), "crouch": 3.0, "lean": 0.18,
-			"lunge": 7.0, "step": 1.0}},
+			"crouch": 2.5, "lean": -0.05, "lunge": -1.0, "pelvis_yaw": -0.2, "chest_yaw": -0.6},
+		"hit": {"h": Vector2(25, 5), "a": 0.02, "f": Vector2(-1, 8), "s": Vector2(2, 1), "crouch": 3.0, "lean": 0.18,
+			"lunge": 7.0, "step": 1.0, "pelvis_yaw": 0.3, "chest_yaw": 0.6}},
 	# Sword or hand axe with a shield: coil — deep wide crouch, weapon raised high and pulled back above
 	# the helmet, blade pointing back; cleave — a 45° line of action, the weapon sweeping a crescent over
 	# the shield's rim, foreshortened larger as it comes down; lockout — arm straight, wrist locked with
@@ -88,13 +90,13 @@ const STANCES := {
 		"guard": {"h": Vector2(0, -12), "a": -2.2, "rim": Vector2(10, -9.5), "s": Vector2(-0.5, -1), "crouch": 3.5,
 			"wide": 10.0, "lean": 0.06},
 		"wind": {"h": Vector2(-7, -15), "a": -2.7, "rim": Vector2(10, -9.5), "s": Vector2(-1.5, -2),
-			"crouch": 5.0, "wide": 12.0, "lean": -0.05, "lunge": -1.0},
-		"hit": {"h": Vector2(20, 10), "a": 0.49, "rim": Vector2(11, -9.5), "s": Vector2(3, 1), "crouch": 5.5,
-			"wide": 14.0, "lean": 0.35, "lunge": 8.0, "zoom": 1.12, "lock": 1.0, "turn": 0.8}},
+			"crouch": 5.0, "wide": 12.0, "lean": -0.05, "lunge": -1.0, "pelvis_yaw": -0.15, "chest_yaw": -0.5},
+		"hit": {"h": Vector2(22.5, 10), "a": 0.49, "rim": Vector2(11, -9.5), "s": Vector2(3, 1), "crouch": 5.5,
+			"wide": 14.0, "lean": 0.35, "lunge": 8.0, "zoom": 1.12, "lock": 1.0, "turn": 0.8, "pelvis_yaw": 0.25, "chest_yaw": 0.55}},
 	"chop": {"path": "arc",
 		"guard": {"h": Vector2(14, 5), "a": -0.33},
-		"wind": {"h": Vector2(3.6, -14.5), "a": -2.03, "lean": -0.08, "lunge": -1.5},
-		"hit": {"h": Vector2(13, 9), "a": 0.1, "lean": 0.2, "lunge": 6.0}},
+		"wind": {"h": Vector2(3.6, -14.5), "a": -2.03, "lean": -0.08, "lunge": -1.5, "pelvis_yaw": -0.25, "chest_yaw": -0.7},
+		"hit": {"h": Vector2(13, 9), "a": 0.1, "lean": 0.2, "lunge": 6.0, "pelvis_yaw": 0.3, "chest_yaw": 0.7}},
 	"thrust": {"two": true,
 		"guard": {"h": Vector2(12, 9), "a": -0.12},
 		"wind": {"h": Vector2(0, 9), "a": -0.12, "lean": -0.06, "lunge": -2.0},
@@ -208,7 +210,8 @@ const GAITS := {
 ## Far-hand shield grip (relative to sh) for shield bearers: holds the shield in front of the chest.
 const SHIELD_GRIP := Vector2(6, 11)
 
-const _FLOATS := {"a": 0.0, "lean": 0.0, "lunge": 0.0, "crouch": 0.0, "step": 0.0, "wide": 0.0, "zoom": 1.0, "lock": 0.0, "rise": 0.0, "bend": 1.0, "turn": 0.5}
+const _FLOATS := {"a": 0.0, "lean": 0.0, "lunge": 0.0, "crouch": 0.0, "step": 0.0, "wide": 0.0, "zoom": 1.0, "lock": 0.0, "rise": 0.0, "bend": 1.0, "turn": 0.5,
+	"pelvis_yaw": 0.0, "chest_yaw": 0.0}
 const _VECTORS := {"s": Vector2.ZERO, "sf": Vector2.ZERO}
 
 
@@ -305,8 +308,11 @@ static func _bell(d: float) -> float:
 ## All joints for one frame. b = build; pose = {walk, move, atk, t}; shield = the shield kind the far
 ## hand holds ("" = none); seated = rider (one leg in a stirrup, no walk cycle); look = the race preset:
 ## its `body` gives legs and spine their height (y) and the figure its width (x), its `head` the head's
-## size. Every joint also has a depth in j.z (+ toward the viewer), and every bone keeps its length in 3D.
-static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seated := false, look := {}) -> Dictionary:
+## size. Every joint is a Vector3 in j.p3 (rig space, whatever the camera); the flat keys (j.hand_n, …) are
+## its projection through `view` (FkRig: {yaw} of the camera, default square-on) and j.z its z (+ toward the
+## viewer, the side of the body it is on: what parts sort by, whatever the camera). Every bone keeps its
+## length in 3D.
+static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seated := false, look := {}, view := {}) -> Dictionary:
 	var mv: float = pose.get("move", 1.0 if pose.get("moving", false) else 0.0)
 	var walk: float = pose.get("walk", 0.0)
 	var t: float = pose.get("t", 0.0)
@@ -336,12 +342,15 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 	if seated:
 		sh.y -= pose.get("ride_bob", 0.0)
 	# Pelvis and chest turn against each other about the vertical axis as the figure walks.
-	var yaw_p: float = 0.0 if seated else g.get("twist", 0.0) * sin(walk) * mv
-	var yaw_c := -0.8 * yaw_p
-	var j := {"lean": k.lean, "lunge": lunge, "crouch": k.crouch, "dir": Vector2.from_angle(k.a), "zoom": k.zoom,
+	var twist: float = 0.0 if seated else g.get("twist", 0.0) * sin(walk) * mv
+	var yaw_p: float = twist + k.pelvis_yaw
+	var yaw_c: float = -0.8 * twist + k.chest_yaw
+	# The weapon's direction in the plane of its arm; drawn as its projection (see the end).
+	var dir := Vector2.from_angle(k.a)
+	var j := {"lean": k.lean, "lunge": lunge, "crouch": k.crouch, "zoom": k.zoom,
 		"gait": gait_for(weapon, shield), "w": w, "shield_turn": k.turn}
 	# Every joint in rig space (x forward, y down, z toward the viewer). The flat keys the parts are drawn
-	# from, and the depths j.z they sort by, are derived from these at the end.
+	# from, and the z j.z they sort by, are derived from these at the end.
 	var p := {"hip": FkRig.at(hip), "sh": FkRig.at(sh), "chest": FkRig.at(hip.lerp(sh, 0.55))}
 	# Neck and head: the neck follows half the spine's lean and the head a quarter, so the gaze stays level.
 	var tilt: float = k.lean * 0.25
@@ -414,14 +423,14 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 	if k.el_w > 0.0:
 		# A steered elbow sits where it shows on screen; its depth keeps both bones their length, so an
 		# arm swinging round toward the viewer draws foreshortened.
-		var s2 := FkRig.project(shoulder_n)
-		var h2 := FkRig.project(hand_n)
-		var el := _fit(FkRig.project(elbow_n).lerp(sh + (k.el as Vector2) * b, k.el_w), s2, h2, UPPER * b, FORE * b)
+		var s2 := FkRig.xy(shoulder_n)
+		var h2 := FkRig.xy(hand_n)
+		var el := _fit(FkRig.xy(elbow_n).lerp(sh + (k.el as Vector2) * b, k.el_w), s2, h2, UPPER * b, FORE * b)
 		elbow_n = FkRig.at(el, shoulder_n.z + sqrt(maxf(0.0, pow(UPPER * b, 2) - el.distance_squared_to(s2))))
 		hand_n.z = elbow_n.z - sqrt(maxf(0.0, pow(FORE * b, 2) - el.distance_squared_to(h2)))
-	var hand_flat := FkRig.project(hand_n)
+	var hand_xy := FkRig.xy(hand_n)
 	if k.lock > 0.0:
-		j["dir"] = (j.dir as Vector2).slerp((hand_flat - FkRig.project(elbow_n)).normalized(), k.lock)
+		dir = dir.slerp((hand_xy - FkRig.xy(elbow_n)).normalized(), k.lock)
 	var ft: Vector2
 	if k.has("rim") and shield != "":
 		ft = sh + ((k.rim as Vector2) + Vector2(0, FkArmour.SHIELD_TOP.get(shield, 10.5))) * b
@@ -430,9 +439,9 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 	elif shield != "":
 		ft = sh + SHIELD_GRIP * b
 	elif k.two:
-		ft = hand_flat - (j.dir as Vector2) * 8.0 * b
+		ft = hand_xy - dir * 8.0 * b
 	else:
-		ft = FkRig.project(shoulder_f) + Vector2(0, 16.5 * b).rotated(sin(walk) * g.swing * mv - 0.1)
+		ft = FkRig.xy(shoulder_f) + Vector2(0, 16.5 * b).rotated(sin(walk) * g.swing * mv - 0.1)
 	var hand_f := FkRig.reach3(shoulder_f, FkRig.at(ft, shoulder_f.z), UPPER * b, FORE * b)
 	p["sh_n"] = shoulder_n
 	p["sh_f"] = shoulder_f
@@ -443,10 +452,11 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 	# The one place the flat picture is read off the rig.
 	var z := {}
 	for joint in p:
-		j[joint] = FkRig.project(p[joint])
-		z[joint] = FkRig.depth(p[joint])
+		z[joint] = (p[joint] as Vector3).z
+	j.merge(FkRig.project_all(p, view))
 	j["p3"] = p
 	j["z"] = z
+	j["dir"] = FkRig.project_dir(FkRig.at(dir), view)
 	# Attachment points (weapons and shields are still drawn from the hands; these are the hook).
 	j["sockets"] = {"grip_n": {"p": j.hand_n, "a": (j.dir as Vector2).angle(), "z": z.hand_n},
 		"grip_f": {"p": j.hand_f, "a": ((j.hand_f as Vector2) - (j.elbow_f as Vector2)).angle(), "z": z.hand_f},

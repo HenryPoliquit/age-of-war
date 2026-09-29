@@ -91,7 +91,7 @@ static func _parts(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, 
 	var weapon: String = st.get("weapon", "none")
 	var shield: String = st.get("shield", "")
 	# One skeleton per frame, in the race's proportions; the idle-breath phase is offset per individual.
-	var j := FkSkeleton.solve(build, weapon, pose.merged({"t": t + seed / 2.1}, true), shield, not legs, lk)
+	var j := FkSkeleton.solve(build, weapon, pose.merged({"t": t + seed / 2.1}, true), shield, not legs, lk, st.get("view", {}))
 	var z: Dictionary = j.z
 	if pose.get("mirrored", false):
 		# Drawn flipped, the figure is the same right-handed body seen from its other side (not a
@@ -306,7 +306,7 @@ static func _smear(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, 
 	var pts := PackedVector2Array()
 	for i in 9:
 		var p := pose.merged({"atk": lerpf(0.33, minf(atk, 0.55), i / 8.0), "t": pose.get("t", 0.0) + seed / 2.1}, true)
-		var s := FkSkeleton.solve(b, weapon, p, shield, seated, st.look)
+		var s := FkSkeleton.solve(b, weapon, p, shield, seated, st.look, st.get("view", {}))
 		pts.append((s.hand_n as Vector2) + (s.dir as Vector2) * length)
 	for i in pts.size() - 1:
 		var u := float(i + 1) / (pts.size() - 1)
@@ -362,4 +362,4 @@ static func crew(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, at
 
 ## A sub-figure (crew, driver) wearing `extra`'s gear in the parent's race look and colours.
 static func dress(spec: Dictionary, extra: Dictionary) -> Dictionary:
-	return extra.merged({"look": spec.look, "palette": spec.palette, "team": spec.team})
+	return extra.merged({"look": spec.look, "palette": spec.palette, "team": spec.team, "view": spec.get("view", {})})

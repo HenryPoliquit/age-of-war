@@ -648,28 +648,70 @@ func _all_weapons() -> Array:
 	return out
 
 
+## Camera angles the projection tests run at: square-on, and turned 15° and 25° toward the side the figure faces.
+const VIEWS := [{}, {"yaw": 0.2618}, {"yaw": 0.4363}]
+
+
 ## `fn(j, look, tag)` for every weapon, race, frame, and (no shield / a shield / a rider) combination.
-func _each_p3_frame(fn: Callable) -> void:
+func _each_p3_frame(fn: Callable, view := {}) -> void:
 	for lk in [{}, DWARF, ELF]:
 		for w in _all_weapons():
 			for f in FRAMES:
 				for opt in [["", false], ["round", false], ["", true]]:
-					var j := FkSkeleton.solve(1.16, w, {"walk": f[0], "move": f[1], "atk": f[2]}, opt[0], opt[1], lk)
-					fn.call(j, lk, "%s %s %s shield=%s seated=%s" % [lk.get("body", "human"), w, f, opt[0], opt[1]])
+					var j := FkSkeleton.solve(1.16, w, {"walk": f[0], "move": f[1], "atk": f[2]}, opt[0], opt[1], lk, view)
+					fn.call(j, lk, "%s %s %s shield=%s seated=%s view=%s" % [lk.get("body", "human"), w, f, opt[0], opt[1], view])
 
 
-func test_flat_keys_and_depths_are_read_off_p3() -> void:
+func test_flat_keys_and_z_are_read_off_p3() -> void:
 	var want := ["hip", "chest", "sh", "neck", "head", "eye", "sh_n", "sh_f", "elbow_n", "elbow_f", "hand_n", "hand_f",
 		"hip_n", "hip_f", "knee_n", "knee_f", "foot_n", "foot_f", "toe_n", "toe_f"]
 	want.sort()
-	_each_p3_frame(func(j: Dictionary, _lk: Dictionary, tag: String) -> void:
-		var p3: Dictionary = j.p3
-		var have := p3.keys()
-		have.sort()
-		check_eq(have, want, "p3 holds every joint: " + tag)
-		for k in p3:
-			check_eq(j[k], FkRig.project(p3[k]), "%s is the projection of p3: %s" % [k, tag])
-			check_eq(j.z[k], FkRig.depth(p3[k]), "%s depth is read off p3: %s" % [k, tag]))
+	for view in VIEWS:
+		_each_p3_frame(func(j: Dictionary, _lk: Dictionary, tag: String) -> void:
+			var p3: Dictionary = j.p3
+			var have := p3.keys()
+			have.sort()
+			check_eq(have, want, "p3 holds every joint: " + tag)
+			for k in p3:
+				check_eq(j[k], FkRig.project(p3[k], view), "%s is the projection of p3: %s" % [k, tag])
+				check_eq(j.z[k], (p3[k] as Vector3).z, "%s z is p3's z, whatever the camera: %s" % [k, tag]), view)
+
+
+func test_the_camera_moves_the_picture_not_the_rig() -> void:
+	# p3 is rig space: turning the camera must not move a single joint.
+	for lk in [{}, DWARF, ELF]:
+		for w in ["sword", "spear", "bow", "musket", "javelin", "none"]:
+			for f in FRAMES:
+				var pose := {"walk": f[0], "move": f[1], "atk": f[2]}
+				var flat := FkSkeleton.solve(1.1, w, pose, "round", false, lk)
+				for view in VIEWS:
+					var turned := FkSkeleton.solve(1.1, w, pose, "round", false, lk, view)
+					for k in flat.p3:
+						check_eq(turned.p3[k], flat.p3[k], "%s %s %s: %s in rig space, view %s" % [lk.get("body", "human"), w, f, k, view])
+	var a := FkSkeleton.solve(1.0, "sword", {"atk": 0.5})
+	var c := FkSkeleton.solve(1.0, "sword", {"atk": 0.5}, "", false, {}, {"yaw": 0.0})
+	for k in a:
+		if k != "p3" and k != "z" and k != "sockets":
+			check_eq(c[k], a[k], "an explicit yaw of 0 is the same figure: " + k)
+
+
+func test_camera_yaw_spreads_the_near_and_far_sides() -> void:
+	var flat := FkSkeleton.solve(1.0, "none", {"atk": -1.0})
+	var turned := FkSkeleton.solve(1.0, "none", {"atk": -1.0}, "", false, {}, {"yaw": deg_to_rad(20.0)})
+	# Near side (z > 0) toward the rear, far side toward the front, by z · sin(yaw); the middle stays.
+	check_near(flat.sh_n.x - turned.sh_n.x, flat.z.sh_n * sin(deg_to_rad(20.0)) + flat.sh_n.x * (1.0 - cos(deg_to_rad(20.0))), 1e-4, "near shoulder")
+	check(turned.sh_f.x > flat.sh_f.x - 0.5 and turned.sh_n.x < flat.sh_n.x, "far shoulder forward, near shoulder back")
+	check(turned.hip_f.x - turned.hip_n.x > flat.hip_f.x - flat.hip_n.x + 2.0, "the hips spread apart on screen")
+	check_near(turned.hip.x, flat.hip.x * cos(deg_to_rad(20.0)), 1e-4, "the spine, at z = 0, only foreshortens")
+
+
+func test_weapon_direction_is_the_projected_direction() -> void:
+	for w in ["sword", "spear", "axe"]:
+		for atk in [-1.0, 0.2, 0.34, 0.5, 0.75]:
+			var flat := FkSkeleton.solve(1.0, w, {"atk": atk})
+			var turned := FkSkeleton.solve(1.0, w, {"atk": atk}, "", false, {}, {"yaw": 0.4363})
+			check_near(turned.dir.length(), 1.0, 1e-5, "%s %.2f: still a unit direction" % [w, atk])
+			check(turned.dir.dot(FkRig.project_dir(Vector3(flat.dir.x, flat.dir.y, 0.0), {"yaw": 0.4363})) > 0.999, "%s %.2f: the flat direction, projected" % [w, atk])
 
 
 func test_p3_bones_keep_their_exact_length() -> void:

@@ -24,6 +24,10 @@ const ROLE_FALLBACK := {
 ## (or carry an upright polearm); Ranged are slighter and carry a pack on the back.
 const ROLE_BUILD := {"vanguard": 1.16, "ranged": 0.94}
 
+## Camera yaw (rad) the figures are seen at; 0 is the square-on side view. The one knob for the whole view;
+## the review tools set it from --yaw= (degrees).
+static var view_yaw := 0.0
+
 static var _style_cache := {}
 
 
@@ -65,4 +69,4 @@ static func wreck_kind(st: Dictionary) -> String:
 
 
 static func draw_unit(ci: CanvasItem, def: UnitDef, team: Color, pose: Dictionary, seed: int = 0, race: StringName = &"human") -> void:
-	FkUnits.draw(ci, style_for(def, race).merged({"look": RaceLook.look(race), "palette": RaceLook.palette(race, def.age), "team": team}), pose, seed)
+	FkUnits.draw(ci, style_for(def, race).merged({"look": RaceLook.look(race), "palette": RaceLook.palette(race, def.age), "team": team, "view": {"yaw": view_yaw}}), pose, seed)

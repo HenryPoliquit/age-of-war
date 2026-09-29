@@ -2,12 +2,19 @@ class_name FkRig
 extends RefCounted
 ## 3D helpers under the figure rigs. A joint is a Vector3 in rig space: x forward (the way the figure
 ## faces), y down (up is −y), z toward the viewer (the near side is +z). A fixed orthographic camera,
-## optionally turned about the vertical, projects it to the flat picture the parts are drawn in.
+## optionally turned about the vertical, projects it to the flat picture the parts are drawn in. Parts
+## still sort by z (which side of the body they are on), not by camera depth: sorting by the camera's depth
+## reorders the arm, cap, weapon and shield layering as soon as the camera turns.
 
 
-## A flat (x, y) point lifted into rig space at depth `z`.
+## A flat (x, y) point lifted into rig space at `z`.
 static func at(p: Vector2, z := 0.0) -> Vector3:
 	return Vector3(p.x, p.y, z)
+
+
+## The flat (x, y) of a rig point, as the picture would show it with the camera square-on.
+static func xy(p: Vector3) -> Vector2:
+	return Vector2(p.x, p.y)
 
 
 ## Screen position of a rig point. `view.yaw` (rad, default 0) turns the camera about the vertical toward
@@ -19,12 +26,31 @@ static func project(p: Vector3, view := {}) -> Vector2:
 	return Vector2(p.x * cos(yaw) - p.z * sin(yaw), p.y)
 
 
-## How near the camera a rig point is (+ = nearer): the key parts sort by. It is z when the camera is square-on.
-static func depth(p: Vector3, view := {}) -> float:
+## Every joint in `p` (name → Vector3) projected at once, reading the view a single time (name → Vector2).
+## Equal to project() per joint.
+static func project_all(p: Dictionary, view := {}) -> Dictionary:
+	var yaw: float = view.get("yaw", 0.0)
+	var out := {}
+	if yaw == 0.0:
+		for k in p:
+			var v: Vector3 = p[k]
+			out[k] = Vector2(v.x, v.y)
+	else:
+		var c := cos(yaw)
+		var s := sin(yaw)
+		for k in p:
+			var v: Vector3 = p[k]
+			out[k] = Vector2(v.x * c - v.z * s, v.y)
+	return out
+
+
+## Screen direction (a unit vector) of a rig direction. Square-on that is its (x, y) as given.
+static func project_dir(d: Vector3, view := {}) -> Vector2:
 	var yaw: float = view.get("yaw", 0.0)
 	if yaw == 0.0:
-		return p.z
-	return p.z * cos(yaw) + p.x * sin(yaw)
+		return Vector2(d.x, d.y)
+	var flat := Vector2(d.x * cos(yaw) - d.z * sin(yaw), d.y)
+	return flat.normalized() if flat.length() > 1e-6 else Vector2.RIGHT
 
 
 ## Where the limb's end actually gets to: `target` if reachable, else full extension toward it.

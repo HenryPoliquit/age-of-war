@@ -2,9 +2,9 @@ extends TestCase
 ## FkFigure layering: parts drawn back to front by depth, in today's order wherever depths tie.
 
 
-func _spec(weapon: String, shield := "", race := &"human", build := 1.0) -> Dictionary:
+func _spec(weapon: String, shield := "", race := &"human", build := 1.0, view := {}) -> Dictionary:
 	return {"rig": "humanoid", "weapon": weapon, "shield": shield, "look": FkLooks.BODIES[race],
-		"palette": FkLooks.PALETTES[race][2], "team": Color.RED, "build": build}
+		"palette": FkLooks.PALETTES[race][2], "team": Color.RED, "build": build, "view": view}
 
 
 func test_standing_order_is_the_approved_order() -> void:
@@ -101,3 +101,16 @@ func test_marching_archer_carries_the_bow_on_the_far_side() -> void:
 		check(_before(names, "torso", "bow"), "turned around, the bow hand is the near one, walk phase %d" % i)
 	for atk in [-1.0, 0.34]:
 		check(_before(FkFigure.layers(_spec("bow"), {"atk": atk}), "head", "bow"), "standing to shoot, the bow is in front (atk %s)" % atk)
+
+
+func test_turning_the_camera_keeps_the_approved_layering() -> void:
+	# The order comes from which side of the body a part is on, so the camera can't reorder it.
+	for yaw in [0.2618, 0.4363, -0.2618]:
+		var view := {"yaw": yaw}
+		for w in ["sword", "axe", "spear", "halberd", "musket", "javelin", "sling", "staff", "none"]:
+			for shield in ["", "round"]:
+				for pose in [{"atk": -1.0}, {"walk": 1.0, "move": 1.0, "atk": -1.0}, {"atk": 0.3}, {"atk": 0.5}, {"atk": 0.8}]:
+					check_eq(FkFigure.layers(_spec(w, shield, &"human", 1.0, view), pose), FkFigure.layers(_spec(w, shield), pose), "%s %s yaw %.2f %s" % [w, shield, yaw, pose])
+		for i in 102:
+			var pose := {"atk": -1.0 if i == 101 else i / 100.0}
+			check_eq(FkFigure.layers(_spec("bow", "", &"human", 1.0, view), pose), FkFigure.layers(_spec("bow"), pose), "bow yaw %.2f atk %.2f" % [yaw, pose.atk])

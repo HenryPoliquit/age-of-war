@@ -8,7 +8,6 @@ func test_project_at_yaw_zero_is_the_flat_picture() -> void:
 	for p in [Vector3(3, -20, 4), Vector3(-7, 0, -2), Vector3.ZERO]:
 		check_eq(FkRig.project(p), Vector2(p.x, p.y), "no yaw: (x, y)")
 		check_eq(FkRig.project(p, {"yaw": 0.0}), Vector2(p.x, p.y), "explicit yaw 0")
-		check_eq(FkRig.depth(p), p.z, "no yaw: depth is z")
 
 
 func test_yaw_moves_the_near_side_toward_the_rear() -> void:
@@ -19,21 +18,24 @@ func test_yaw_moves_the_near_side_toward_the_rear() -> void:
 	check_eq(near.y, -10.0, "height is untouched")
 
 
-func test_projection_and_depth_are_a_rotation() -> void:
-	for p in [Vector3(3, -20, 4), Vector3(-7, 5, -2), Vector3(12, 0, 9)]:
-		var s := FkRig.project(p, {"yaw": YAW})
-		check_near(Vector2(s.x, FkRig.depth(p, {"yaw": YAW})).length(), Vector2(p.x, p.z).length(), 1e-4, "lengths in (x, z) survive")
+func test_yaw_spreads_the_two_sides_evenly_and_leaves_the_middle() -> void:
+	for p in [Vector3(3, -20, 4), Vector3(-7, 5, 2), Vector3(12, 0, 9)]:
+		var near := FkRig.project(p, {"yaw": YAW})
+		var far := FkRig.project(Vector3(p.x, p.y, -p.z), {"yaw": YAW})
+		check_near((near.x + far.x) / 2.0, p.x * cos(YAW), 1e-5, "the pair's middle is the flat picture, foreshortened")
+		check_near(far.x - near.x, 2.0 * p.z * sin(YAW), 1e-5, "and the sides spread by 2 · z · sin(yaw)")
+		check_eq(near.y, far.y, "height matches")
+	check_eq(FkRig.project(Vector3(5, -3, 0), {"yaw": YAW}).y, -3.0, "height is untouched")
 
 
 func test_a_figure_turned_around_projects_as_its_mirror() -> void:
-	# The view flips x and the kit negates depth for the enemy army; a world-fixed camera agrees.
+	# The view flips x and the kit negates z for the enemy army; a world-fixed camera agrees.
 	for p in [Vector3(3, -20, 4), Vector3(-7, 5, -2), Vector3(12, 0, 9)]:
 		var turned := Vector3(-p.x, p.y, -p.z)
 		var a := FkRig.project(p, {"yaw": YAW})
 		var b := FkRig.project(turned, {"yaw": YAW})
 		check_near(b.x, -a.x, 1e-5, "screen x mirrors")
 		check_near(b.y, a.y, 1e-6, "height matches")
-		check_near(FkRig.depth(turned, {"yaw": YAW}), -FkRig.depth(p, {"yaw": YAW}), 1e-5, "depth negates")
 
 
 func test_reach3_clamps_far_targets_only() -> void:
@@ -100,3 +102,27 @@ func test_ik3_degenerate_pole_puts_the_joint_on_the_line() -> void:
 		var j := FkRig.ik3(root, target, 15.0, 14.0, pole)
 		check(not is_nan(j.x) and not is_nan(j.y) and not is_nan(j.z), "no NaN for pole %s" % pole)
 		check(j.distance_to(root + axis * 15.0) < 1e-4, "on the line for pole %s" % pole)
+
+
+func test_project_all_is_project_per_joint() -> void:
+	var p := {"a": Vector3(3, -20, 4), "b": Vector3(-7, 5, -2), "c": Vector3(12, 0, 9)}
+	for view in [{}, {"yaw": 0.0}, {"yaw": YAW}, {"yaw": -0.6}]:
+		var all := FkRig.project_all(p, view)
+		check_eq(all.keys(), p.keys(), "every joint projected")
+		for k in p:
+			check_eq(all[k], FkRig.project(p[k], view), "%s, view %s" % [k, view])
+
+
+func test_xy_drops_the_depth() -> void:
+	check_eq(FkRig.xy(Vector3(3, -20, 4)), Vector2(3, -20), "the flat picture of a point")
+
+
+func test_project_dir_is_the_screen_direction_of_a_rig_direction() -> void:
+	var d := Vector3(0.6, -0.8, 0.0)
+	check_eq(FkRig.project_dir(d), Vector2(0.6, -0.8), "square-on: unchanged")
+	var s := FkRig.project_dir(d, {"yaw": YAW})
+	check_near(s.length(), 1.0, 1e-5, "a screen direction is a unit vector")
+	check_near(s.angle(), Vector2(0.6 * cos(YAW), -0.8).angle(), 1e-5, "x foreshortens by cos(yaw)")
+	# A direction along the camera's line of sight has no screen direction: it falls back, never NaN.
+	var line := FkRig.project_dir(Vector3(sin(YAW), 0, cos(YAW)), {"yaw": YAW})
+	check(not is_nan(line.x) and not is_nan(line.y), "no NaN along the line of sight")

@@ -1,6 +1,6 @@
 extends SceneTree
 ## Owner review sheet: one role for one race — rows = ages, columns = walk ×4, guard, wind-up, strike, recover.
-##   godot --path . --resolution 1920x1080 -s tools/unit_sheet.gd -- --role=vanguard --race=elf --out=reports/sheet_vanguard_elf.png
+##   godot --path . --resolution 1920x1080 -s tools/unit_sheet.gd -- --role=vanguard --race=elf --out=reports/sheet_vanguard_elf.png [--yaw=15]
 
 const COLS := [["walk", 0.0, 1.0, -1.0], ["walk", 1.6, 1.0, -1.0], ["walk", 3.1, 1.0, -1.0], ["walk", 4.7, 1.0, -1.0],
 	["guard", 0.6, 0.0, -1.0], ["wind-up", 0.6, 0.0, 0.25], ["strike", 0.6, 0.0, 0.45], ["recover", 0.6, 0.0, 0.75]]
@@ -19,6 +19,8 @@ func _initialize() -> void:
 			race = StringName(a.get_slice("=", 1))
 		elif a.begins_with("--role="):
 			role = a.get_slice("=", 1)
+		elif a.begins_with("--yaw="):
+			UnitArt.view_yaw = deg_to_rad(float(a.get_slice("=", 1)))
 	vp.size = Vector2i(1920, 1440)
 	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	root.add_child(vp)
