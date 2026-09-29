@@ -639,3 +639,54 @@ func test_staff_raised_one_handed_straight_at_30_degrees() -> void:
 	var butt: Vector2 = hit.hand_n - hit.dir * 22.0
 	var near := Geometry2D.get_closest_point_to_segment(hit.hand_f, butt, hit.hand_n)
 	check(near.distance_to(hit.hand_f) > 6.0, "the other hand has let go of the staff")
+
+
+## Every weapon the rig knows, plus none; the p3 tests run this whole roster.
+func _all_weapons() -> Array:
+	var out: Array = FkSkeleton.FAMILY.keys()
+	out.append("none")
+	return out
+
+
+## `fn(j, look, tag)` for every weapon, race, frame, and (no shield / a shield / a rider) combination.
+func _each_p3_frame(fn: Callable) -> void:
+	for lk in [{}, DWARF, ELF]:
+		for w in _all_weapons():
+			for f in FRAMES:
+				for opt in [["", false], ["round", false], ["", true]]:
+					var j := FkSkeleton.solve(1.16, w, {"walk": f[0], "move": f[1], "atk": f[2]}, opt[0], opt[1], lk)
+					fn.call(j, lk, "%s %s %s shield=%s seated=%s" % [lk.get("body", "human"), w, f, opt[0], opt[1]])
+
+
+func test_flat_keys_and_depths_are_read_off_p3() -> void:
+	var want := ["hip", "chest", "sh", "neck", "head", "eye", "sh_n", "sh_f", "elbow_n", "elbow_f", "hand_n", "hand_f",
+		"hip_n", "hip_f", "knee_n", "knee_f", "foot_n", "foot_f", "toe_n", "toe_f"]
+	want.sort()
+	_each_p3_frame(func(j: Dictionary, _lk: Dictionary, tag: String) -> void:
+		var p3: Dictionary = j.p3
+		var have := p3.keys()
+		have.sort()
+		check_eq(have, want, "p3 holds every joint: " + tag)
+		for k in p3:
+			check_eq(j[k], FkRig.project(p3[k]), "%s is the projection of p3: %s" % [k, tag])
+			check_eq(j.z[k], FkRig.depth(p3[k]), "%s depth is read off p3: %s" % [k, tag]))
+
+
+func test_p3_bones_keep_their_exact_length() -> void:
+	var b := 1.16
+	_each_p3_frame(func(j: Dictionary, lk: Dictionary, tag: String) -> void:
+		var body: Vector2 = lk.get("body", Vector2.ONE)
+		var hb: float = b * lk.get("head", 1.0)
+		var by := b * body.y
+		var p3: Dictionary = j.p3
+		for bone in [["hip_n", "knee_n", FkSkeleton.THIGH * by], ["knee_n", "foot_n", FkSkeleton.SHIN * by],
+				["hip_f", "knee_f", FkSkeleton.THIGH * by], ["knee_f", "foot_f", FkSkeleton.SHIN * by],
+				["sh_n", "elbow_n", FkSkeleton.UPPER * b], ["elbow_n", "hand_n", FkSkeleton.FORE * b],
+				["sh_f", "elbow_f", FkSkeleton.UPPER * b], ["elbow_f", "hand_f", FkSkeleton.FORE * b],
+				["foot_n", "toe_n", (FkSkeleton.BALL * body * b).length()], ["foot_f", "toe_f", (FkSkeleton.BALL * body * b).length()],
+				["hip", "sh", Vector2(1.5, -FkSkeleton.SPINE * body.y).length() * b],
+				["sh", "neck", Vector2(0.8, -3.5).length() * hb], ["neck", "head", Vector2(1.0, -6.0).length() * hb],
+				["head", "eye", Vector2(3.4, -0.9).length() * hb],
+				["hip", "hip_n", j.w], ["hip", "hip_f", j.w]]:
+			var d: float = (p3[bone[0]] as Vector3).distance_to(p3[bone[1]])
+			check_near(d, bone[2], 0.05, "%s: %s-%s" % [tag, bone[0], bone[1]]))

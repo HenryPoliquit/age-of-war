@@ -338,23 +338,26 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 	# Pelvis and chest turn against each other about the vertical axis as the figure walks.
 	var yaw_p: float = 0.0 if seated else g.get("twist", 0.0) * sin(walk) * mv
 	var yaw_c := -0.8 * yaw_p
-	var j := {"hip": hip, "sh": sh, "chest": hip.lerp(sh, 0.55), "lean": k.lean, "lunge": lunge, "crouch": k.crouch,
-		"dir": Vector2.from_angle(k.a), "zoom": k.zoom, "gait": gait_for(weapon, shield), "w": w, "shield_turn": k.turn}
-	var z := {"hip": 0.0, "chest": 0.0, "sh": 0.0, "neck": 0.0, "head": 0.0, "eye": 0.0}
+	var j := {"lean": k.lean, "lunge": lunge, "crouch": k.crouch, "dir": Vector2.from_angle(k.a), "zoom": k.zoom,
+		"gait": gait_for(weapon, shield), "w": w, "shield_turn": k.turn}
+	# Every joint in rig space (x forward, y down, z toward the viewer). The flat keys the parts are drawn
+	# from, and the depths j.z they sort by, are derived from these at the end.
+	var p := {"hip": FkRig.at(hip), "sh": FkRig.at(sh), "chest": FkRig.at(hip.lerp(sh, 0.55))}
 	# Neck and head: the neck follows half the spine's lean and the head a quarter, so the gaze stays level.
-	j["head_tilt"] = k.lean * 0.25
-	j["neck"] = sh + Vector2(0.8, -3.5).rotated(k.lean * 0.5) * hb
-	j["head"] = (j.neck as Vector2) + Vector2(1.0, -6.0).rotated(j.head_tilt) * hb
-	j["eye"] = (j.head as Vector2) + Vector2(3.4, -0.9).rotated(j.head_tilt) * hb
+	var tilt: float = k.lean * 0.25
+	var neck := sh + Vector2(0.8, -3.5).rotated(k.lean * 0.5) * hb
+	var head := neck + Vector2(1.0, -6.0).rotated(tilt) * hb
+	j["head_tilt"] = tilt
+	p["neck"] = FkRig.at(neck)
+	p["head"] = FkRig.at(head)
+	p["eye"] = FkRig.at(head + Vector2(3.4, -0.9).rotated(tilt) * hb)
 	# Legs: from hip roots either side of the pelvis; feet on the ground line; the gait's stride, lift and
 	# heel-to-toe roll while walking, the front foot planted forward on a lunge, the back foot swinging
-	# through on a passing step.
+	# through on a passing step. Each leg lies in the plane of its own hip.
 	for i in 2:
 		var tag := "n" if i == 0 else "f"
 		var side := 1.0 if i == 0 else -1.0
-		var root := hip + Vector2(side * w * sin(yaw_p), 0)
-		j["hip_" + tag] = root
-		z["hip_" + tag] = side * w * cos(yaw_p)
+		var root := FkRig.at(hip + Vector2(side * w * sin(yaw_p), 0), side * w * cos(yaw_p))
 		var foot: Vector2
 		var rot := 0.0
 		var flex := 0.0
@@ -379,49 +382,46 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 			foot = Vector2(fx, -lift) * by
 			# Keep the boot's lowest point on (never under) the ground.
 			var low := 0.0
-			for p in boot(Vector2.ZERO, rot, b, flex, body):
-				low = maxf(low, (p as Vector2).y)
+			for q in boot(Vector2.ZERO, rot, b, flex, body):
+				low = maxf(low, (q as Vector2).y)
 			foot.y = minf(foot.y, -low)
-		foot = reach(root, foot, THIGH * by, SHIN * by)
-		j["foot_" + tag] = foot
+		var ankle := FkRig.reach3(root, FkRig.at(foot, root.z), THIGH * by, SHIN * by)
+		p["hip_" + tag] = root
+		p["knee_" + tag] = FkRig.ik3(root, ankle, THIGH * by, SHIN * by, FkRig.plane_pole(root, ankle, KNEE))
+		p["foot_" + tag] = ankle
+		p["toe_" + tag] = ankle + FkRig.at((BALL * body * b).rotated(rot))
 		j["rot_" + tag] = rot
 		j["toe_bend_" + tag] = flex
-		j["toe_" + tag] = foot + (BALL * body * b).rotated(rot)
-		j["knee_" + tag] = ik(root, foot, THIGH * by, SHIN * by, KNEE)
 		j["dust_" + tag] = _bell(ph - PI / 2) * mv if g.get("dust", false) and not seated else 0.0
-		for c in ["knee_", "foot_", "toe_"]:
-			z[c + tag] = z["hip_" + tag]
 	# Arms: shoulders ride on the chest (turned by its yaw) and move with the pose; near arm to the
 	# stance's hand target; far arm to the shield (by its rim), the stance's far target, the weapon
-	# (two-handed), or swinging with the gait.
-	j["sh_n"] = sh + Vector2(2, 1) * b * body + (k.s as Vector2) * b + Vector2(w * sin(yaw_c), 0)
-	j["sh_f"] = sh + Vector2(-3, 1) * b * body + (k.sf as Vector2) * b - Vector2(w * sin(yaw_c), 0)
-	z["sh_n"] = w * cos(yaw_c)
-	z["sh_f"] = -w * cos(yaw_c)
+	# (two-handed), or swinging with the gait. Each arm lies in the plane of its own shoulder.
+	var shoulder_n := FkRig.at(sh + Vector2(2, 1) * b * body + (k.s as Vector2) * b + Vector2(w * sin(yaw_c), 0), w * cos(yaw_c))
+	var shoulder_f := FkRig.at(sh + Vector2(-3, 1) * b * body + (k.sf as Vector2) * b - Vector2(w * sin(yaw_c), 0), -w * cos(yaw_c))
 	var target_n := sh + (k.h as Vector2) * b
 	if pose.get("atk", -1.0) < 0.0:
 		target_n.x -= sin(walk) * g.get("hswing", 0.0) * mv * b
-	var hand_n := reach(j.sh_n, target_n, UPPER * b, FORE * b)
+	var hand_n := FkRig.reach3(shoulder_n, FkRig.at(target_n, shoulder_n.z), UPPER * b, FORE * b)
 	var bend: float = k.bend
 	if absf(bend) < 1.0:
 		# Changing which way the elbow folds: the arm straightens through the change, so it never snaps.
-		var v := hand_n - (j.sh_n as Vector2)
-		hand_n = j.sh_n + v.normalized() * lerpf((UPPER + FORE) * b - 0.01, v.length(), absf(bend))
-	j["hand_n"] = hand_n
+		var v := hand_n - shoulder_n
+		hand_n = shoulder_n + v.normalized() * lerpf((UPPER + FORE) * b - 0.01, v.length(), absf(bend))
 	j["bend_n"] = 1.0 if bend >= 0.0 else -1.0
-	j["elbow_n"] = ik(j.sh_n, hand_n, UPPER * b, FORE * b, j.bend_n if absf(bend) > 1e-3 else 0.0)
+	var elbow_n := FkRig.ik3(shoulder_n, hand_n, UPPER * b, FORE * b,
+		FkRig.plane_pole(shoulder_n, hand_n, j.bend_n if absf(bend) > 1e-3 else 0.0))
 	j["el_w"] = k.el_w
-	z["elbow_n"] = z.sh_n
-	z["hand_n"] = z.sh_n
 	if k.el_w > 0.0:
 		# A steered elbow sits where it shows on screen; its depth keeps both bones their length, so an
 		# arm swinging round toward the viewer draws foreshortened.
-		var el := _fit((j.elbow_n as Vector2).lerp(sh + (k.el as Vector2) * b, k.el_w), j.sh_n, hand_n, UPPER * b, FORE * b)
-		j["elbow_n"] = el
-		z["elbow_n"] = z.sh_n + sqrt(maxf(0.0, pow(UPPER * b, 2) - el.distance_squared_to(j.sh_n)))
-		z["hand_n"] = z.elbow_n - sqrt(maxf(0.0, pow(FORE * b, 2) - el.distance_squared_to(hand_n)))
+		var s2 := FkRig.project(shoulder_n)
+		var h2 := FkRig.project(hand_n)
+		var el := _fit(FkRig.project(elbow_n).lerp(sh + (k.el as Vector2) * b, k.el_w), s2, h2, UPPER * b, FORE * b)
+		elbow_n = FkRig.at(el, shoulder_n.z + sqrt(maxf(0.0, pow(UPPER * b, 2) - el.distance_squared_to(s2))))
+		hand_n.z = elbow_n.z - sqrt(maxf(0.0, pow(FORE * b, 2) - el.distance_squared_to(h2)))
+	var hand_flat := FkRig.project(hand_n)
 	if k.lock > 0.0:
-		j["dir"] = (j.dir as Vector2).slerp((hand_n - (j.elbow_n as Vector2)).normalized(), k.lock)
+		j["dir"] = (j.dir as Vector2).slerp((hand_flat - FkRig.project(elbow_n)).normalized(), k.lock)
 	var ft: Vector2
 	if k.has("rim") and shield != "":
 		ft = sh + ((k.rim as Vector2) + Vector2(0, FkArmour.SHIELD_TOP.get(shield, 10.5))) * b
@@ -430,19 +430,27 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 	elif shield != "":
 		ft = sh + SHIELD_GRIP * b
 	elif k.two:
-		ft = hand_n - (j.dir as Vector2) * 8.0 * b
+		ft = hand_flat - (j.dir as Vector2) * 8.0 * b
 	else:
-		ft = j.sh_f + Vector2(0, 16.5 * b).rotated(sin(walk) * g.swing * mv - 0.1)
-	var hand_f := reach(j.sh_f, ft, UPPER * b, FORE * b)
-	j["hand_f"] = hand_f
-	j["elbow_f"] = ik(j.sh_f, hand_f, UPPER * b, FORE * b, ELBOW)
-	z["elbow_f"] = z.sh_f
-	z["hand_f"] = z.sh_f
+		ft = FkRig.project(shoulder_f) + Vector2(0, 16.5 * b).rotated(sin(walk) * g.swing * mv - 0.1)
+	var hand_f := FkRig.reach3(shoulder_f, FkRig.at(ft, shoulder_f.z), UPPER * b, FORE * b)
+	p["sh_n"] = shoulder_n
+	p["sh_f"] = shoulder_f
+	p["elbow_n"] = elbow_n
+	p["hand_n"] = hand_n
+	p["elbow_f"] = FkRig.ik3(shoulder_f, hand_f, UPPER * b, FORE * b, FkRig.plane_pole(shoulder_f, hand_f, ELBOW))
+	p["hand_f"] = hand_f
+	# The one place the flat picture is read off the rig.
+	var z := {}
+	for joint in p:
+		j[joint] = FkRig.project(p[joint])
+		z[joint] = FkRig.depth(p[joint])
+	j["p3"] = p
 	j["z"] = z
 	# Attachment points (weapons and shields are still drawn from the hands; these are the hook).
-	j["sockets"] = {"grip_n": {"p": hand_n, "a": (j.dir as Vector2).angle(), "z": z.hand_n},
-		"grip_f": {"p": hand_f, "a": (hand_f - (j.elbow_f as Vector2)).angle(), "z": z.hand_f},
-		"back": {"p": j.chest, "a": (sh - hip).angle(), "z": 0.0}}
+	j["sockets"] = {"grip_n": {"p": j.hand_n, "a": (j.dir as Vector2).angle(), "z": z.hand_n},
+		"grip_f": {"p": j.hand_f, "a": ((j.hand_f as Vector2) - (j.elbow_f as Vector2)).angle(), "z": z.hand_f},
+		"back": {"p": j.chest, "a": ((j.sh as Vector2) - (j.hip as Vector2)).angle(), "z": 0.0}}
 	return j
 
 
