@@ -33,10 +33,14 @@ Units are 3D bodies seen through a 25° camera; the bases and towers are flat fr
 - **Bases.** Hide camp, temple, Roman castrum, star fort and wizard citadel are built from `Arch` volumes: boxes, prisms, frustums, cylinders and recesses, with the existing masonry, windows and banners drawn on their faces.
 - **Towers.** Lashed lookout (tapered post prisms and a plank platform), temple plinth (stepped box base, fluted cylinder pilasters, gilt cornice), watchtower (tufa base with an arch recess, timber post boxes, tiled skirt), earthwork bastion (frustum of earth, brick cap, gabion boxes) and arcane pylon (tapered body, brass ring boxes, crystal on the front plane; the orbiting runestones stay flat).
 
+## Elves (built): grown volumes
+
+- **Bases.** The trunk is a solid of revolution (`Arch.lathe`) with a root flare, bark grooves and two root fins; the decks and hall are timber boxes wrapped round it, the hall under a hipped leaf roof with real eaves (an eave shadow on the wall); the canopy is layers of foliage at different depths (`Arch.blob`) that shift against each other as the camera turns; the gate is a bark-clad frame with a pointed doorway recessed into it; the white gate-tower is a masonry cylinder with a cone roof and two vines winding round it (`Arch.helix`); the silver spire is an extruded slab behind the trunk.
+- **Towers.** Standing stone (a slab with thickness, a woven nest bowl with twigs), wicker cone with a leaf collar all the way round, three braided roots that really pass over and under each other (drawn in camera-depth order as mitred quads), fluted white column with a vine and a leaf balcony, moon-mushroom (stalk, ring, shelf fungi, domed cap with spots), hexagonal crystal pillar (`Arch.faceted`) with shards at its foot.
+
 ## Rollout (not built)
 
-1. **Elves:** grown structures, not masonry. The trunks are cylinders with root flares, the tree-halls timber bodies with real eaves, the canopies layered masses in depth; the towers woven and vine-bound columns (cylinders with spiral detail).
-2. **Dwarves:** mountain holds as stacked rock slabs with side faces and a stone hall at the foot; iron-banded towers as boxes and cylinders with rivet lines.
+1. **Dwarves:** mountain holds as stacked rock slabs with side faces and a stone hall at the foot; iron-banded towers as boxes and cylinders with rivet lines.
 
 Each step ends with a before and after gallery (`tools/base_gallery.gd`, with `--towers` and `--night=1`) for the owner to review; visual work cannot be verified in the cloud.
 

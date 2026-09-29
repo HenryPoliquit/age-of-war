@@ -124,3 +124,53 @@ func test_frustum_faces_taper() -> void:
 	check_eq(front[2].y, -70.0, "up to its height")
 	Arch.yaw = 0.0
 	check_eq(Arch.frustum_faces(-24.0, 24.0, -16.0, 16.0, -14.0, 14.0, -10.0, 10.0, -70.0).size(), 2, "the end of a tapered body still shows square-on: its slope faces the camera")
+
+
+func test_pt_is_the_camera_projection() -> void:
+	Arch.yaw = YAW
+	for p in [Vector3(-30, -50, 12), Vector3(20, -5, -8)]:
+		check(Arch.pt(p.x, p.y, p.z).distance_to(FkRig.project(p, {"yaw": YAW})) < 1e-4, "same as FkRig.project for %s" % p)
+	Arch.yaw = 0.0
+
+
+func test_lathe_follows_its_profile_and_leaves_the_camera_to_the_axis() -> void:
+	# A trunk's silhouette is its radius each side of the axis, whatever the yaw; the axis itself shifts with depth.
+	var profile := [[-100.0, 20.0], [-40.0, 26.0], [0.0, 60.0]]
+	for yaw in [0.0, YAW]:
+		Arch.yaw = yaw
+		var lo := INF
+		var hi := -INF
+		var strips := Arch.lathe_strips(-50.0, 10.0, profile)
+		for st in strips:
+			for v in st.poly:
+				lo = minf(lo, v.x)
+				hi = maxf(hi, v.x)
+		var axis := Arch.cylinder_x(-50.0, 10.0)
+		check(absf((axis - lo) - 61.2) < 0.5 and absf((hi - axis) - 61.2) < 0.5, "a base 60 each side of the axis at yaw %s (%s..%s)" % [yaw, lo, hi])
+		check(strips[2].k > strips[strips.size() - 1].k, "lit on the left, dark on the right")
+	Arch.yaw = 0.0
+
+
+func test_helix_draws_only_the_near_half() -> void:
+	Arch.yaw = YAW
+	var runs := Arch.helix_runs(-30.0, 0.0, 14.0, -200.0, 0.0, 3.0, -PI / 2.0)
+	var x := Arch.cylinder_x(-30.0, 0.0)
+	check_eq(runs.size(), 3, "a run of vine for each near half turn")
+	for run in runs:
+		for v in run:
+			check(v.x >= x - 14.01 and v.x <= x + 14.01, "inside the column's silhouette")
+			check(v.y <= 0.0 and v.y >= -200.0, "between the two ends")
+	Arch.yaw = 0.0
+
+
+func test_facets_show_the_faces_that_look_at_the_camera() -> void:
+	# A four-sided column with a face square to the viewer: one face square-on, two once the camera turns.
+	var profile := [[-40.0, 10.0], [0.0, 10.0]]
+	Arch.yaw = 0.0
+	check_eq(Arch.facets(0.0, 0.0, profile, 4, PI / 4.0).size(), 1, "square-on: the front face only")
+	Arch.yaw = YAW
+	var f := Arch.facets(0.0, 0.0, profile, 4, PI / 4.0)
+	check_eq(f.size(), 2, "turned: the front and the lane-facing face")
+	check(f[0].k != f[1].k, "the two faces are lit differently")
+	Arch.yaw = 0.0
+	check_eq(Arch.facets(0.0, 0.0, profile, 6).size(), 3, "a hexagon shows three faces from any side")

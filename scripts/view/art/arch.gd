@@ -218,6 +218,125 @@ static func cylinder(ci: CanvasItem, cx: float, cz: float, r: float, y0: float, 
 	ci.draw_line(Vector2(x + r, y0), Vector2(x + r, y1), EDGE, 1.0)
 
 
+## Screen position of the rig point (x, y, z).
+static func pt(x: float, y: float, z: float) -> Vector2:
+	return Vector2(cylinder_x(x, z), y)
+
+
+## The strips of a solid of revolution about the vertical axis at (cx, cz): `profile` is [[y, r], ...] from the top down,
+## and each strip {poly, k} is the surface between two angles, following the profile, with its brightness `k` (lit on
+## the left, like cylinder()).
+static func lathe_strips(cx: float, cz: float, profile: Array, n := 14) -> Array:
+	var x := cylinder_x(cx, cz)
+	var out: Array = []
+	for i in n:
+		var u0 := -1.0 + 2.0 * i / n
+		var u1 := -1.0 + 2.0 * (i + 1) / n
+		var um := (u0 + u1) * 0.5
+		var facing := Vector2(um, sqrt(maxf(0.0, 1.0 - um * um)))
+		var strip := PackedVector2Array()
+		for row in profile:
+			strip.append(Vector2(x + row[1] * (u0 - 0.02), row[0]))
+		for j in range(profile.size() - 1, -1, -1):
+			strip.append(Vector2(x + profile[j][1] * (u1 + 0.02), profile[j][0]))
+		out.append({"poly": strip, "k": 0.5 + 0.62 * maxf(0.0, facing.dot(Vector2(-0.55, 0.83)))})
+	return out
+
+
+## A rounded mass of foliage, rock or cloud centred at (x, y, z): an ellipse (a sphere seen from any side), lit from the
+## upper left, with a soft highlight. Masses at different z shift against each other as the camera turns.
+static func blob(ci: CanvasItem, x: float, y: float, z: float, r: Vector2, col: Color, rot := 0.0, n := 22) -> void:
+	var c := pt(x, y, z)
+	FkPaint.shade_poly(ci, FkPaint.ellipse_pts(c, r, rot, n), col, Vector2(0.5, -0.8))
+	ci.draw_colored_polygon(PackedVector2Array(FkPaint.ellipse_pts(c + Vector2(-r.x * 0.22, -r.y * 0.3), r * 0.55, rot, 14)), Color(1, 1, 1, 0.05))
+
+
+## A solid of revolution (a trunk, a bell, a column that swells), see lathe_strips(). `grain` grooves run down it
+## (bark), swaying a little.
+static func lathe(ci: CanvasItem, cx: float, cz: float, profile: Array, col: Color, grain := 0, n := 14, ink := Color(0, 0, 0, 0), ink_w := 1.1) -> void:
+	var x := cylinder_x(cx, cz)
+	for st in lathe_strips(cx, cz, profile, n):
+		ci.draw_colored_polygon(st.poly, _shade(col, st.k))
+	for g in grain:
+		var u := sin(lerpf(-PI * 0.4, PI * 0.4, (g + 0.5) / grain))
+		var line := PackedVector2Array()
+		for row in profile:
+			line.append(Vector2(x + row[1] * (u + 0.05 * sin(row[0] * 0.07 + g * 2.1)), row[0]))
+		ci.draw_polyline(line, Color(0, 0, 0, 0.22), 1.4)
+	if ink.a > 0.0:
+		# An ink outline round the silhouette (the towers' style): down the left, across the foot, up the right, across the top.
+		var outline := PackedVector2Array()
+		for row in profile:
+			outline.append(Vector2(x - row[1], row[0]))
+		for j in range(profile.size() - 1, -1, -1):
+			outline.append(Vector2(x + profile[j][1], profile[j][0]))
+		outline.append(outline[0])
+		ci.draw_polyline(outline, ink, ink_w)
+	else:
+		for side in [-1.0, 1.0]:
+			var edge := PackedVector2Array()
+			for row in profile:
+				edge.append(Vector2(x + side * row[1], row[0]))
+			ci.draw_polyline(edge, EDGE, 1.0)
+
+
+## The facets of a vertical prism or frustum with `sides` flat faces about the axis (cx, cz) that face the camera: `profile`
+## is [[y, r], ...] from the top down (r the radius to a corner), `rot` (rad) turns the first corner round from the +x axis.
+## Each {poly (screen), k (brightness, lit on the left like cylinder())}.
+static func facets(cx: float, cz: float, profile: Array, sides: int, rot := 0.0) -> Array:
+	var out: Array = []
+	for i in sides:
+		var a0 := rot + TAU * i / sides
+		var a1 := rot + TAU * (i + 1) / sides
+		var m := (a0 + a1) * 0.5
+		if cos(m) * sin(yaw) + sin(m) * cos(yaw) <= 1e-4:
+			continue
+		var poly := PackedVector2Array()
+		for row in profile:
+			poly.append(pt(cx + row[1] * cos(a0), row[0], cz + row[1] * sin(a0)))
+		for j in range(profile.size() - 1, -1, -1):
+			poly.append(pt(cx + profile[j][1] * cos(a1), profile[j][0], cz + profile[j][1] * sin(a1)))
+		out.append({"poly": poly, "k": 0.5 + 0.62 * maxf(0.0, -0.55 * cos(m) + 0.83 * sin(m))})
+	return out
+
+
+## A faceted column (a crystal, a hexagonal shaft), see facets().
+static func faceted(ci: CanvasItem, cx: float, cz: float, profile: Array, col: Color, sides := 6, rot := 0.0, ink := Color(0, 0, 0, 0), ink_w := 1.0) -> void:
+	for f in facets(cx, cz, profile, sides, rot):
+		ci.draw_colored_polygon(f.poly, _shade(col, f.k))
+		if ink.a > 0.0:
+			var q: PackedVector2Array = f.poly
+			q.append(q[0])
+			ci.draw_polyline(q, ink, ink_w)
+
+
+## The near runs of a helix (a vine, a rope, a stripe) winding round the vertical axis at (cx, cz), radius r, from
+## y_bottom up to y_top over `turns` turns, starting `phase` (rad) round from the front: the parts on the far half are
+## hidden behind the column. `radius_fn(y)` (optional) gives the radius at height y for a swelling or tapering column.
+static func helix_runs(cx: float, cz: float, r: float, y_top: float, y_bottom: float, turns: float, phase: float, radius_fn := Callable()) -> Array:
+	var x := cylinder_x(cx, cz)
+	var steps := int(ceil(turns * 24.0))
+	var out: Array = []
+	var run := PackedVector2Array()
+	for i in steps + 1:
+		var th := phase + TAU * turns * i / steps
+		var y := lerpf(y_bottom, y_top, float(i) / steps)
+		if cos(th) > 0.0:
+			run.append(Vector2(x + (radius_fn.call(y) if radius_fn.is_valid() else r) * sin(th), y))
+		else:
+			if run.size() >= 2:
+				out.append(run)
+			run = PackedVector2Array()
+	if run.size() >= 2:
+		out.append(run)
+	return out
+
+
+static func helix(ci: CanvasItem, cx: float, cz: float, r: float, y_top: float, y_bottom: float, turns: float, phase: float, col: Color, w := 2.0, radius_fn := Callable()) -> void:
+	for run in helix_runs(cx, cz, r, y_top, y_bottom, turns, phase, radius_fn):
+		ci.draw_polyline(run, col, w)
+
+
 ## Crenellation: the merlons along the front edge (z1) and, while the camera is turned, the lane-facing end (x1), as
 ## boxes [{side, x0, x1, z0, z1}] `h` tall and `w` wide every `pitch`, `thick` deep, on a wall top at y_top.
 static func merlon_boxes(x0: float, x1: float, z0: float, z1: float, y_top: float, h: float, w: float, pitch: float, thick: float) -> Array:
