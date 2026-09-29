@@ -26,7 +26,7 @@ The humanoid rig is 2.5D: every joint has a depth `z`, the pelvis and chest yaw 
 | Question | Decision |
 |---|---|
 | Approach | **3D rig, painted 2D parts.** Solve in 3D, project, draw the same procedural parts at the projected joints. Not real meshes baked to sprites: that would replace the procedural kit with a mesh and bake pipeline. |
-| Camera | **Profile by default, yaw as a parameter.** Ship yaw 0 (identical to today) and compare 0°, 15° and 25° on the review page before choosing. |
+| Camera | **Yaw as a parameter; 25° chosen.** Reviewed at 0°, 15° and 25° on the sheets, and the owner picked 25°. `UnitArt.VIEW_YAW_DEG` is the one setting; yaw 0 is still exactly today's square-on picture. |
 | Order | **3D core first, then mounts on it.** The mount rig is docs only so far, so nothing is redone. |
 
 ## 1. Space and camera
@@ -106,7 +106,7 @@ New: `j.p3` (joint name → `Vector3`) and, from stage 3, `j.wpn` and `j.shield`
 Every stage: tests green, `tools/unit_sheet.gd` renders, and the animation page republished (same URL) with a before/after strip. The owner reviews motion locally.
 
 1. **Core.** `FkRig`, `p3`, IK3 with in-plane poles. Nothing visual changes. The 720-frame golden test (`fk_golden.txt`) proves it.
-2. **Torso turn and camera yaw.** `pelvis_yaw`, `chest_yaw` channels, first authored for the melee swings (blade, shield, chop): the weapon shoulder pulls back on the wind-up and drives forward on the strike, the hips leading the chest, and the strike targets move forward with the shoulder so the arm still locks straight. `view.yaw` plumbed through `spec.view` (`UnitArt.view_yaw`). Sheet, gallery and animation tools get `--yaw=`. Review 0°, 15° and 25°, then the owner picks the default.
+2. **Torso turn and camera yaw.** `pelvis_yaw`, `chest_yaw` channels, first authored for the melee swings (blade, shield, chop): the weapon shoulder pulls back on the wind-up and drives forward on the strike, the hips leading the chest, and the strike targets move forward with the shoulder so the arm still locks straight. `view.yaw` plumbed through `spec.view` (`UnitArt.view_yaw`). Sheet, gallery and animation tools get `--yaw=`. Reviewed at 0°, 15° and 25°: the owner picked 25° (2026-09-29).
 3. **Held-object frames.** Shield plate and weapon frames. Retire `turn`, `zoom`, `lock`, `el`, `bend`.
 4. **Re-author the families in 3D**, one per owner brief, starting from the approved 2D motion (same hand target, plus a lateral component and a pole). Order: sword and shield (the brief that started this), blade, chop, thrust and pole, bow, aim, throw and sling, staff.
 5. **Mounts on `FkRig`.** Revise the mount spec and plan: the quadruped's IK becomes `ik3` and its `z` a real axis. Then the rest of that spec.
@@ -129,8 +129,8 @@ Every stage: tests green, `tools/unit_sheet.gd` renders, and the animation page 
 
 ## Risks
 
-- **Mounts and machines do not turn with the camera until stage 5.** At yaw ≠ 0 a rider is yawed and its horse is not (a couple of pixels of mismatch at 25°). Review the yaw on the foot soldiers.
-- **Yaw ≠ 0 on 2D-authored motion.** The approved poses were tuned in the flat profile. At 15°–25° they project with the depth shift and a slight x compression (`cos 25° = 0.91`). The review in stage 2 decides whether to compensate (uniform x scale) or accept.
+- **Mounts and machines do not turn with the camera until stage 5.** A rider, chariot driver or siege crew is yawed and its mount or machine is not. Checked on the sheets at 25° (mounted, chariot and every siege engine): no visible mismatch, a pixel or two at most.
+- **Yaw ≠ 0 on 2D-authored motion.** The approved poses were tuned in the flat profile. At 15°–25° they project with the depth shift and a slight x compression (`cos 25° = 0.91`). Decided at the stage 2 review: accepted at 25°, with no compensating x scale.
 - **Degenerate pole.** A straight arm has no elbow plane. Covered by the fallback pole and the continuity test.
 - **Left-handed axes.** Handled by pinning every rotation helper's sign with a test.
 

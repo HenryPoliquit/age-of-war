@@ -24,9 +24,11 @@ const ROLE_FALLBACK := {
 ## (or carry an upright polearm); Ranged are slighter and carry a pack on the back.
 const ROLE_BUILD := {"vanguard": 1.16, "ranged": 0.94}
 
-## Camera yaw (rad) the figures are seen at; 0 is the square-on side view. The one knob for the whole view;
-## the review tools set it from --yaw= (degrees).
-static var view_yaw := 0.0
+## Camera yaw the figures are seen at, degrees toward the side they face (0 = square-on). The owner picked 25
+## from the 0 / 15 / 25 review sheets (2026-09-29). The one knob for the whole view; the review tools override
+## `view_yaw` (radians) from --yaw=.
+const VIEW_YAW_DEG := 25.0
+static var view_yaw := deg_to_rad(VIEW_YAW_DEG)
 
 static var _style_cache := {}
 
