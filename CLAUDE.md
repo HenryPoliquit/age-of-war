@@ -32,6 +32,8 @@ timeout 90 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolu
 timeout 90 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --rendering-method gl_compatibility --path . --resolution 1920x1080 -s tools/unit_sheet.gd -- --role=vanguard --race=human --out=reports/sheet_vanguard_human.png
 # Base gallery (every race × age base with its turret towers in front; --towers for a close-up of the towers; --solo=elf:3 for one base big; --night=1 lights the windows; --yaw=DEG the camera, 25 by default):
 timeout 90 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolution 1920x1080 -s tools/base_gallery.gd -- --out=reports/base_gallery.png
+# Backdrop gallery (sky, scenery, ground, foreground and the base at the gate; --race=human|elf|dwarf --ages=1,2,3,4 → a 2 × 2 sheet; --solo=elf:3 for one full-size; --cam=X):
+timeout 120 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolution 1920x1080 -s tools/backdrop_gallery.gd -- --race=elf --ages=1,2,3,4 --out=reports/backdrop_elf.png
 ```
 
 After adding a new `class_name` script, run `timeout 100 tools/godot --headless --path . --import` once so the class is registered.
