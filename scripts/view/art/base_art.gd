@@ -7,16 +7,16 @@ extends RefCounted
 ## (y = 0), the base extends toward −x, and the enemy is toward +x (the right base is drawn mirrored).
 
 ## Tower foot per turret slot, in front of the gate; odd slots stand a step further back in depth.
-const PADS := [Vector2(44, -4), Vector2(104, -16), Vector2(164, -4), Vector2(224, -16), Vector2(284, -4)]
+const PADS := [Vector2(44, -4), Vector2(124, -16), Vector2(204, -4), Vector2(284, -16), Vector2(364, -4)]
 const SCALE := 1.35
 const TOWER_SCALE := 1.35
-## Tower height (before TOWER_SCALE) per race and age. A tower stands a good deal taller than the infantry of its age (which are
-## drawn 82–104 px tall; dwarves 63–72): about 1.35 times as tall for humans and elves, 1.5 for the stockier dwarves, so a turret
-## looks down on the units it protects.
+## Tower height (before TOWER_SCALE) per race and age. A tower stands well above the tallest mounted troop of its age (the
+## heavy horsemen and the bronze age chariot are drawn 90–120 px tall): about 30 px over their heads, so a turret looks down on
+## everyone it protects (the infantry are 63–104 px). In px after TOWER_SCALE: humans 132–148, elves 138–153, dwarves 120–134.
 const TOWER_H := {
-	&"human": [83.0, 87.0, 92.0, 96.0, 89.0, 102.0],
-	&"elf": [91.0, 93.0, 96.0, 99.0, 102.0, 105.0],
-	&"dwarf": [70.0, 72.0, 74.0, 76.0, 78.0, 80.0],
+	&"human": [98.0, 101.0, 103.0, 105.0, 107.0, 110.0],
+	&"elf": [102.0, 103.0, 107.0, 109.0, 111.0, 113.0],
+	&"dwarf": [89.0, 96.0, 96.0, 97.0, 98.0, 99.0],
 }
 
 

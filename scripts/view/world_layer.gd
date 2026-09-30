@@ -17,6 +17,9 @@ const BLEND_TIME := 0.12
 const BASE_BAR_BACK := 110.0
 const BASE_BAR_HEIGHT := 470.0
 const BASE_BAR_SIZE := Vector2(230, 12)
+## A damaged turret's life bar: its size and how far over the turret's mount it hangs.
+const TOWER_BAR_SIZE := Vector2(40, 6)
+const TOWER_BAR_ABOVE := 40.0
 var _font: Font
 
 
@@ -148,7 +151,26 @@ func _draw_overlay() -> void:
 			_draw_bars(_overlay, u)
 	for s in sim.sides:
 		_draw_base_bar(_overlay, s)
+		_draw_tower_bars(_overlay, s)
 
+
+
+## A damaged turret's life over its head, the base bar's colour, so it reads against any backdrop and is never hidden by a unit.
+func _draw_tower_bars(ci: CanvasItem, s: SimSide) -> void:
+	var dir := 1.0 if s.index == 0 else -1.0
+	var gate := view.sim.to_world(s.index, 0.0)
+	for i in s.turret_slots:
+		var tur: SimTurret = s.turrets[i]
+		if tur == null or tur.hp >= tur.max_hp:
+			continue
+		var mp := BaseArt.mount_pos(i, s.race, tur.def.age)
+		var centre := Vector2(gate + dir * mp.x, GROUND_Y + 4.0 + mp.y - TOWER_BAR_ABOVE)
+		var r := Rect2(centre - TOWER_BAR_SIZE * 0.5, TOWER_BAR_SIZE)
+		ci.draw_rect(r.grow(2.0), Color(0, 0, 0, 0.7))
+		var fill := Rect2(r.position, Vector2(r.size.x * clampf(tur.hp / tur.max_hp, 0.0, 1.0), r.size.y))
+		if s.index == 1:
+			fill.position.x = r.end.x - fill.size.x
+		ci.draw_rect(fill, view.team_color(s.index))
 
 
 func _draw_base_bar(ci: CanvasItem, s: SimSide) -> void:
@@ -194,9 +216,6 @@ func _draw_base(s: SimSide, t: float) -> void:
 			var kick := clampf(1.0 - (sim.time - tur.last_fire_time) / 0.25, 0.0, 1.0)
 			FkPaint.begin(self, xf * Transform2D(0.0, mp))
 			BaseArt.draw_turret(self, tur.def, team, aim, kick, t, outclassed, s.race)
-			if tur.hp < tur.max_hp:
-				draw_rect(Rect2(-14, -30, 28, 3), Color(0, 0, 0, 0.6))
-				draw_rect(Rect2(-14, -30, 28 * tur.hp / tur.max_hp, 3), Color("e05050"))
 			FkPaint.begin(self, xf)
 			if tur.def.kind == "support":
 				draw_set_transform(Vector2.ZERO)
