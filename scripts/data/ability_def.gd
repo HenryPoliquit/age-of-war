@@ -41,11 +41,6 @@ func is_targeted() -> bool:
 	return aim == "target"
 
 
-## Damage a single pulse does to a victim with `max_hp`, before armour and Defence (flat only).
-func nominal_hit(max_hp: float) -> float:
-	return damage_pct * max_hp if damage_mode == "percent" else damage
-
-
 ## True when armour and Defence upgrades do not reduce this skill's damage.
 func ignores_armour() -> bool:
 	return damage_mode != "flat"

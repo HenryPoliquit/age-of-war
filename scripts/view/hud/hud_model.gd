@@ -11,7 +11,6 @@ const SHAPE_TEXT := {
 	"strip": "hits the enemy line from its front unit back toward their base",
 	"sweep": "sweeps the whole lane from your gate to theirs",
 }
-const DAMAGE_WORD := {"slash": "slash", "pierce": "pierce", "blast": "blast", "siege": "siege"}
 
 
 static func pips(level: int, levels: int) -> String:
@@ -100,7 +99,7 @@ static func skill_effect_text(ab: AbilityDef) -> String:
 		"true":
 			text = "%d true damage%s, ignoring armour and Defence" % [roundi(ab.damage), times]
 		_:
-			text = "%d %s damage%s (armour applies)" % [roundi(ab.damage), DAMAGE_WORD.get(ab.damage_type, ab.damage_type), times]
+			text = "%d %s damage%s (armour applies)" % [roundi(ab.damage), ab.damage_type, times]
 	if ab.slow > 0.0:
 		text += "; survivors are slowed %d%% for %d s" % [roundi(ab.slow * 100.0), roundi(ab.slow_time)]
 	if ab.knockback >= 20.0:
