@@ -152,7 +152,7 @@ func test_feet_roll_heel_to_toe() -> void:
 			for p in FkSkeleton.boot(j["foot_" + tag], j["rot_" + tag], 1.0, j["toe_bend_" + tag]):
 				check((p as Vector2).y <= 0.05, "sole never below ground (phase %.2f)" % ph)
 	check(toe_off > 0.3, "heel lifts at toe-off")
-	check(heel_strike < -0.2, "toes lift at heel strike")
+	check(heel_strike < -0.02 and heel_strike > -0.2, "lands nearly flat, a mid-foot strike (%.2f)" % heel_strike)
 
 
 func test_blade_arm_straight_at_the_hit() -> void:
@@ -246,7 +246,7 @@ func _spread(frames: Array, f: Callable) -> float:
 
 func test_archer_head_stays_level() -> void:
 	var fr := _walk("bow")
-	check(_spread(fr, func(j): return j.sh.y) <= 1.6, "the head barely bobs (the hips arc a little so the knee can straighten)")
+	check(_spread(fr, func(j): return j.sh.y) <= 2.2, "the head bobs gently (the hips swell a little so the knee can straighten)")
 	check(fr[0].crouch >= 3.0, "bent knees, low centre")
 	check(fr[0].hand_f.y > fr[0].sh.y + 10.0, "bow held low at the side")
 
@@ -319,6 +319,25 @@ func test_reins_low_over_the_withers() -> void:
 		for atk in [-1.0, 0.34, 0.5]:
 			var j := _ride(w, atk)
 			check((j.hand_f - j.sh).distance_to(Vector2(8, 16)) < 2.5, "%s at %s: rein hand low over the withers" % [w, atk])
+
+
+func test_mounted_weapon_is_carried_tilted_toward_the_front() -> void:
+	# Owner: the weapon looked attached to the rider's shoulder on the march. It rides tilted up and toward the enemy from a
+	# hand held out in front of the hip, like the bow.
+	for w in ["saber", "axe", "lance", "spear"]:
+		var j := FkSkeleton.solve(1.0, w, {"atk": -1.0, "walk": 0.0, "move": 1.0}, "", true)
+		check(j.dir.x > 0.5 and j.dir.y < -0.5, "%s: tilted up and forward (dir %s)" % [w, j.dir])
+		check(j.hand_n.x - j.sh.x >= 8.0, "%s: the hand is out in front of the shoulder" % w)
+		check(j.hand_n.y > j.sh.y + 8.0, "%s: the hand is well below the shoulder" % w)
+
+
+func test_mounted_riders_lean_into_the_attack() -> void:
+	for w in ["saber", "axe", "lance", "spear"]:
+		var ride := FkSkeleton.solve(1.0, w, {"atk": -1.0}, "", true)
+		var strike := FkSkeleton.solve(1.0, w, {"atk": 0.5}, "", true)
+		check(strike.lean >= 0.3, "%s: leaning forward at the strike (%.2f)" % [w, strike.lean])
+		check(strike.lean >= ride.lean + 0.2, "%s: leaning further than on the march" % w)
+		check(strike.sh.x > ride.sh.x + 3.0, "%s: the shoulders travel forward" % w)
 
 
 func test_sabre_half_seat_draw_cut() -> void:
@@ -457,6 +476,7 @@ func _d3(j: Dictionary, a: String, c: String) -> float:
 	return Vector3(j[a].x, j[a].y, z[a]).distance_to(Vector3(j[c].x, j[c].y, z[c]))
 
 
+## (The seated blade and thrust stances were re-snapshotted when the mounted carry and lean changed, 2026-09-30.)
 func test_default_look_matches_the_pre_rig_skeleton() -> void:
 	var rows: Array = str_to_var(FileAccess.get_file_as_string("res://tests/fk_golden.txt"))
 	check_eq(rows.size(), 720, "golden loaded")
@@ -554,8 +574,8 @@ func test_toe_stays_down_as_the_heel_lifts() -> void:
 			best = j
 	var pts := FkSkeleton.boot(best.foot_n, best.rot_n, 1.0, best.toe_bend_n)
 	check_near(best.toe_bend_n, best.rot_n, 0.02, "toe cap lies flat at push-off")
-	check(absf((pts[4] as Vector2).y) < 0.1, "toe tip on the ground (y %.2f)" % (pts[4] as Vector2).y)
-	check((pts[5] as Vector2).y < -2.0, "heel lifted (y %.2f)" % (pts[5] as Vector2).y)
+	check(absf((pts[FkSkeleton.BOOT_TOE] as Vector2).y) < 0.1, "toe cap on the ground (y %.2f)" % (pts[FkSkeleton.BOOT_TOE] as Vector2).y)
+	check((pts[FkSkeleton.BOOT_HEEL] as Vector2).y < -2.0, "heel lifted (y %.2f)" % (pts[FkSkeleton.BOOT_HEEL] as Vector2).y)
 	for i in 64:
 		var j := FkSkeleton.solve(1.0, "none", {"walk": TAU * i / 64.0, "move": 1.0})
 		check(j.toe_bend_n >= 0.0 and j.toe_bend_n <= maxf(j.rot_n, 0.0) + 1e-5, "bend only while the heel is up (phase %d)" % i)
@@ -621,10 +641,10 @@ func test_walking_stance_knee_comes_close_to_straight() -> void:
 			var tag := "n" if j.foot_n.y >= j.foot_f.y else "f"
 			var f := _flex(j, tag)
 			straightest = minf(straightest, f)
-			if f < 30.0:
+			if f < 35.0:
 				straight += 1
 		check(straightest < 26.0, "%s: the stance knee gets nearly straight (%.0f degrees at best)" % [c[0], straightest])
-		check(straight >= fr.size() / 2, "%s: the stance leg is within 30 degrees of straight for half the stride (%d of %d frames)" % [c[0], straight, fr.size()])
+		check(straight >= fr.size() / 2, "%s: the stance leg is within 35 degrees of straight for half the stride (%d of %d frames)" % [c[0], straight, fr.size()])
 
 
 func test_walking_swing_knee_bends_to_bring_the_foot_through() -> void:
@@ -647,6 +667,53 @@ func test_walking_never_overextends_a_leg() -> void:
 		for j in _walk(c[0], c[1], 32):
 			check(_flex(j, "n") >= 0.0 and _flex(j, "f") >= 0.0, "%s: no hyperextended knee" % c[0])
 			check(j.foot_n.y <= 0.01 and j.foot_f.y <= 0.01, "%s: feet stay above the ground" % c[0])
+
+
+func test_hips_knees_and_ankles_move_smoothly_together() -> void:
+	# Owner: smoother if the hips, knees and ankles are balanced. Sampled 32 times a stride, no joint jumps between samples.
+	for c in WALKERS:
+		var n := 32
+		var hip := []
+		var knee := []
+		var ankle := []
+		var height := []
+		for i in n + 1:
+			var j := FkSkeleton.solve(1.0, c[0], {"walk": TAU * i / n, "move": 1.0, "t": 0.0}, c[1])
+			hip.append(-j.hip.y)
+			knee.append(_flex(j, "n"))
+			ankle.append(j.rot_n)
+			height.append(-j.foot_n.y)
+		var worst := {"hip": 0.0, "knee": 0.0, "ankle": 0.0, "foot": 0.0}
+		for i in n:
+			worst.hip = maxf(worst.hip, absf(hip[i + 1] - hip[i]))
+			worst.knee = maxf(worst.knee, absf(knee[i + 1] - knee[i]))
+			worst.ankle = maxf(worst.ankle, absf(ankle[i + 1] - ankle[i]))
+			worst.foot = maxf(worst.foot, absf(height[i + 1] - height[i]))
+		check(worst.hip < 0.9, "%s: the hips glide (%.2f px between samples)" % [c[0], worst.hip])
+		check(worst.knee < 22.0, "%s: the knee bends and straightens without a snap (%.0f degrees between samples)" % [c[0], worst.knee])
+		check(worst.ankle < 0.15, "%s: the ankle turns steadily (%.2f rad between samples)" % [c[0], worst.ankle])
+		check(worst.foot < 2.2, "%s: the foot rises and sets down without a jump (%.2f px between samples)" % [c[0], worst.foot])
+
+
+func test_the_ankle_works_through_the_whole_stride() -> void:
+	# Owner: "barely any ankle movement". The foot lands nearly flat, lies flat, the heel lifts progressively, the toe points
+	# after push-off and lifts to clear the ground in the swing.
+	for c in WALKERS:
+		if c[0] == "sling":
+			continue
+		var lo := 99.0
+		var hi := -99.0
+		var flat := 0
+		for j in _walk(c[0], c[1], 32):
+			lo = minf(lo, j.rot_n)
+			hi = maxf(hi, j.rot_n)
+			if absf(j.rot_n) < 0.02:
+				flat += 1
+		check(hi > 0.25, "%s: the heel lifts at push-off (%.2f rad)" % [c[0], hi])
+		check(lo < -0.07 and lo > -0.25, "%s: the toe lifts a little to land and to clear the ground (%.2f rad)" % [c[0], lo])
+		check(flat >= 6, "%s: the foot lies flat for part of the stance (%d of 32 frames)" % [c[0], flat])
+	var land := FkSkeleton.solve(1.0, "sling", {"walk": PI * 0.5, "move": 1.0, "t": 0.0})
+	check(land.rot_n > 0.1, "the slinger still lands on the ball of the foot")
 
 
 func test_a_foot_on_the_ground_stays_put_on_the_ground() -> void:

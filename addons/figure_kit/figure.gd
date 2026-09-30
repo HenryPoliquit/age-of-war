@@ -143,10 +143,18 @@ static func _parts(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int, 
 		if armoured:
 			FkPaint.seg(ci, knee.lerp(foot, 0.1), foot + Vector2(0, -2) * bb, 5.8 * bb.x, 4.8 * bb.x, metal.darkened(back))
 			ci.draw_circle(knee, 3.2 * bb.x, metal.darkened(back - 0.1))
-		# Boot: heel, sole and toe — pointing forward, rolling heel to toe with the stride.
+		# Boot: a shaft up the shin (it stays with the shin), the foot (it pitches at the ankle through the stride and bends
+		# at the ball as the heel lifts), and a cap over the joint where they meet.
+		var leather_b := leather.darkened(back)
+		var sd := (foot - knee).normalized()
+		var pn := Vector2(-sd.y, sd.x)
+		var top := foot - sd * 6.5 * b
+		FkPaint.shade_poly(ci, [top + pn * 2.85 * bb.x, top - pn * 2.85 * bb.x, foot - pn * 3.0 * bb.x, foot + pn * 3.0 * bb.x], leather_b)
+		ci.draw_line(top + pn * 2.85 * bb.x, top - pn * 2.85 * bb.x, leather.lightened(0.16).darkened(back), 1.4 * b)
 		var boot := FkSkeleton.boot(foot, j["rot_" + tag], b, j["toe_bend_" + tag], body)
-		FkPaint.shade_poly(ci, boot, leather.darkened(back))
-		ci.draw_line(boot[5], boot[4], Color(0.08, 0.06, 0.05), 1.2 * b)
+		FkPaint.shade_poly(ci, boot, leather_b)
+		ci.draw_circle(foot, 2.7 * b * body.y, leather_b)
+		ci.draw_line(boot[FkSkeleton.BOOT_HEEL], boot[FkSkeleton.BOOT_TOE], Color(0.08, 0.06, 0.05), 1.3 * b)
 	add.call("far leg", -50.0 + 0.5 * signf(z.hip_f), draw_leg.bind(1))
 	add.call("near leg", -50.0 + 0.5 * signf(z.hip_n), draw_leg.bind(0))
 	# Cape trails behind and lags the body (secondary motion).
