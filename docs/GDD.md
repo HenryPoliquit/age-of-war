@@ -314,7 +314,7 @@ The AI aims the same skills through the same command: at the densest group, off 
 
 | Mark | Skills | What it looks like |
 | --- | --- | --- |
-| **Circle** | Rockfall, Starfall (small: 200–260 px) | A ring on the ground whose outline brightens clockwise as the warning runs out. Rockfall's has dust turning round the rim and what falls lands inside it; Starfall's is a sigil (a second ring and a star turning inside it: eight points for the lance, five for the star, six for the rune) |
+| **Circle** | Rockfall, Starfall (small: 250–260 px) | A ring on the ground whose outline brightens clockwise as the warning runs out. Rockfall's has dust turning round the rim and what falls lands inside it; Starfall's is a sigil (a second ring and a star turning inside it: eight points for the lance, five for the star, six for the rune) |
 | **Field of land** | Volley, Cannonade (wide: 500–520 px) | A piece of land tinted in the skill's colour, with brackets painted at its corners; its back edge brightens as the countdown runs. Arrows or shells land anywhere across it, and shafts stay standing in it for a moment |
 | **None** | Stampede, Bombardment | Sweeps run from your gate to theirs and need no marker; the herd or the barrage is the picture |
 
@@ -339,7 +339,7 @@ A skill can also **shove** the units it hits back toward their base.
 | Iron | **Volley** — three waves of arrows rain on a field of land | **Aimed** | Field, 520 px | **True** 123 × 3 pulses (Pierce look) | 175 |
 | Medieval | **Bombardment** — a walking barrage from gate to gate | Auto | Sweep | **Percent** 12% of max HP, shoves back 12 px | 275 |
 | Gunpowder | **Cannonade** — signal flares mark a field, then heavy shells carpet it | **Aimed** | Field, 500 px | Flat Blast 912 × 5 pulses | 700 |
-| Arcane | **Starfall** — after a 1.5 s warning, a strike lands on every enemy unit inside the circle, six times, 0.5 s apart | **Aimed** | Circle, 200 px | **Percent** 18% of max HP × 6 pulses | 1,000 |
+| Arcane | **Starfall** — after a 1.5 s warning, a strike lands on every enemy unit inside the circle, six times, 0.5 s apart | **Aimed** | Circle, 250 px | **Percent** 18% of max HP × 6 pulses | 1,000 |
 
 A sweep's slices cross each unit once, so its damage is per unit, not per pulse. Every other shape hits a unit on every pulse it stands in.
 

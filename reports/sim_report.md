@@ -4,13 +4,13 @@
 
 | Area | Metric | Target | Value | |
 | --- | --- | --- | --- | --- |
-| Stalemates | Share of AI-vs-AI matches reaching escalation (15:00) | < 10% | 43% | ❌ |
+| Stalemates | Share of AI-vs-AI matches reaching escalation (15:00) | < 10% | 41% | ❌ |
 | Match length | Median match duration, Tactician vs. Tactician | 10–14 min | 14:21 | ❌ |
 | Pacing | Median time a balanced AI reaches Age 6 | 10:00–12:00 | 13:30 (59% of sides reach it) | ❌ |
-| Balance | Each personality's aggregate win rate (Hard vs. Hard) | 40–60% | tactician 47%, rusher 51%, turtle 42%, economist 61% | ❌ |
-| Balance | Any single personality pairing (first-named side's win rate) | 30–70% | tactician vs rusher 55%; tactician vs turtle 53%; tactician vs economist 33%; rusher vs turtle 55%; rusher vs economist 53%; turtle vs economist 33% | ✅ |
-| Decisions | Fast-age vs. skill-heavy Tactician (fast-age win rate) | 40–60% | 54% | ✅ |
-| Dominant units | Single-role spam vs. Tactician (Hard), spam win rate | < 30% each | vanguard 30%, ranged 60%, heavy 45%, siege 15% | ❌ |
+| Balance | Each personality's aggregate win rate (Hard vs. Hard) | 40–60% | tactician 46%, rusher 49%, turtle 43%, economist 62% | ❌ |
+| Balance | Any single personality pairing (first-named side's win rate) | 30–70% | tactician vs rusher 50%; tactician vs turtle 57%; tactician vs economist 30%; rusher vs turtle 53%; rusher vs economist 45%; turtle vs economist 40% | ✅ |
+| Decisions | Fast-age vs. skill-heavy Tactician (fast-age win rate) | 40–60% | 57% | ✅ |
+| Dominant units | Single-role spam vs. Tactician (Hard), spam win rate | < 30% each | vanguard 35%, ranged 60%, heavy 45%, siege 15% | ❌ |
 | Worst-case defence | Turtle vs. Turtle | < 25% reach escalation; none > 18:00 | 40% escalate; longest 29:59 | ❌ |
 
 ## Match length distribution (round robin + mirror + fast/skill)
@@ -22,11 +22,11 @@
 | 6–8 | 10 |
 | 8–10 | 30 |
 | 10–12 | 59 |
-| 12–14 | 9 |
-| 14–16 | 10 |
-| 16–18 | 16 |
-| 18–20 | 22 |
-| 20+ | 52 |
+| 12–14 | 10 |
+| 14–16 | 12 |
+| 16–18 | 8 |
+| 18–20 | 14 |
+| 20+ | 65 |
 
 ## Age arrival, Tactician mirror (median)
 
@@ -42,24 +42,24 @@
 
 | Lane | 0% | 8% | 16% | 25% | 33% | 41% | 50% | 58% | 66% | 75% | 83% | 91% |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Lost | 10% | 8% | 8% | 8% | 8% | 8% | 8% | 7% | 7% | 6% | 16% | 5% |
+| Lost | 9% | 7% | 8% | 8% | 8% | 9% | 9% | 8% | 8% | 7% | 14% | 5% |
 
 ## Per-unit trade efficiency (all suites)
 
 | Unit | Spawned | Damage dealt / gold | Damage absorbed / gold |
 | --- | --- | --- | --- |
-| arcane_heavy | 40 | 3.25 | 7.79 |
-| arcane_ranged | 10280 | 6.05 | 4.36 |
-| arcane_siege | 443 | 3.07 | 2.30 |
-| arcane_vanguard | 15341 | 4.72 | 7.94 |
+| arcane_heavy | 73 | 2.86 | 7.97 |
+| arcane_ranged | 11643 | 5.91 | 4.38 |
+| arcane_siege | 524 | 2.65 | 2.37 |
+| arcane_vanguard | 17885 | 4.78 | 8.01 |
 | bronze_heavy | 92 | 5.42 | 4.27 |
 | bronze_ranged | 2843 | 3.86 | 2.80 |
 | bronze_siege | 265 | 0.43 | 1.75 |
 | bronze_vanguard | 5587 | 3.04 | 4.88 |
-| gunpowder_heavy | 87 | 2.45 | 6.67 |
-| gunpowder_ranged | 3272 | 5.73 | 3.64 |
-| gunpowder_siege | 237 | 3.63 | 1.99 |
-| gunpowder_vanguard | 5425 | 4.53 | 6.75 |
+| gunpowder_heavy | 89 | 2.46 | 6.67 |
+| gunpowder_ranged | 3277 | 5.69 | 3.64 |
+| gunpowder_siege | 237 | 3.49 | 1.98 |
+| gunpowder_vanguard | 5446 | 4.48 | 6.75 |
 | iron_heavy | 88 | 3.72 | 4.93 |
 | iron_ranged | 3923 | 4.03 | 3.12 |
 | iron_siege | 196 | 2.27 | 1.79 |
