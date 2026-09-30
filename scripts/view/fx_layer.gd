@@ -133,6 +133,9 @@ func shoot(kind: String, from: Vector2, to: Vector2, dtype: String, on_hit: Call
 		"shell": 520.0, "bolt": 1500.0, "orb": 560.0}.get(kind, 800.0) as float
 	if kind in ["arrow", "stone", "javelin", "axe"]:
 		_sound("bow", from, -6.0)
+	if kind == "stone":
+		# The crack of the sling as the stone is let go.
+		flash(from, 9.0, Color(1.0, 0.98, 0.9, 0.6), 0.06)
 	var arc := {"arrow": 0.22, "stone": 0.2, "javelin": 0.2, "axe": 0.2, "ball": 0.18, "shell": 0.55, "orb": 0.4}.get(kind, 0.0) as float
 	projectiles.append({"kind": kind, "from": from, "to": to, "born": now(), "dur": maxf(0.06, dist / speed),
 		"arc": dist * arc, "dtype": dtype, "on_hit": on_hit, "heavy": heavy})
@@ -142,6 +145,21 @@ func _proj_pos(p: Dictionary, u: float) -> Vector2:
 	var a: Vector2 = p.from
 	var b: Vector2 = p.to
 	return a.lerp(b, u) + Vector2(0, -4.0 * p.arc * u * (1.0 - u))
+
+
+## A fading streak behind a projectile: a dark under-stroke, so it shows on a bright sky, and a light one on top of it.
+func _streak(ci: CanvasItem, p: Dictionary, u: float, span: float, col: Color, w: float) -> void:
+	var du := minf(span / maxf(1.0, (p.to as Vector2).distance_to(p.from)), u)
+	if du <= 0.0:
+		return
+	var n := 8
+	var pts := PackedVector2Array()
+	for i in n + 1:
+		pts.append(_proj_pos(p, u - du * i / n))
+	ci.draw_polyline(pts, Color(0.05, 0.05, 0.08, 0.2), w + 2.5)
+	for i in n:
+		var f := float(i) / n
+		ci.draw_line(pts[i], pts[i + 1], Color(col, col.a * (1.0 - f)), maxf(0.6, w * (1.0 - 0.8 * f)))
 
 
 # ---------------------------------------------------------------------------
@@ -307,30 +325,66 @@ func _draw() -> void:
 		var pos := _proj_pos(p, u)
 		var ahead := _proj_pos(p, minf(1.0, u + 0.04))
 		var dirv := (ahead - pos).normalized()
+		var tint: Color = p.get("col", Color(1, 1, 1))
+		var ink := Color(0.06, 0.05, 0.05, 0.85)
 		match p.kind:
 			"arrow", "javelin":
-				var l := 16.0 if p.kind == "arrow" else 22.0
-				draw_line(pos - dirv * l, pos, Color("6b4a2b"), 2.0)
-				draw_line(pos - dirv * l, pos - dirv * (l - 4) + dirv.orthogonal() * 3, Color(0.9, 0.9, 0.9), 1.5)
-				draw_colored_polygon(PackedVector2Array([pos + dirv * 4, pos + dirv.orthogonal() * 2.5, pos - dirv.orthogonal() * 2.5]), Color("b5b9bf"))
+				var l := 28.0 if p.kind == "arrow" else 36.0
+				var side := dirv.orthogonal()
+				_streak(self, p, u, l * 2.2, Color(0.98, 0.95, 0.85, 0.7), 2.6)
+				draw_line(pos - dirv * l, pos, ink, 4.6)
+				draw_line(pos - dirv * l, pos, Color("dcb57c"), 2.6)
+				# Fletching in the shooter's colour, so a volley shows whose it is.
+				for k in 3:
+					var at := pos - dirv * (l - 1.0 - k * 3.2)
+					draw_line(at, at - dirv * 3.6 + side * 3.6, ink, 3.2)
+					draw_line(at, at - dirv * 3.6 - side * 3.6, ink, 3.2)
+					draw_line(at, at - dirv * 3.6 + side * 3.6, tint, 1.8)
+					draw_line(at, at - dirv * 3.6 - side * 3.6, tint, 1.8)
+				var head := PackedVector2Array([pos + dirv * 9.0, pos + side * 3.4 - dirv * 1.5, pos - side * 3.4 - dirv * 1.5])
+				draw_colored_polygon(PackedVector2Array([pos + dirv * 11.0, pos + side * 5.0 - dirv * 2.5, pos - side * 5.0 - dirv * 2.5]), ink)
+				draw_colored_polygon(head, Color("e2e6ec"))
 			"stone":
-				draw_circle(pos, 3.0, Color("7b7466"))
+				_streak(self, p, u, 46.0, Color(0.98, 0.95, 0.85, 0.8), 3.4)
+				draw_circle(pos, 6.0, ink)
+				draw_circle(pos, 4.8, Color("b4ad99"))
+				draw_circle(pos + Vector2(1.3, 1.3), 2.6, Color("8c8571"))
+				draw_circle(pos + Vector2(-1.6, -1.6), 1.6, Color(1, 1, 1, 0.9))
 			"axe":
-				# Spinning throwing axe.
+				# A spinning throwing axe, with the ghosts of where it just was.
 				var a: float = (t - p.born) * 18.0
-				var d := Vector2.RIGHT.rotated(a)
-				draw_line(pos - d * 7, pos + d * 7, Color("6b4a2b"), 2.0)
-				draw_colored_polygon(PackedVector2Array([pos + d * 7, pos + d * 7 + d.orthogonal() * 6, pos + d * 3 + d.orthogonal() * 6]), Color("b5b9bf"))
+				for k in 3:
+					var back := _proj_pos(p, maxf(0.0, u - k * 0.02))
+					var d := Vector2.RIGHT.rotated(a - k * 0.7)
+					var fade := 1.0 - k * 0.35
+					if k == 0:
+						draw_line(back - d * 13, back + d * 13, ink, 6.0)
+					draw_line(back - d * 13, back + d * 13, Color(Color("dcb57c"), fade), 3.6)
+					var blade := PackedVector2Array([back + d * 13, back + d * 13 + d.orthogonal() * 11, back + d * 5 + d.orthogonal() * 11])
+					if k == 0:
+						draw_colored_polygon(PackedVector2Array([back + d * 15.5, back + d * 15.5 + d.orthogonal() * 13.5, back + d * 2.5 + d.orthogonal() * 13.5]), ink)
+					draw_colored_polygon(blade, Color(Color("e4e8ed"), fade))
 			"orb":
-				draw_circle(pos, 4.5, Color(1, 1, 1, 0.9))
+				draw_circle(pos, 6.5, Color(1, 1, 1, 0.95))
 			"ball":
-				draw_circle(pos, 5.5, Color(0.1, 0.1, 0.1))
+				_streak(self, p, u, 30.0, Color(0.8, 0.8, 0.8, 0.35), 5.0)
+				draw_circle(pos, 8.8, Color(0.85, 0.85, 0.8, 0.9))
+				draw_circle(pos, 7.6, Color(0.07, 0.07, 0.08))
+				draw_circle(pos + Vector2(-2.4, -2.4), 2.4, Color(1, 1, 1, 0.5))
 			"shell":
-				draw_circle(pos, 5.0, Color(0.2, 0.2, 0.18))
+				_streak(self, p, u, 30.0, Color(0.8, 0.8, 0.8, 0.35), 5.0)
+				draw_circle(pos, 8.0, Color(0.9, 0.85, 0.7, 0.9))
+				draw_circle(pos, 6.8, Color(0.24, 0.22, 0.2))
+				draw_circle(pos + Vector2(-2.0, -2.0), 2.2, Color(1, 1, 1, 0.5))
 			"bullet", "tracer":
-				pass
+				var back := _proj_pos(p, maxf(0.0, u - 44.0 / maxf(1.0, (p.to as Vector2).distance_to(p.from))))
+				draw_line(back, pos, Color(1.0, 0.72, 0.3, 0.55), 5.0)
+				draw_line(back, pos, Color(1.0, 0.95, 0.75, 0.95), 2.6)
+				draw_circle(pos, 3.0, Color(1, 1, 0.9))
 			"bolt":
-				pass
+				var back := _proj_pos(p, maxf(0.0, u - 40.0 / maxf(1.0, (p.to as Vector2).distance_to(p.from))))
+				draw_line(back, pos, Color(1, 1, 1, 0.95), 2.4)
+				draw_circle(pos, 3.6, Color(1, 1, 1))
 
 
 func _draw_actor(a: Dictionary, t: float) -> void:
@@ -372,20 +426,27 @@ func _draw_glow() -> void:
 	for p in projectiles:
 		var u: float = (t - p.born) / p.dur
 		var pos := _proj_pos(p, u)
-		var back := _proj_pos(p, maxf(0.0, u - 0.08))
+		var span := 44.0 / maxf(1.0, (p.to as Vector2).distance_to(p.from))
+		var back := _proj_pos(p, maxf(0.0, u - span))
 		match p.kind:
 			"bullet", "tracer":
-				glow.draw_line(back, pos, Color(1.0, 0.85, 0.5, 0.9), 2.0)
+				glow.draw_line(back, pos, Color(1.0, 0.85, 0.5, 0.9), 4.0)
+				glow.draw_circle(pos, 7.0, Color(1.0, 0.85, 0.5, 0.45))
 			"bolt":
 				var c: Color = p.get("col", Color("37e7ff"))
-				glow.draw_line(back, pos, Color(c, 0.9), 4.0)
-				glow.draw_circle(pos, 6.0, Color(c, 0.6))
+				glow.draw_line(back, pos, Color(c, 0.9), 7.0)
+				glow.draw_circle(pos, 10.0, Color(c, 0.6))
 			"shell", "ball":
-				glow.draw_circle(pos, 8.0, Color(1.0, 0.6, 0.3, 0.25))
+				glow.draw_circle(pos, 12.0, Color(1.0, 0.6, 0.3, 0.3))
 			"orb":
 				var c: Color = p.get("col", Color("9fe4ff"))
-				glow.draw_line(back, pos, Color(c, 0.6), 6.0)
-				glow.draw_circle(pos, 10.0, Color(c, 0.55))
+				glow.draw_line(back, pos, Color(c, 0.6), 8.0)
+				glow.draw_circle(pos, 13.0, Color(c, 0.55))
+			"stone":
+				# A soft halo so a small stone still shows against dark ground and bright sky.
+				glow.draw_circle(pos, 10.0, Color(1.0, 0.97, 0.88, 0.13))
+			"arrow", "javelin", "axe":
+				glow.draw_circle(pos, 8.0, Color(1.0, 0.97, 0.88, 0.14))
 	for a in actors:
 		if a.kind == "beam":
 			var u: float = (t - a.born) / a.life

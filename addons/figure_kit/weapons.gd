@@ -19,7 +19,20 @@ const HELD_FAR := ["bow", "starbow"]
 ## at head height, since ranged units now aim and fire from the shoulder and jaw.
 const MUZZLE := {"musket": Vector2(36, -50), "rifle": Vector2(32, -50), "arcane_rifle": Vector2(32, -50),
 	"rune_rifle": Vector2(32, -50), "crossbow": Vector2(27, -50), "bow": Vector2(22, -53), "starbow": Vector2(22, -53),
-	"javelin": Vector2(20, -56), "throwing_axe": Vector2(20, -56), "sling": Vector2(18, -60)}
+	"javelin": Vector2(20, -56), "throwing_axe": Vector2(20, -56), "sling": Vector2(10, -68)}
+
+## How far into the attack the shot leaves the weapon (the default is the bow's and the guns': as the wind-up ends). The slinger
+## lets go later, in the middle of the forward whip, once the stone has been whirled up to speed.
+const RELEASE := {"sling": 0.46}
+const RELEASE_DEFAULT := 0.35
+
+## The sling: cord and pouch from the hand to the stone (px × build), the angle the stone is let go at (rad, y down: just before
+## the top of the circle, where it is travelling forward and up), the whole turns it makes on top of the way round to that
+## angle, and the angle it starts from (hanging below the hand).
+const SLING_R := 15.0
+const SLING_LET_GO := deg_to_rad(-112.0)
+const SLING_TURNS := 1.0
+const SLING_START := PI * 0.5
 
 ## A long gun's butt relative to the trigger hand (× build, along the gun): it sits in the shoulder.
 const GUN_BUTT := Vector2(-6, -1)
@@ -35,6 +48,37 @@ static func weapon_length(kind: String) -> float:
 ## Side a bladed head's edge faces: the leading side of the figure's forward/downward strike.
 static func edge_normal(dir: Vector2) -> Vector2:
 	return -dir.orthogonal()
+
+
+## How far into the attack (0..1) this weapon's shot leaves it.
+static func release(kind: String) -> float:
+	return RELEASE.get(kind, RELEASE_DEFAULT)
+
+
+## The sling at attack progress `atk` (0..1) for a hand at `hand`; `carried` is where the pouch hangs when it is not being swung
+## and `kx` how much the camera squeezes horizontal distances (cos of its yaw). The pouch is carried up into a whirl over the
+## head that speeds up until the release (RELEASE.sling), then swings on over the top and down, and settles back into the
+## carried pose. Returns {pouch, theta, speed (rad per unit of atk), loaded (the stone is in it), hold (0..1, how much the
+## far hand has the pouch)}.
+static func sling_pose(atk: float, hand: Vector2, carried: Vector2, b: float, kx: float) -> Dictionary:
+	var rel: float = RELEASE.sling
+	var r := SLING_R * b
+	var let_go := SLING_LET_GO + TAU
+	var total := let_go + TAU * SLING_TURNS - SLING_START
+	if atk < rel:
+		var s := clampf(atk / rel, 0.0, 1.0)
+		var theta := SLING_START + total * pow(s, 1.7)
+		var swing := hand + Vector2(cos(theta) * kx, sin(theta)) * r
+		var lift := smoothstep(0.0, 0.25, s)
+		return {"pouch": carried.lerp(swing, lift), "theta": theta, "speed": total * 1.7 * pow(s, 0.7) / rel, "loaded": true, "hold": 1.0 - lift}
+	var u := clampf((atk - rel) / (1.0 - rel), 0.0, 1.0)
+	# The empty sling carries on over the top and hangs, wobbling as it comes to rest, then goes back to the far hand.
+	var fall := clampf(u / 0.5, 0.0, 1.0)
+	var phi := let_go + deg_to_rad(202.0) * (1.0 - (1.0 - fall) * (1.0 - fall)) + deg_to_rad(14.0) * sin(u * 10.0) * (1.0 - u)
+	var reach := r * lerpf(1.0, 0.82, fall)
+	var hang := hand + Vector2(cos(phi) * kx, sin(phi)) * reach
+	var back := smoothstep(0.65, 1.0, u)
+	return {"pouch": hang.lerp(carried, back), "theta": phi, "speed": 0.0, "loaded": false, "hold": back}
 
 
 ## j = FkSkeleton.solve() joints (arms already offset to the drawn shoulders); s = FkUnits.swing(atk).
@@ -122,23 +166,7 @@ static func weapon(ci: CanvasItem, kind: String, j: Dictionary, b: float, s: flo
 					FkPaint.poly(ci, [hand + Vector2(1, -10) * b, hand + Vector2(7, -13) * b, hand + Vector2(7, -5) * b, hand + Vector2(1, -7) * b], metal)
 				FkFigure.fist(ci, hand, dirv.angle(), b, skin, false)
 		"sling":
-			if atk < 0.0:
-				# Carried: the braided cords drape between both hands at chest level, the pouch swinging
-				# with each bounce of the walk.
-				var other: Vector2 = j.hand_f
-				var sway := sin(pose.get("walk", 0.0) * 2.0 + t) * 2.0 * b
-				var pouch := hand.lerp(other, 0.5) + Vector2(sway, 6.0 * b)
-				var cord := Color("c9b28a")
-				ci.draw_polyline(PackedVector2Array([hand, hand.lerp(pouch, 0.5) + Vector2(0, 1.5 * b), pouch]), cord, 1.2)
-				ci.draw_polyline(PackedVector2Array([pouch, other.lerp(pouch, 0.5) + Vector2(0, 1.5 * b), other]), cord, 1.2)
-				FkPaint.ellipse(ci, pouch, Vector2(2.4, 1.8) * b, Color("8a6a45"))
-			else:
-				var spin := t * (22.0 if atk < 0.4 else 5.0)
-				var stone := hand + Vector2(cos(spin), sin(spin) * 0.5) * 10 * b
-				ci.draw_line(hand, stone, Color("c9b28a"), 1.2)
-				ci.draw_arc(hand, 10 * b, 0, TAU, 16, Color(0.8, 0.75, 0.6, 0.35), 1.5)
-				if atk < 0.4 or atk > 0.9:
-					ci.draw_circle(stone, 2.2 * b, Color("7b7466"))
+			_sling(ci, j, b, atk, pose, t)
 		"bow", "starbow":
 			# The far hand holds the bow at the throat; the near hand hooks and draws the string.
 			var grip: Vector2 = j.hand_f
@@ -237,3 +265,61 @@ static func weapon(ci: CanvasItem, kind: String, j: Dictionary, b: float, s: flo
 					for i in 3:
 						ci.draw_line(at.call(16.0 + i * 4, -2.5), at.call(16.0 + i * 4, 0.5), metal.lightened(0.2), 1.0)
 			FkFigure.fist(ci, hand, dirv.angle(), b, skin, false)
+
+
+## A cord from a to c with a little sag, dark outlined so it reads against any backdrop.
+static func _cord(ci: CanvasItem, a: Vector2, c: Vector2, sag: float, b: float, pose: Dictionary, alpha := 1.0) -> void:
+	var chord := a.lerp(c, 0.5)
+	var mid := chord + Vector2(0, sag * b)
+	var pts := PackedVector2Array([a, a.lerp(mid, 0.5), mid, mid.lerp(c, 0.5), c])
+	ci.draw_polyline(pts, Color(0.1, 0.08, 0.05, 0.55 * alpha), 2.6)
+	ci.draw_polyline(pts, Color(FkPaint.tint(Color("dcc79c"), pose), alpha), 1.3)
+
+
+## The sling: braided cords and a leather pouch that drapes between the hands, is whirled overhead through the wind-up (a stone in
+## the pouch, a blur behind it that grows with its speed), lets the stone go as the arm whips forward, and swings on empty.
+static func _sling(ci: CanvasItem, j: Dictionary, b: float, atk: float, pose: Dictionary, t: float) -> void:
+	var hand: Vector2 = j.hand_n
+	var other: Vector2 = j.hand_f
+	var sway := sin(pose.get("walk", 0.0) * 2.0 + t) * 2.0 * b
+	var carried := hand.lerp(other, 0.5) + Vector2(sway, 6.0 * b)
+	var pouch := carried
+	var hold := 1.0
+	var loaded := true
+	var spin := 0.0
+	var theta := 0.0
+	var kx := cos(j.get("yaw", 0.0))
+	if atk >= 0.0:
+		var sp := sling_pose(atk, hand, carried, b, kx)
+		pouch = sp.pouch
+		hold = sp.hold
+		loaded = sp.loaded
+		spin = sp.speed
+		theta = sp.theta
+	# The blur behind a stone in the whirl: the faster it goes, the longer the arc.
+	var span := clampf(spin * 0.045, 0.0, 2.4)
+	if loaded and span > 0.15:
+		var r := (pouch - hand).length()
+		var arc := PackedVector2Array()
+		var n := 12
+		for i in n + 1:
+			var a := theta - span * i / n
+			arc.append(hand + Vector2(cos(a) * kx, sin(a)) * r)
+		ci.draw_polyline(arc, Color(0.1, 0.08, 0.05, 0.22), 4.0)
+		for i in n:
+			var f := float(i) / n
+			ci.draw_line(arc[i], arc[i + 1], Color(0.97, 0.93, 0.8, 0.75 * (1.0 - f)), lerpf(2.6, 0.6, f))
+	# The far hand holds the pouch until the whirl starts, and takes the ends back after the throw.
+	_cord(ci, hand, pouch, 0.0 if atk < 0.0 or loaded else 2.5, b, pose)
+	if atk < 0.0 or not loaded:
+		_cord(ci, hand + Vector2(1.2, 1.0) * b, pouch, 3.5 if loaded else 5.0, b, pose, 0.9)
+	if hold > 0.02:
+		_cord(ci, pouch, other, 2.0, b, pose, hold)
+	var tilt := (pouch - hand).angle() + PI * 0.5
+	var leather := FkPaint.tint(Color("8a6a45"), pose)
+	FkPaint.ellipse(ci, pouch, Vector2(3.8, 2.7) * b, Color(0.1, 0.08, 0.05, 0.7), tilt)
+	FkPaint.ellipse(ci, pouch, Vector2(3.0, 2.0) * b, leather, tilt)
+	if loaded:
+		ci.draw_circle(pouch, 3.4 * b, Color(0.1, 0.08, 0.05, 0.8))
+		ci.draw_circle(pouch, 2.6 * b, FkPaint.tint(Color("cfc9b8"), pose))
+		ci.draw_circle(pouch + Vector2(-0.8, -0.8) * b, 0.9 * b, Color(1, 1, 1, 0.8))

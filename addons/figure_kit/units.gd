@@ -88,10 +88,30 @@ static func stride_rate(spec: Dictionary, scale: float, fallback := 0.1) -> floa
 	return FkSkeleton.stride_rate(spec.get("weapon", "none"), spec.get("shield", ""), spec.get("build", 1.0), body, scale)
 
 
-## Muzzle in unit-local space (feet origin, facing +x).
+static var _muzzle_cache := {}
+
+
+## Muzzle in unit-local space (feet origin, facing +x). A slinger's is where the stone is when it is let go, which follows the
+## body, so it is worked out from the pose (spec.look and spec.view as when drawing).
 static func muzzle(spec: Dictionary) -> Vector2:
+	if spec.rig == "humanoid" and spec.get("weapon", "") == "sling" and not spec.has("muzzle"):
+		var b: float = spec.get("build", 1.0)
+		var look: Dictionary = spec.get("look", {})
+		var yaw: float = spec.get("view", {}).get("yaw", 0.0)
+		var key := "%s|%s|%s" % [b, look.get("body", Vector2.ONE), yaw]
+		if not _muzzle_cache.has(key):
+			var rel := FkWeapons.release("sling")
+			var j := FkSkeleton.solve(b, "sling", {"walk": 0.0, "move": 0.0, "atk": rel, "t": 0.0}, "", false, look, {"yaw": yaw})
+			var wrist: Vector2 = j.hand_n
+			_muzzle_cache[key] = FkWeapons.sling_pose(rel, wrist, wrist, b, cos(yaw)).pouch
+		return _muzzle_cache[key]
 	var hand: Vector2 = FkWeapons.MUZZLE.get(spec.get("weapon", ""), Vector2(22, -34)) if spec.rig == "humanoid" else Vector2(22, -34)
 	return spec.get("muzzle", RIGS.get(spec.rig, {}).get("muzzle", hand))
+
+
+## How far into the attack (0..1) the shot leaves the unit: a slinger lets go late, in the whip; the rest as the wind-up ends.
+static func release(spec: Dictionary) -> float:
+	return FkWeapons.release(spec.get("weapon", "")) if spec.rig == "humanoid" else FkWeapons.RELEASE_DEFAULT
 
 
 ## "blast", "siege" or "" (a body that falls over).

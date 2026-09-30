@@ -507,6 +507,7 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 	j["p3"] = p
 	j["z"] = z
 	j["dir"] = FkRig.project_dir(FkRig.at(dir), view)
+	j["yaw"] = view.get("yaw", 0.0)
 	# Attachment points (weapons and shields are still drawn from the hands; these are the hook).
 	j["sockets"] = {"grip_n": {"p": j.hand_n, "a": (j.dir as Vector2).angle(), "z": z.hand_n},
 		"grip_f": {"p": j.hand_f, "a": ((j.hand_f as Vector2) - (j.elbow_f as Vector2)).angle(), "z": z.hand_f},

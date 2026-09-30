@@ -416,7 +416,7 @@ func _on_shot(f: Dictionary) -> void:
 		# Melee: the hit lands on the contact frame of the swing (GDD §13.3).
 		fx.later(L * 0.42, hit)
 		return
-	var m := UnitArt.muzzle_for(st)
+	var m := UnitArt.muzzle_for(st, race)
 	var muzzle := origin + Vector2(dir * m.x, m.y) * WorldLayer.UNIT_SCALE
 	var info: Dictionary = UnitArt.RIGS.get(rig, {})
 	var big: bool = info.get("gun", false) and def.role == "siege"
@@ -427,13 +427,12 @@ func _on_shot(f: Dictionary) -> void:
 		col = magic if def.age >= 5 or kind == "orb" else col
 	if st.get("variant", "") == "flame":
 		col = Color(1.0, 0.55, 0.2)
-	fx.later(L * 0.35, func():
+	fx.later(L * UnitArt.release_for(st), func():
 		if gun:
 			fx.muzzle(muzzle, 0.0 if dir > 0 else PI, big, col if kind in ["bolt", "orb"] else Color(1.0, 0.8, 0.4),
 				"zap" if kind == "bolt" else ("cannon" if big else "gun"))
 		fx.shoot(kind, muzzle, to, dtype, hit, heavy)
-		if kind in ["bolt", "orb"]:
-			fx.projectiles[-1]["col"] = col)
+		fx.projectiles[-1]["col"] = col)
 
 
 ## Attacks land between the target's head and chest: this fraction of its drawn height.
@@ -470,8 +469,7 @@ func _on_turret_shot(f: Dictionary) -> void:
 			flash_at[tid] = anim_time
 		if splash:
 			_splash_flash(enemy, f.to_x, radius), splash)
-	if kind == "bolt":
-		fx.projectiles[-1]["col"] = col
+	fx.projectiles[-1]["col"] = col
 
 
 ## Flashes the enemy units an artillery splash caught: the sim's victims, so compare sim x (world px).

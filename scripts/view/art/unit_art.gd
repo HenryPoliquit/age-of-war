@@ -61,8 +61,13 @@ static func depth_for(def: UnitDef, race: StringName = &"human") -> float:
 
 
 ## Muzzle in unit-local space (feet origin, facing +x).
-static func muzzle_for(st: Dictionary) -> Vector2:
-	return FkUnits.muzzle(st)
+static func muzzle_for(st: Dictionary, race: StringName = &"human") -> Vector2:
+	return FkUnits.muzzle(st.merged({"look": RaceLook.look(race), "view": {"yaw": view_yaw}}))
+
+
+## How far into the attack (0..1) the shot leaves the unit.
+static func release_for(st: Dictionary) -> float:
+	return FkUnits.release(st)
 
 
 ## "blast", "siege" or "" (a body that falls over).
