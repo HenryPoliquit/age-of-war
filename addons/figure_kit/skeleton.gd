@@ -24,6 +24,10 @@ const BALL := Vector2(4.5, 1.5)
 ## never snap across to its mirror solution between frames.
 const ELBOW := 1.0
 const KNEE := -1.0
+## Walking: how straight the stance leg stays (share of its full length between hip and ankle), and how much of it the knee
+## gives up just after the heel lands (loading).
+const STANCE_EXT := 0.995
+const LOAD_DIP := 0.02
 
 
 ## Middle joint (knee, elbow) of a two-bone limb from `root` to `target`, bent to `bend`'s side
@@ -179,39 +183,40 @@ const STANCES := {
 		"hit": {"h": Vector2(24, 11), "a": 0.4, "f": Vector2(8, 16), "lean": 0.25, "rise": 3.0}},
 }
 
-## Walk styles. bob = hip drop at each contact (px); stride = foot reach (px); lift = knee lift (px);
+## Walk styles. arc = how much the hips rise and fall over the stance leg (1 = the leg keeps its length like a pendulum, so the
+## knee stays nearly straight; less keeps the hips level at the cost of a bent knee mid-stance); stride = foot reach (px); lift = knee lift (px);
 ## heel / toe = foot roll at landing / push-off (rad; a negative heel lands on the ball of the foot);
 ## swing = free-arm swing (rad); dust = puffs at heel contact; twist = pelvis yaw at full stride (rad), the
 ## chest turning against it at 0.8. `carry` is the pose (stance channels)
 ## the unit blends into as it walks; "free" lets the off hand swing even if the stance holds it.
 const GAITS := {
-	"default": {"bob": 2.2, "stride": 13.0, "lift": 4.5, "heel": 0.35, "toe": 0.5, "swing": 0.5, "twist": 0.35},
+	"default": {"arc": 1.0, "stride": 12.5, "lift": 4.5, "heel": 0.35, "toe": 0.5, "swing": 0.5, "twist": 0.35},
 	# Spear skirmisher: low stealthy glide, torso canted 15°, spear gripped at the hip angled up 30°.
-	"glide": {"bob": 0.6, "stride": 13.0, "lift": 3.5, "heel": 0.35, "toe": 0.5, "swing": 0.55, "twist": 0.25,
+	"glide": {"arc": 0.9, "stride": 12.0, "lift": 3.5, "heel": 0.35, "toe": 0.5, "swing": 0.55, "twist": 0.25,
 		"carry": {"h": Vector2(6, 17), "a": -0.52, "lean": 0.26, "crouch": 3.0, "free": true}},
 	# Axe thrower: heavy heel strikes with dust, upright broad chest, hunched shoulders, axe low at the
 	# hip with the blade down, short tight arm swing, a distinct bob.
-	"heavy": {"bob": 3.0, "stride": 12.0, "lift": 4.0, "heel": 0.45, "toe": 0.45, "swing": 0.3, "dust": true, "twist": 0.25,
+	"heavy": {"arc": 1.0, "stride": 12.0, "lift": 4.0, "heel": 0.45, "toe": 0.45, "swing": 0.3, "dust": true, "twist": 0.25,
 		"carry": {"h": Vector2(5, 18), "a": 1.25, "s": Vector2(1, 0.6), "lean": 0.0, "free": true}},
 	# Slinger: light bouncy scout walk on the balls of the feet, high knee lift, sling draped between
 	# both hands at chest level.
-	"bounce": {"bob": 3.2, "stride": 11.0, "lift": 8.0, "heel": -0.25, "toe": 0.45, "swing": 0.4, "twist": 0.35,
+	"bounce": {"arc": 1.0, "stride": 11.0, "lift": 8.0, "heel": -0.25, "toe": 0.45, "swing": 0.4, "twist": 0.35,
 		"carry": {"h": Vector2(8, 6), "f": Vector2(4, 8), "lean": 0.0}},
 	# Archer: level grouse glide — soft knees, hips and head level. Bow arm low and relaxed (shoulder
 	# pressed down, elbow soft) holding the bow vertically at the flank, a little forward of the legs;
 	# the drawing arm dropped, elbow ~100°, a relaxed hook swinging by the hip with the counter-stride.
-	"track": {"bob": 0.0, "stride": 12.0, "lift": 3.0, "heel": 0.3, "toe": 0.4, "swing": 0.25, "hswing": 4.0, "twist": 0.1,
+	"track": {"arc": 0.8, "stride": 11.0, "lift": 3.0, "heel": 0.3, "toe": 0.4, "swing": 0.25, "hswing": 4.0, "twist": 0.1,
 		"carry": {"h": Vector2(4, 15), "f": Vector2(7, 14), "s": Vector2(0, 1.5), "sf": Vector2(0, 1.5),
 			"lean": 0.08, "crouch": 3.5, "bend": 1.0}},
 	# Rifleman: patrol low-ready — hips low, torso 10° forward, firing hand at the waist, support hand
 	# under the forend, barrel 45° down ahead of the lead knee, locked steady while the legs step.
-	"patrol": {"bob": 0.5, "stride": 11.0, "lift": 3.0, "heel": 0.3, "toe": 0.4, "swing": 0.0, "twist": 0.1,
+	"patrol": {"arc": 0.8, "stride": 10.5, "lift": 3.0, "heel": 0.3, "toe": 0.4, "swing": 0.0, "twist": 0.1,
 		"carry": {"h": Vector2(4, 12), "f": Vector2(10, 13), "s": Vector2.ZERO, "sf": Vector2.ZERO, "a": 0.785, "lean": 0.17,
 			"crouch": 2.5}},
 	# Shield wall: low guarded advance in measured wide steps, shield fixed across the chest (eyes over
 	# the rim), weapon held ready up-and-forward at chest height with the shoulder and elbow relaxed
 	# (clear of the face), minimal bob.
-	"wall": {"bob": 0.4, "stride": 9.0, "lift": 2.0, "heel": 0.2, "toe": 0.3, "swing": 0.0, "twist": 0.1,
+	"wall": {"arc": 0.7, "stride": 9.0, "lift": 2.0, "heel": 0.2, "toe": 0.3, "swing": 0.0, "twist": 0.1,
 		"carry": {"h": Vector2(9, 8), "a": -0.9, "s": Vector2(0, 1), "rim": Vector2(10, -9.5), "lean": 0.08, "crouch": 4.0,
 			"wide": 8.0, "elbow_out": 0.0}},
 }
@@ -302,6 +307,25 @@ static func boot(foot: Vector2, rot: float, b: float, toe := 0.0, body := Vector
 		return foot + q.rotated(rot))
 
 
+## A foot's position ahead of the hips over one stride (−1..1 × the gait's stride), at its phase `ph` (PI/2 as the heel lands, 3·PI/2
+## as the toe leaves). On the ground the foot slides back at a steady pace, so it stays put on the ground as the body moves
+## over it (a sine would skate: fast under the hips, nearly still at either end). The swing carries it forward on a curve that
+## leaves and arrives at that same pace, reaching a little past its landing spot before settling back onto it.
+static func foot_x(ph: float) -> float:
+	var a := fposmod(ph + PI * 0.5, TAU)
+	if a < PI:
+		var u := a / PI
+		return ((-8.0 * u + 12.0) * u - 2.0) * u - 1.0
+	return 1.0 - 2.0 * (a - PI) / PI
+
+
+## Stride phase (rad) per px of ground the figure covers, so a foot on the ground stays put on the ground: a step (the foot
+## travelling 2 × stride, × build, × the drawn scale) takes PI of phase. `body` is the race's proportions (look.body).
+static func stride_rate(weapon: String, shield: String, build: float, body: Vector2, scale: float) -> float:
+	var g: Dictionary = GAITS[gait_for(weapon, shield)]
+	return PI / (2.0 * g.stride * build * body.y * scale)
+
+
 ## Heel-to-toe roll over a stride: `heel` as the foot lands in front (phase PI/2; toes up), `toe` as it
 ## pushes off behind (3·PI/2; heel up), flat in between.
 static func _roll(ph: float, heel: float, toe: float) -> float:
@@ -312,6 +336,42 @@ static func _roll(ph: float, heel: float, toe: float) -> float:
 static func _bell(d: float) -> float:
 	var w := wrapf(d, -PI, PI)
 	return cos(2.0 * w) if absf(w) < PI / 4 else 0.0
+
+
+## Height of the hips above the ground the legs need while walking (px, up): the lowest of what each leg on the ground allows.
+## A leg's ankle stays close to the leg's full length from the hip (a pendulum), so the knee is nearly straight as the heel
+## lands, gives a little as the weight comes onto it (loading), and is nearly straight again as the body passes over it; the
+## hips are highest then and lowest as the foot lands ahead. A leg lifting into its swing allows more height, so it never
+## holds the hips down, and its knee bends to bring the foot up.
+static func _walk_need(g: Dictionary, walk: float, b: float, body: Vector2) -> float:
+	var by := b * body.y
+	var l := (THIGH + SHIN) * by
+	var best := INF
+	for i in 2:
+		var ph := walk + PI * i
+		var v := fposmod(ph - PI * 0.5, TAU) / PI
+		var lift: float = g.lift * maxf(0.0, cos(ph)) * by
+		var rot := _roll(ph, g.heel, g.toe)
+		var flex := clampf(maxf(rot, 0.0) * (1.0 - lift / (1.5 * by)), 0.0, maxf(rot, 0.0))
+		var low := 0.0
+		for q in boot(Vector2.ZERO, rot, b, flex, body):
+			low = maxf(low, (q as Vector2).y)
+		var ext := STANCE_EXT - LOAD_DIP * pow(sin(PI * clampf(v / 0.4, 0.0, 1.0)), 2.0) if v <= 1.0 else STANCE_EXT
+		# The ankle's distance ahead of its hip root (the pelvis turns a little as it walks, swinging the roots fore and aft).
+		var root_dx := (1.0 if i == 0 else -1.0) * HALF_W * b * body.x * sin(g.get("twist", 0.0) * sin(walk))
+		var x: float = g.stride * foot_x(ph) * by - root_dx
+		best = minf(best, maxf(lift, low) + sqrt(maxf(0.0, pow(l * ext, 2.0) - x * x)))
+	return best
+
+
+## The hips' height over a stride: what the legs need, flattened toward the landing height by the gait's `arc` (0 keeps the
+## hips level at the cost of a bent knee mid-stance) and never above what the legs allow.
+static func walk_hip_height(g: Dictionary, walk: float, b: float, body: Vector2) -> float:
+	var need := _walk_need(g, walk, b, body)
+	var arc: float = g.get("arc", 1.0)
+	if arc >= 1.0:
+		return need
+	return minf(need, lerpf(_walk_need(g, PI * 0.5, b, body), need, arc))
 
 
 ## All joints for one frame. b = build; pose = {walk, move, atk, t}; shield = the shield kind the far
@@ -336,11 +396,16 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 		family = "shield"
 	var g: Dictionary = GAITS[gait_for(weapon, shield)]
 	var k := key(family, pose.get("atk", -1.0), {} if seated else g.get("carry", {}), mv)
-	var bob := lerpf(sin(t * 2.1) * 0.7, absf(sin(walk)) * g.bob, mv)
+	# Idle sway; a walking figure's hips are placed by walk_hip_height() instead.
+	var bob := sin(t * 2.1) * 0.7 * (1.0 - mv)
 	var lunge: float = k.lunge * b * (0.0 if seated else 1.0)
 	var crouch: float = k.crouch * b * (0.0 if seated else 1.0)
 	# On foot the hips stand at the race's leg height; a rider's seat is the saddle's whatever the race.
-	var hip := Vector2(lunge * 0.6, (-HIP_Y * b + bob * 0.5 + crouch) * (1.0 if seated else body.y))
+	var hip_y := (-HIP_Y * b + bob * 0.5 + crouch) * (1.0 if seated else body.y)
+	if not seated and mv > 0.0:
+		# A stance pose's crouch (the carry pose) counts for less on the march, or the knees never straighten.
+		hip_y = lerpf(hip_y, -walk_hip_height(g, walk, b, body) + crouch * 0.15 * body.y, mv)
+	var hip := Vector2(lunge * 0.6, hip_y)
 	# A rider's feet stay in the stirrups (relative to the saddle) while the hips rise off it; the hips
 	# sway with the mount's gait and the spine absorbs its bob so the head stays level.
 	var saddle_hip := hip
@@ -384,7 +449,7 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 			foot = saddle_hip + Vector2(5.0 - 3.0 * i, 16.0) * b * body
 			rot = -0.3 - 0.05 * k.rise
 		else:
-			var fx := lerpf(2.8 if i == 0 else -3.6, g.stride * sin(ph), mv)
+			var fx := lerpf(2.8 if i == 0 else -3.6, g.stride * foot_x(ph), mv)
 			var lift: float = g.lift * maxf(0.0, cos(ph)) * mv
 			rot = _roll(ph, g.heel, g.toe) * mv
 			fx += k.wide * (0.5 if i == 0 else -0.5)

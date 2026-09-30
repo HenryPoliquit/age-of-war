@@ -246,7 +246,7 @@ func _spread(frames: Array, f: Callable) -> float:
 
 func test_archer_head_stays_level() -> void:
 	var fr := _walk("bow")
-	check(_spread(fr, func(j): return j.sh.y) <= 0.6, "no vertical head bob")
+	check(_spread(fr, func(j): return j.sh.y) <= 1.6, "the head barely bobs (the hips arc a little so the knee can straighten)")
 	check(fr[0].crouch >= 3.0, "bent knees, low centre")
 	check(fr[0].hand_f.y > fr[0].sh.y + 10.0, "bow held low at the side")
 
@@ -285,7 +285,7 @@ func test_rifle_patrol_low_ready() -> void:
 func test_shield_wall_advance() -> void:
 	var fr := _walk("sword", "round")
 	check(fr[0].crouch >= 3.5, "low guarded stance")
-	check(_spread(fr, func(j): return j.sh.y) <= 0.5, "minimal bob")
+	check(_spread(fr, func(j): return j.sh.y) <= 1.4, "minimal bob")
 	check(_spread(fr, func(j): return (j.hand_f - j.sh).y) <= 0.3, "shield fixed across the chest")
 	check(fr[0].dir.y < -0.5 and fr[0].dir.x > 0.3, "weapon held up and forward, ready")
 	check(fr[0].hand_n.distance_to(fr[0].head) > 14.0, "weapon hand well away from the face")
@@ -597,6 +597,86 @@ func test_head_level_while_walking() -> void:
 	for w in ["none", "spear", "throwing_axe", "sling", "bow", "musket", "sword"]:
 		for j in _walk(w, "round" if w == "sword" else ""):
 			check(absf(j.head_tilt) < 0.1, "%s: head level on the march" % w)
+
+
+# --- Walking legs (owner: units walked with their knees always bent, as if too heavy) -----------
+
+## Knee flexion in degrees from a straight leg (0 = straight).
+func _flex(j: Dictionary, tag: String) -> float:
+	var u: Vector3 = j.p3["hip_" + tag] - j.p3["knee_" + tag]
+	var w: Vector3 = j.p3["foot_" + tag] - j.p3["knee_" + tag]
+	return 180.0 - rad_to_deg(u.angle_to(w))
+
+
+const WALKERS := [["none", ""], ["spear", ""], ["throwing_axe", ""], ["sling", ""], ["bow", ""], ["musket", ""], ["sword", "round"]]
+
+
+func test_walking_stance_knee_comes_close_to_straight() -> void:
+	for c in WALKERS:
+		var fr := _walk(c[0], c[1], 32)
+		var straight := 0
+		var straightest := 999.0
+		for j in fr:
+			# The leg on the ground is the one with the lower ankle.
+			var tag := "n" if j.foot_n.y >= j.foot_f.y else "f"
+			var f := _flex(j, tag)
+			straightest = minf(straightest, f)
+			if f < 30.0:
+				straight += 1
+		check(straightest < 26.0, "%s: the stance knee gets nearly straight (%.0f degrees at best)" % [c[0], straightest])
+		check(straight >= fr.size() / 2, "%s: the stance leg is within 30 degrees of straight for half the stride (%d of %d frames)" % [c[0], straight, fr.size()])
+
+
+func test_walking_swing_knee_bends_to_bring_the_foot_through() -> void:
+	for c in WALKERS:
+		var bent := 0.0
+		for j in _walk(c[0], c[1], 32):
+			bent = maxf(bent, _flex(j, "n" if j.foot_n.y < j.foot_f.y else "f"))
+		check(bent >= 40.0, "%s: the swing knee bends (%.0f degrees at most)" % [c[0], bent])
+
+
+func test_hips_rise_as_the_body_passes_over_the_stance_foot() -> void:
+	for w in ["none", "throwing_axe", "sling"]:
+		var passing := FkSkeleton.solve(1.0, w, {"walk": 0.0, "move": 1.0, "t": 0.0})
+		var landing := FkSkeleton.solve(1.0, w, {"walk": PI * 0.5, "move": 1.0, "t": 0.0})
+		check(passing.hip.y < landing.hip.y - 0.5, "%s: the hips are higher passing over the foot than as the heel lands ahead" % w)
+
+
+func test_walking_never_overextends_a_leg() -> void:
+	for c in WALKERS:
+		for j in _walk(c[0], c[1], 32):
+			check(_flex(j, "n") >= 0.0 and _flex(j, "f") >= 0.0, "%s: no hyperextended knee" % c[0])
+			check(j.foot_n.y <= 0.01 and j.foot_f.y <= 0.01, "%s: feet stay above the ground" % c[0])
+
+
+func test_a_foot_on_the_ground_stays_put_on_the_ground() -> void:
+	# stride_rate() says how much phase a px of ground is worth; with it the planted foot does not skate. (Before: the feet
+	# slid back faster than the body advanced, and stopped at either end of the stance.)
+	var sc := 1.3
+	var b := 1.1
+	for c in WALKERS:
+		var rate := FkSkeleton.stride_rate(c[0], c[1], b, Vector2.ONE, sc)
+		var span := {}
+		for i in 1200:
+			var d := i * 0.2
+			var ph := rate * d
+			var a := fposmod(ph, TAU)
+			if a < PI * 0.6 or a > PI * 1.4:
+				continue
+			var j := FkSkeleton.solve(b, c[0], {"walk": ph, "move": 1.0, "t": 0.0}, c[1])
+			var x: float = d + sc * j.foot_n.x
+			var key := floori(ph / TAU)
+			var r: Vector2 = span.get(key, Vector2(x, x))
+			span[key] = Vector2(minf(r.x, x), maxf(r.y, x))
+		check(span.size() >= 3, "%s: several stances measured" % c[0])
+		for key in span:
+			check(span[key].y - span[key].x < 0.8, "%s: the foot on the ground slides %.2f px" % [c[0], span[key].y - span[key].x])
+
+
+func test_stride_rate_follows_the_legs_and_the_drawn_size() -> void:
+	var human := FkSkeleton.stride_rate("sword", "", 1.0, Vector2.ONE, 1.25)
+	check(FkSkeleton.stride_rate("sword", "", 1.0, DWARF.body, 1.25) > human * 1.2, "short legs take quicker steps")
+	check(FkSkeleton.stride_rate("sword", "", 1.0, Vector2.ONE, 2.5) < human * 0.6, "a figure drawn twice as big takes slower steps")
 
 
 # --- Shield turn (owner: shields face the camera while the body is side-on) --------------------

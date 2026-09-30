@@ -77,6 +77,15 @@ static func height(spec: Dictionary) -> float:
 	return h
 
 
+## Stride phase (rad) per px of ground a foot soldier covers at `scale` (its drawn scale), so its feet stay put on the ground
+## as it walks; the caller multiplies the distance walked by it to get pose.walk. Other rigs return their own default `fallback`.
+static func stride_rate(spec: Dictionary, scale: float, fallback := 0.1) -> float:
+	if spec.rig != "humanoid":
+		return fallback
+	var body: Vector2 = spec.get("look", FkLooks.BODIES[&"human"]).body
+	return FkSkeleton.stride_rate(spec.get("weapon", "none"), spec.get("shield", ""), spec.get("build", 1.0), body, scale)
+
+
 ## Muzzle in unit-local space (feet origin, facing +x).
 static func muzzle(spec: Dictionary) -> Vector2:
 	var hand: Vector2 = FkWeapons.MUZZLE.get(spec.get("weapon", ""), Vector2(22, -34)) if spec.rig == "humanoid" else Vector2(22, -34)

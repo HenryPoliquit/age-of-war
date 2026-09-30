@@ -52,7 +52,7 @@ func _draw() -> void:
 
 | Key | Meaning |
 |---|---|
-| `walk` | stride phase in radians (advance it with distance walked) |
+| `walk` | stride phase in radians (advance it with distance walked; `FkUnits.stride_rate(spec, scale)` says how much phase a px of ground is worth, so a foot on the ground stays put on the ground) |
 | `move` | 0 (standing) … 1 (walking): the walk blend, eased by the caller. The legacy boolean `moving` is also read |
 | `atk` | attack progress 0..1, or < 0 when not attacking. Contact happens at 0.35–0.55 (`FkUnits.swing`) |
 | `t` | seconds, for idle motion (breathing, capes, flames) |

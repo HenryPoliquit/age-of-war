@@ -70,5 +70,10 @@ static func wreck_kind(st: Dictionary) -> String:
 	return FkUnits.wreck(st)
 
 
+## Stride phase per px walked for a unit drawn at `scale` (see FkUnits.stride_rate): the walk keeps its feet planted.
+static func stride_rate(def: UnitDef, scale: float, race: StringName = &"human", fallback := 0.1) -> float:
+	return FkUnits.stride_rate(style_for(def, race).merged({"look": RaceLook.look(race)}), scale, fallback)
+
+
 static func draw_unit(ci: CanvasItem, def: UnitDef, team: Color, pose: Dictionary, seed: int = 0, race: StringName = &"human") -> void:
 	FkUnits.draw(ci, style_for(def, race).merged({"look": RaceLook.look(race), "palette": RaceLook.palette(race, def.age), "team": team, "view": {"yaw": view_yaw}}), pose, seed)
