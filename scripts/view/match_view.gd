@@ -35,6 +35,8 @@ var camera: Camera2D
 var backdrops: Array[Backdrop] = []
 var fronts: Array[FrontLayer] = []
 var world: WorldLayer
+## The skills' marks on the ground, drawn under the units (created with `fx`, placed just beneath `world`).
+var ground: SkillGround
 var fx: FxLayer
 var lights: LightPool
 var audio: AudioDirector
@@ -115,6 +117,10 @@ func _ready() -> void:
 	fx.view = self
 	fx.lights = lights
 	add_child(fx)
+	ground = SkillGround.new()
+	ground.skills = fx.skills
+	add_child(ground)
+	move_child(ground, world.get_index())  # units stand on the marks, not under them
 	apply_settings()
 	for i in 2:
 		var fl := FrontLayer.new()
@@ -215,6 +221,7 @@ func _process(delta: float) -> void:
 	var adt := delta * spd
 	anim_time += adt
 	fx.step(adt)
+	ground.refresh()
 	if prev_progress.size() > 400:
 		_prune_prev()
 	_pan(delta)
@@ -436,6 +443,7 @@ func _consume_fx() -> void:
 			"skill_hit":
 				fx.skills.hit(f)
 			"ability_pulse":
+				fx.skills.pulse(f)
 				for u in sim.sides[1 - f.side].units:
 					var x := sim.to_world(u.side, u.progress)
 					if x >= f.lo and x <= f.hi:

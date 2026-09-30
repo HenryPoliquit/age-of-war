@@ -13,7 +13,8 @@
 From the owner's request to make skills more playable: every skill was auto-aimed, hit the same way, and several were hard to read on screen. Spec of the change is §7; the balance evidence is in `docs/balance_log.md` (B20+).
 
 - **Aimed skills (§7, §10):** four of the six skills are aimed — click the Skill button or press Space, then click the lane (or the lane map). The two sweeps stay one-click. Space twice lets the game aim an aimed skill.
-- **Two marks on the ground (§7):** a **circle** for the small targets (Rockfall, Starfall) and a **field of land** for the wide ones (Volley's arrow rain, Cannonade). The same mark is the aim reticle and, after firing, the warning, so you always see where a skill will land. The skills that run from your base to theirs (Stampede, Bombardment) put no mark on the ground.
+- **Two marks on the ground (§7):** a **circle** for the small targets (Rockfall, Starfall) and a **field of land** for the wide ones (Volley's arrow rain, Cannonade). The same mark is the aim reticle and, after firing, the warning, so you always see where a skill will land. The marks are part of the ground: drawn *under* the units (they stand on it), feathered, in the skill's own colour. The skills that run from your base to theirs (Stampede, Bombardment) put no mark on the ground.
+- **Starfall hits units only (§7):** inside its circle a strike (a lance of light, a star, a lightning bolt, by race) lands on every enemy unit, six times, and nothing falls on empty ground: no blast zone, crater or shake.
 - **Three damage rules (§7):** *flat* (armour and Defence apply, like a unit), *true* (ignores both) and *percent* (a share of each victim's max health, ignores both).
 - **Readable skills (§13.4):** a countdown that fills the mark's outline, the skill's name (red and "ENEMY …" for the opponent's), a target count and markers while aiming, shots that land inside the mark exactly when the damage does, and damage numbers coloured by rule. Each race has its own look for every skill, with identical footprint, timing and damage (§5.7).
 - **Simpler:** the *strip* shape is gone (Volley was the only one; it is an aimed field now) and so is Rockfall's slow. A sweep's herd moves at 1,200 px/s instead of 2,000, so a Stampede can be followed.
@@ -313,11 +314,11 @@ The AI aims the same skills through the same command: at the densest group, off 
 
 | Mark | Skills | What it looks like |
 | --- | --- | --- |
-| **Circle** | Rockfall, Starfall (small: 200–260 px) | A ring on the ground with a dashed inner ring and a crosshair; its outline fills clockwise as the warning runs out. What falls lands inside it |
-| **Field of land** | Volley, Cannonade (wide: 420–500 px) | A hatched piece of land with a stake and pennant at each corner; its back edge is the countdown bar. Arrows or shells land anywhere across it, and shafts stay standing in it for a moment |
+| **Circle** | Rockfall, Starfall (small: 200–260 px) | A ring on the ground whose outline brightens clockwise as the warning runs out. Rockfall's has dust turning round the rim and what falls lands inside it; Starfall's is a sigil (a second ring and a star turning inside it: eight points for the lance, five for the star, six for the rune) |
+| **Field of land** | Volley, Cannonade (wide: 500–520 px) | A piece of land tinted in the skill's colour, with brackets painted at its corners; its back edge brightens as the countdown runs. Arrows or shells land anywhere across it, and shafts stay standing in it for a moment |
 | **None** | Stampede, Bombardment | Sweeps run from your gate to theirs and need no marker; the herd or the barrage is the picture |
 
-The mark is drawn in your colour for your skills and in red, labelled "ENEMY …", for the opponent's, and pending marks also show on the lane map.
+A mark is drawn *under* the units, as a soft shade with a thin light on it, in the skill's own (race) colour, fading in as the warning runs out. The opponent's is pushed toward red and labelled "ENEMY …", and pending marks also show on the lane map. The aim reticle is the same mark in gold (red when it would hit nothing), with a crosshair for a circle.
 
 ### Damage
 
@@ -335,16 +336,17 @@ A skill can also **shove** the units it hits back toward their base.
 | --- | --- | --- | --- | --- | --- |
 | Stone | **Stampede** — a herd charges down the lane at 1,200 px/s | Auto | Sweep | Flat Slash 35, shoves back 60 px | 60 |
 | Bronze | **Rockfall** — boulders crash inside a circle | **Aimed** | Circle, 260 px | Flat Blast 90 × 3 pulses | 75 |
-| Iron | **Volley** — three waves of arrows rain on a field of land | **Aimed** | Field, 420 px | **True** 123 × 3 pulses (Pierce look) | 175 |
+| Iron | **Volley** — three waves of arrows rain on a field of land | **Aimed** | Field, 520 px | **True** 123 × 3 pulses (Pierce look) | 175 |
 | Medieval | **Bombardment** — a walking barrage from gate to gate | Auto | Sweep | **Percent** 12% of max HP, shoves back 12 px | 275 |
 | Gunpowder | **Cannonade** — signal flares mark a field, then heavy shells carpet it | **Aimed** | Field, 500 px | Flat Blast 912 × 5 pulses | 700 |
-| Arcane | **Starfall** — three strikes on a circle after a 1.5 s warning | **Aimed** | Circle, 200 px | **Percent** 36% of max HP × 3 pulses | 1,000 |
+| Arcane | **Starfall** — after a 1.5 s warning, a strike lands on every enemy unit inside the circle, six times, 0.5 s apart | **Aimed** | Circle, 200 px | **Percent** 18% of max HP × 6 pulses | 1,000 |
 
 A sweep's slices cross each unit once, so its damage is per unit, not per pulse. Every other shape hits a unit on every pulse it stands in.
 
 ### What you see
 
 - **Warning.** While an aimed skill winds up, its mark stays on the ground (§ The mark on the ground) with the outline filling as the warning runs out and the skill's name and seconds left above it: in your colour for your skills, red with "ENEMY" for the opponent's. The lane map marks pending zones too, so a skill off-screen is never a surprise. Sweeps show no warning.
+- **Starfall** (Arcane Lance, Thunder Rune) draws nothing on empty ground: each strike comes from the sim's hit on a unit and lands exactly where that unit stands, so a unit that walks in is struck and one that walks out is not. No crater, ring, scorch or shake. A dense pack gets at most 12 full strikes per pulse and a glint for the rest.
 - **Landing.** Shots are launched early enough to land at the instant their pulse resolves, and inside the mark; incoming boulders and shells cast a growing shadow on the ground, arrows and thorns stay standing for a moment, and a light curtain falls over a volley's field. Cannonade plants three coloured signal flares in its field during the warning.
 - **Numbers.** Every unit a skill hits shows what it took, coloured by rule: orange for flat, cyan with a diamond for true, green with a percent sign for percent; bigger when it kills. A setting turns them off.
 - **Result.** When your skill finishes, a line reports it: "Rockfall: 4 hit, 1 killed", or "Rockfall: missed".
@@ -360,7 +362,7 @@ Each race names and dresses the same skill; footprint, timing and damage never c
 | Iron | **Pilum Volley** — heavy javelins on the field | **Arrow Rain** — a swarm of glowing arrows | **Axe Storm** — spinning throwing axes |
 | Medieval | **Trebuchet Barrage** — flaming stones lobbed from your walls | **Hail of Thorns** — briar spikes raining down | **Rockslide** — an avalanche of tumbling boulders |
 | Gunpowder | **Cannonade** — iron round shot with smoke and a muzzle flash | **Moonfire** — silver orbs in pillars of moonlight | **Grand Cannonade** — rune-forged shells trailing furnace fire |
-| Arcane | **Arcane Lance** — a spear of light hurled from the sky | **Starfall** — stars falling from the night | **Thunder Rune** — a rune circle wakes and lightning strikes it |
+| Arcane | **Arcane Lance** — a spear of light through each unit | **Starfall** — a star dives onto each unit | **Thunder Rune** — a lightning bolt strikes each unit |
 
 The AI uses the same skills under the same rules.
 
@@ -527,7 +529,7 @@ Effects are built per damage type, so the counter system is visible:
 | Lights | Muzzle flashes, explosions and abilities spawn short-lived 2D lights that shade nearby units |
 | Glow | Emissive effects (muzzle flashes, Arcane-age magic weapons, ability beams) glow; confirm how 2D glow behaves in the chosen renderer during M2 |
 | Knockback | Blast damage pushes units back a few pixels with a small hop |
-| Telegraphs | A circle or a field of land on the ground for every aimed skill, its outline filling as the warning runs out, with the skill's name (red and "ENEMY" for the opponent's); none for the base-to-base sweeps; Starfall also charges (converging rings, a rising column, motes) and Cannonade plants signal flares |
+| Telegraphs | A circle or a field of land on the ground, *under* the units, for every aimed skill: a soft shade with a thin light in the skill's colour that brightens as the warning runs out, with the skill's name (red and "ENEMY" for the opponent's); none for the base-to-base sweeps; Starfall also charges (a sigil, converging rings, a rising column, motes) and Cannonade plants signal flares |
 | Damage numbers | Optional, off by default for units and turrets; skill numbers (coloured by damage rule, §7) are on by default and have their own toggle |
 
 ### 13.5 The Evolution Moment

@@ -13,6 +13,8 @@ const INK := Color(0.06, 0.05, 0.05, 0.85)
 ## How long a projectile spends in the air, by launch style (a launch is delayed to land on time).
 const FLIGHT := {"sky": 0.42, "diag": 0.7, "home": 0.65}
 const MAX_POPUPS := 40
+## Most strikes a Starfall pulse draws in full (a dense pack gets a glint for the rest).
+const MAX_STRIKES := 12
 ## The ground is seen at a slant: a circle on it is drawn as an ellipse this flat.
 const CIRCLE_SQUASH := 0.30
 ## A field of land reaches from just behind the units' feet to well in front of them.
@@ -22,6 +24,7 @@ const FIELD_FRONT := 62.0
 var fxl: FxLayer
 var items: Array[Dictionary] = []
 var popups: Array[Dictionary] = []
+var _strike_budget := 0
 var rng := RandomNumberGenerator.new()
 
 
@@ -228,21 +231,11 @@ func _cast_cannonade(c: Dictionary) -> void:
 
 # --- Starfall ---------------------------------------------------------------
 
+## Starfall hits units only: nothing is thrown at the ground. The circle charges while it warns, and then a
+## strike lands on every enemy inside it at each pulse (`_strike_unit`, driven by the sim's hit records).
 func _cast_starfall(c: Dictionary) -> void:
 	var def: AbilityDef = c.def
-	var mid: float = (c.lo + c.hi) * 0.5
-	var w: float = c.hi - c.lo
-	items.append({"k": "charge", "born": fxl.now(), "life": def.telegraph, "x": mid, "w": w, "look": c.look, "side": c.side})
-	var offsets := [-0.3, 0.3, 0.0]
-	for k in def.pulses:
-		var last := k == def.pulses - 1
-		var x: float = mid + w * (offsets[k % 3] if def.pulses > 1 else 0.0)
-		_launch(c, k, Vector2(x, GROUND_Y + 8), {"last": last, "r": float(c.look.r) * (1.35 if last else 1.0)})
-		if last:
-			fxl.later(_t(c, k), func():
-				view.add_shake(16.0)
-				view.zoom_punch(0.05)
-				fxl.ring(Vector2(mid, GROUND_Y), w * 1.4, Color(c.glow.lightened(0.3), 0.8), 0.7, 8.0))
+	items.append({"k": "charge", "born": fxl.now(), "life": def.telegraph, "x": (c.lo + c.hi) * 0.5, "w": c.hi - c.lo, "look": c.look, "side": c.side})
 
 
 # ---------------------------------------------------------------------------
@@ -325,7 +318,7 @@ func _land(p: Dictionary) -> void:
 		"pilum", "arrow", "axe":
 			fxl.burst("smoke", to, 3, Color(0.86, 0.8, 0.68, 0.5), Vector2(10, 50), Vector2(0.3, 0.6), Vector2(5, 10))
 			fxl.burst("spark", to, 4, glow, Vector2(80, 200), Vector2(0.12, 0.25), Vector2(1.5, 3), 300.0, 1.0, -PI * 0.5, true)
-			fxl.flash(to, 16, Color(glow, 0.6), 0.08)
+			fxl.flash(to, 11.0, Color(glow, 0.42), 0.07)
 			if look.get("land", "") == "leaves":
 				fxl.burst("leaf", to, 2, glow.darkened(0.1), Vector2(40, 120), Vector2(0.6, 1.0), Vector2(5, 8), 60.0, 0.8, -PI * 0.5)
 			items.append({"k": "stuck", "shot": p.shot, "pos": to + Vector2(0, 4), "ang": clampf(ang, 0.4, 2.8) if p.shot != "axe" else rng.randf_range(-0.5, 0.5),
@@ -360,47 +353,41 @@ func _land(p: Dictionary) -> void:
 			view.add_shake(4.0)
 			fxl.sound("zap", to, -2.0)
 		"star":
-			fxl.flash(to, 90 * s, Color(glow, 0.65), 0.22)
-			fxl.particle({"kind": "flare", "pos": to + Vector2(0, -10), "vel": Vector2.ZERO, "life": 0.4, "size": 90.0 * s, "col": look.body, "g": 0.0, "add": true, "rot": 0.0, "spin": 0.5})
-			fxl.ring(to, 150 * s, Color(glow.lightened(0.4), 0.85), 0.55, 6.0)
-			fxl.burst("spark", to, 16, look.body, Vector2(100, 380), Vector2(0.35, 0.8), Vector2(2, 4), 300.0, PI, -PI * 0.5, true)
-			fxl.light(to, glow, 2.0, 420.0, 0.5)
-			fxl.scorch(to.x, 48)
-			view.add_shake(6.0 if not p.last else 0.0)
-			fxl.sound("blast", to, -2.0)
+			# A star that found a unit: a glint on it and a few sparks, no crater.
+			fxl.flash(to, 34.0, Color(glow, 0.55), 0.12)
+			fxl.particle({"kind": "flare", "pos": to, "vel": Vector2.ZERO, "life": 0.3, "size": 38.0, "col": look.body, "g": 0.0, "add": true, "rot": 0.0, "spin": 0.5})
+			_sparks(to, glow)
+
+
+func _sparks(at: Vector2, glow: Color) -> void:
+	fxl.burst("spark", at, 6, glow.lightened(0.4), Vector2(80, 260), Vector2(0.2, 0.45), Vector2(2, 3.5), 350.0, PI, -PI * 0.5, true)
+
+
+## Starfall, Arcane Lance and Thunder Rune hit units only. A strike lands on an enemy unit exactly where it
+## stands and leaves nothing on the ground: no crater, no ring, no scorch, no shake.
+func _strike_unit(at: Vector2, caster_race: StringName, dir: float) -> void:
+	var look := SkillLook.for_skill(caster_race, "starfall")
+	var glow: Color = look.get("glow", Color.WHITE)
+	if _strike_budget <= 0:
+		fxl.flash(at, 22.0, Color(glow, 0.45), 0.1)
+		return
+	_strike_budget -= 1
+	match look.shot:
 		"lance":
-			_column(to.x, 70.0 * s, glow, 0.55)
-			fxl.flash(to, 110 * s, Color(glow, 0.7), 0.25)
-			fxl.particle({"kind": "flare", "pos": to + Vector2(0, -6), "vel": Vector2.ZERO, "life": 0.45, "size": 110.0 * s, "col": look.lit, "g": 0.0, "add": true, "rot": 0.0, "spin": 0.0})
-			fxl.ring(to, 160 * s, Color(glow.lightened(0.4), 0.85), 0.5, 7.0)
-			fxl.burst("spark", to, 16, glow.lightened(0.4), Vector2(100, 380), Vector2(0.35, 0.8), Vector2(2, 4), 300.0, PI, -PI * 0.5, true)
-			fxl.light(to, glow, 2.2, 450.0, 0.5)
-			fxl.scorch(to.x, 44)
-			view.add_shake(6.0 if not p.last else 0.0)
-			fxl.sound("zap", to, -1.0)
+			# A thin spear of light, through the unit.
+			_column(at.x, 22.0, glow, 0.24)
+			fxl.flash(at, 38.0, Color(glow, 0.6), 0.14)
+			_sparks(at, glow)
 		"bolt":
-			_strike(to, glow, p.r, p.last)
-
-
-## Lightning from the clouds to the ground, with a couple of forks.
-func _strike(to: Vector2, glow: Color, r: float, last: bool) -> void:
-	var top := Vector2(to.x + rng.randf_range(-70.0, 70.0), -260.0)
-	var main := _bolt_points(top, to, 46.0)
-	var forks := []
-	for i in 2:
-		var at := main[rng.randi_range(3, 6)]
-		forks.append(_bolt_points(at, at + Vector2(rng.randf_range(-150.0, 150.0), rng.randf_range(160.0, 300.0)), 24.0))
-	items.append({"k": "bolt", "born": fxl.now(), "life": 0.32, "main": main, "forks": forks, "col": glow})
-	fxl.flash(to, 100.0, Color(glow, 0.7), 0.2)
-	fxl.flash(Vector2(to.x, 120.0), 520.0, Color(glow, 0.22), 0.16)
-	fxl.ring(to, 130.0, Color(glow.lightened(0.5), 0.85), 0.45, 6.0)
-	fxl.burst("spark", to, 18, Color.WHITE, Vector2(120, 420), Vector2(0.3, 0.7), Vector2(2, 4), 400.0, PI, -PI * 0.5, true)
-	fxl.burst("chunk", to, 6, Color("3b3026"), Vector2(140, 320), Vector2(0.5, 0.9), Vector2(3, 6), 900.0, 1.0)
-	fxl.light(to, glow, 2.4, 520.0, 0.4)
-	_crack(to, 1.3, glow)
-	fxl.scorch(to.x, 44)
-	view.add_shake(5.0 if not last else 0.0)
-	fxl.sound("zap", to, -1.0)
+			var top := Vector2(at.x + rng.randf_range(-40.0, 40.0), -200.0)
+			items.append({"k": "bolt", "born": fxl.now(), "life": 0.24, "main": _bolt_points(top, at, 26.0), "forks": [], "col": glow})
+			fxl.flash(at, 38.0, Color(glow, 0.6), 0.14)
+			_sparks(at, glow)
+		_:
+			# A star that dives onto it from behind the caster's line.
+			items.append({"k": "proj", "shot": "star", "from": at + Vector2(-dir * rng.randf_range(40.0, 90.0), -380.0), "to": at, "born": fxl.now(), "dur": 0.14,
+				"arc": 0.0, "drop": false, "spin": rng.randf_range(-7.0, 7.0), "r": 13.0, "seed": rng.randf() * 100.0, "look": look, "dir": dir,
+				"shadow": false, "last": false})
 
 
 func _bolt_points(top: Vector2, bottom: Vector2, jag: float) -> PackedVector2Array:
@@ -436,7 +423,17 @@ func hit(f: Dictionary) -> void:
 	# A mark on the unit itself, coloured like the number.
 	var pos := Vector2(x, GROUND_Y - h * 0.55)
 	fxl.flash(pos, 26.0, Color(col, 0.55), 0.14)
-	fxl.ring(pos, 36.0, Color(col, 0.7), 0.25, 3.0)
+	if f.ability == "starfall":
+		_strike_unit(Vector2(x, GROUND_Y + WorldLayer.jitter(int(f.unit_id)) - h * 0.55), view.race_of(1 - side), 1.0 if side == 1 else -1.0)
+	else:
+		fxl.ring(pos, 36.0, Color(col, 0.7), 0.25, 3.0)
+
+
+## A skill pulse resolved (sim record "ability_pulse"): the strikes of this pulse start fresh.
+func pulse(f: Dictionary) -> void:
+	_strike_budget = MAX_STRIKES
+	if f.ability == "starfall":
+		fxl.sound("zap", Vector2((f.lo + f.hi) * 0.5, GROUND_Y - 80.0), -4.0)
 
 
 # ---------------------------------------------------------------------------
@@ -544,7 +541,6 @@ func _charge_motes(ch: Dictionary) -> void:
 # Drawing: under the particles (shadows, things stuck in the ground, the herd)
 
 func draw_under(ci: CanvasItem, t: float) -> void:
-	_draw_zone_shadows(ci)
 	for it in items:
 		match it.k:
 			"proj":
@@ -577,27 +573,127 @@ func _marked_effects() -> Array[Dictionary]:
 	return out
 
 
-## A dark plate under every ground mark: the coloured mark is additive light and would vanish on bright
-## ground, so it sits on a dark base with a dark outline.
-func _draw_zone_shadows(ci: CanvasItem) -> void:
+# ---------------------------------------------------------------------------
+# The marks on the ground (drawn by SkillGround, under the units)
+
+## Everything marking the ground right now: the warnings of skills on their way, and the aim reticle.
+## A mark is {lo, hi, kind, id, shot, col, progress, reticle}; `progress` (0..1) is how far a warning has run.
+func _marks() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var sim := view.sim
 	for e in _marked_effects():
-		_mark_under(ci, e.lo, e.hi, SkillLook.footprint(e.def.id))
+		var def: AbilityDef = e.def
+		var look := SkillLook.for_skill(view.race_of(e.side), String(def.id))
+		# A mark glows in its race's colour; the opponent's is pushed toward red so it reads as a threat.
+		var col: Color = look.get("glow", Color.WHITE)
+		if e.side != 0:
+			col = col.lerp(SkillLook.DANGER, 0.65)
+		var progress := 1.0
+		if e.pulse == 0:
+			progress = clampf(1.0 - (e.next_t - sim.time) / maxf(0.05, def.telegraph), 0.0, 1.0)
+		out.append({"lo": e.lo, "hi": e.hi, "kind": SkillLook.footprint(def.id), "id": String(def.id), "shot": look.get("shot", ""), "col": col,
+			"progress": progress, "reticle": false})
 	if view.aim.active:
 		var pv := view.aim.preview()
 		if not pv.is_empty():
-			_mark_under(ci, pv.zone[0], pv.zone[1], SkillLook.footprint(view.sim.ability_def(view.aim.side).id))
+			var ab := sim.ability_def(view.aim.side)
+			out.append({"lo": pv.zone[0], "hi": pv.zone[1], "kind": SkillLook.footprint(ab.id), "id": String(ab.id), "shot": "",
+				"col": Color("ffc61a") if pv.count > 0 else Color("ff5a4a"), "progress": -1.0, "reticle": true})
+	return out
 
 
-func _mark_under(ci: CanvasItem, lo: float, hi: float, kind: String) -> void:
-	if kind == "circle":
-		var c := Vector2((lo + hi) * 0.5, GROUND_Y + 10.0)
+## The shade under a mark: feathered, like the shadow of what is about to fall. A warning deepens as it runs out.
+func draw_ground(ci: CanvasItem, _t: float) -> void:
+	for m in _marks():
+		var st: float = 0.7 if m.reticle else lerpf(0.3, 1.0, m.progress)
+		var lo: float = m.lo
+		var hi: float = m.hi
+		if m.kind == "circle":
+			var c := Vector2((lo + hi) * 0.5, GROUND_Y + 10.0)
+			var half := (hi - lo) * 0.5
+			for i in 6:
+				var k := 1.0 - i * 0.13
+				FkPaint.ellipse(ci, c, Vector2(half * k, half * CIRCLE_SQUASH * k), Color(0, 0, 0, 0.07 * st))
+		else:
+			var top := GROUND_Y + FIELD_BACK
+			var h := FIELD_FRONT - FIELD_BACK
+			for i in 6:
+				var inset := i * 6.0
+				ci.draw_rect(Rect2(lo + inset, top + inset * 0.5, (hi - lo) - inset * 2.0, h - inset), Color(0, 0, 0, 0.08 * st))
+
+
+## The light of a mark: a thin ring or brackets in the skill's own colour, fading in as the warning runs out.
+func draw_ground_glow(ci: CanvasItem, t: float) -> void:
+	for m in _marks():
+		var st: float = 1.15 if m.reticle else lerpf(0.4, 1.0, m.progress)
+		var col: Color = m.col
+		var lo: float = m.lo
+		var hi: float = m.hi
 		var half := (hi - lo) * 0.5
-		FkPaint.ellipse(ci, c, Vector2(half, half * CIRCLE_SQUASH), Color(0, 0, 0, 0.32))
-		ci.draw_polyline(_ring(c, half, half * CIRCLE_SQUASH), Color(0, 0, 0, 0.5), 8.0)
-	else:
-		var r := Rect2(lo, GROUND_Y + FIELD_BACK, hi - lo, FIELD_FRONT - FIELD_BACK)
-		ci.draw_rect(r, Color(0, 0, 0, 0.3))
-		ci.draw_rect(r, Color(0, 0, 0, 0.5), false, 8.0)
+		if m.kind == "circle":
+			var c := Vector2((lo + hi) * 0.5, GROUND_Y + 10.0)
+			var ry := half * CIRCLE_SQUASH
+			var ring := _ring(c, half, ry)
+			ci.draw_colored_polygon(ring.slice(0, ring.size() - 1), Color(col, (0.04 + 0.07 * st) * 0.8))
+			ci.draw_polyline(ring, Color(col, 0.14 * st), 9.0)
+			ci.draw_polyline(ring, Color(col, 0.6 * st), 2.5)
+			if m.progress >= 0.0 and m.progress < 1.0:
+				# The ring brightens clockwise from the top as the warning runs out.
+				var arc := PackedVector2Array()
+				var n := maxi(2, int(64 * m.progress))
+				for i in n + 1:
+					var a: float = -PI * 0.5 + TAU * m.progress * i / n
+					arc.append(c + Vector2(cos(a) * half, sin(a) * ry))
+				ci.draw_polyline(arc, Color(col.lightened(0.35), 0.95), 3.5)
+			if m.id == "starfall":
+				_sigil(ci, c, half, ry, col, t, st, m.shot)
+			elif m.id == "rockfall":
+				# Dust turning slowly round the rim.
+				for i in 18:
+					if i % 2 == 0:
+						var a0 := TAU * i / 18.0 + t * 0.7
+						var a1 := a0 + TAU / 36.0
+						ci.draw_line(c + Vector2(cos(a0) * half * 0.86, sin(a0) * ry * 0.86), c + Vector2(cos(a1) * half * 0.86, sin(a1) * ry * 0.86), Color(col, 0.35 * st), 3.0)
+			if m.reticle:
+				ci.draw_line(c + Vector2(-14, 0), c + Vector2(14, 0), Color(col, 0.9), 2.5)
+				ci.draw_line(c + Vector2(0, -5), c + Vector2(0, 5), Color(col, 0.9), 2.5)
+		else:
+			var top := GROUND_Y + FIELD_BACK
+			var bot := GROUND_Y + FIELD_FRONT
+			var r := Rect2(lo, top, hi - lo, bot - top)
+			ci.draw_rect(r, Color(col, (0.05 + 0.08 * st) * 0.8))
+			ci.draw_rect(r, Color(col, 0.13 * st), false, 9.0)
+			ci.draw_rect(r, Color(col, 0.5 * st), false, 2.0)
+			# Brackets painted at the corners.
+			for corner in [Vector2(lo, top), Vector2(hi, top), Vector2(lo, bot), Vector2(hi, bot)]:
+				var sx: float = 1.0 if corner.x == lo else -1.0
+				var sy: float = 1.0 if corner.y == top else -1.0
+				ci.draw_line(corner, corner + Vector2(sx * 24.0, 0), Color(col, 0.85 * st), 4.0)
+				ci.draw_line(corner, corner + Vector2(0, sy * 18.0), Color(col, 0.85 * st), 4.0)
+			if m.progress >= 0.0 and m.progress < 1.0:
+				ci.draw_line(Vector2(lo, top), Vector2(lo + (hi - lo) * m.progress, top), Color(col.lightened(0.35), 0.95), 3.5)
+			if m.reticle:
+				var mid := (lo + hi) * 0.5
+				ci.draw_line(Vector2(mid, top + 6), Vector2(mid, bot - 6), Color(col, 0.5), 2.0)
+				ci.draw_line(Vector2(mid - 20, (top + bot) * 0.5), Vector2(mid + 20, (top + bot) * 0.5), Color(col, 0.5), 2.0)
+
+
+## The sigil Starfall is cast from: a second ring, a star of the skill's own kind (a lance's eight points, a
+## star's five, a rune's six) turning inside it, and glyph ticks. It wakes up as the warning runs out.
+func _sigil(ci: CanvasItem, c: Vector2, half: float, ry: float, col: Color, t: float, st: float, shot: String) -> void:
+	ci.draw_polyline(_ring(c, half * 0.66, ry * 0.66), Color(col, 0.4 * st), 2.0)
+	var n := {"lance": 8, "star": 5, "bolt": 6}.get(shot, 6) as int
+	var step := 3 if n == 8 else 2
+	var pts := PackedVector2Array()
+	for i in n:
+		var a := t * 0.5 + TAU * i / n - PI * 0.5
+		pts.append(c + Vector2(cos(a) * half * 0.6, sin(a) * ry * 0.6))
+	for i in n:
+		ci.draw_line(pts[i], pts[(i + step) % n], Color(col, (0.25 + 0.4 * st) * 0.8), 2.0)
+	for i in 12:
+		var a := -t * 0.35 + TAU * i / 12.0
+		var d := Vector2(cos(a), sin(a))
+		ci.draw_line(c + Vector2(d.x * half * 0.74, d.y * ry * 0.74), c + Vector2(d.x * half * 0.86, d.y * ry * 0.86), Color(col, 0.55 * st), 2.5)
 
 
 ## A closed ellipse as a polyline.
@@ -805,10 +901,10 @@ func _draw_labels(ci: CanvasItem, _t: float) -> void:
 		var text := name if e.side == 0 else "ENEMY " + name
 		if e.pulse == 0:
 			text += "  %.1f" % remain
-		var w := f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 28).x
-		var at := Vector2((e.lo + e.hi) * 0.5 - w * 0.5, GROUND_Y - 150.0)
-		ci.draw_string_outline(f, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 28, 9, Color(0, 0, 0, 0.9))
-		ci.draw_string(f, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 28, col.lightened(0.3))
+		var w := f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
+		var at := Vector2((e.lo + e.hi) * 0.5 - w * 0.5, GROUND_Y - 140.0)
+		ci.draw_string_outline(f, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, 7, Color(0, 0, 0, 0.8))
+		ci.draw_string(f, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, col.lightened(0.25))
 	var aim := view.aim
 	if aim.active:
 		var pv := aim.preview()
@@ -828,8 +924,7 @@ func _draw_labels(ci: CanvasItem, _t: float) -> void:
 # Drawing: the additive glow pass (telegraphs, the aim reticle, everything luminous)
 
 func draw_glow(ci: CanvasItem, t: float) -> void:
-	_draw_telegraphs(ci, t)
-	_draw_reticle(ci, t)
+	_draw_reticle_overlay(ci, t)
 	for it in items:
 		match it.k:
 			"proj":
@@ -904,79 +999,10 @@ func _glow_proj(ci: CanvasItem, p: Dictionary, t: float) -> void:
 			ci.draw_circle(pos, 9.0, Color(glow, 0.2))
 		"thorn":
 			ci.draw_circle(pos, r * 0.5, Color(glow, 0.2))
-		"lance":
-			# A spear of light: a tall taper falling faster than it can be followed.
-			var top := pos + Vector2(0, -320.0 * clampf(u * 4.0, 0.0, 1.0) - 60.0)
-			var w: float = r
-			ci.draw_colored_polygon(PackedVector2Array([pos, top + Vector2(-w, 0), top + Vector2(w, 0)]), Color(glow, 0.32))
-			ci.draw_colored_polygon(PackedVector2Array([pos + Vector2(0, 6), top + Vector2(-w * 0.32, 0), top + Vector2(w * 0.32, 0)]), Color(1, 1, 1, 0.9))
-			ci.draw_circle(pos, w * 0.9, Color(glow, 0.5))
 
 
-## The mark on the ground for a zone [lo, hi]: a circle (a small round target) or a field (a piece of land).
-## `progress` (0..1) fills the outline as a warning runs out; -1 = a steady mark (the aim reticle).
-func _mark(ci: CanvasItem, lo: float, hi: float, kind: String, col: Color, t: float, progress: float, strength: float) -> void:
-	var pulse := 0.5 + 0.5 * sin(t * 10.0)
-	var half := (hi - lo) * 0.5
-	if kind == "circle":
-		var c := Vector2((lo + hi) * 0.5, GROUND_Y + 10.0)
-		var ry := half * CIRCLE_SQUASH
-		var ring := _ring(c, half, ry)
-		ci.draw_colored_polygon(ring.slice(0, ring.size() - 1), Color(col, (0.16 + 0.12 * pulse) * strength))
-		ci.draw_polyline(ring, Color(col, 0.5 * strength), 4.0)
-		if progress >= 0.0:
-			# The outline fills clockwise from the top as the warning runs out.
-			var arc := PackedVector2Array()
-			var n := maxi(2, int(64 * progress))
-			for i in n + 1:
-				var a := -PI * 0.5 + TAU * progress * i / n
-				arc.append(c + Vector2(cos(a) * half, sin(a) * ry))
-			ci.draw_polyline(arc, Color(col.lightened(0.3), 0.95 * strength), 7.0)
-		# A dashed inner ring, turning, and the crosshair the rocks fall on.
-		for i in 24:
-			if i % 2 == 0:
-				var a0 := TAU * i / 24.0 + t * 0.9
-				var a1 := TAU * (i + 1) / 24.0 + t * 0.9
-				ci.draw_line(c + Vector2(cos(a0) * half * 0.6, sin(a0) * ry * 0.6), c + Vector2(cos(a1) * half * 0.6, sin(a1) * ry * 0.6), Color(col, 0.7 * strength), 3.0)
-		ci.draw_line(c + Vector2(-16, 0), c + Vector2(16, 0), Color(col.lightened(0.4), 0.9 * strength), 3.0)
-		ci.draw_line(c + Vector2(0, -6), c + Vector2(0, 6), Color(col.lightened(0.4), 0.9 * strength), 3.0)
-		for d in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
-			ci.draw_line(c + Vector2(d.x * half, d.y * ry), c + Vector2(d.x * (half + 14.0), d.y * (ry + 5.0)), Color(col, 0.9 * strength), 4.0)
-	else:
-		var top := GROUND_Y + FIELD_BACK
-		var bot := GROUND_Y + FIELD_FRONT
-		var r := Rect2(lo, top, hi - lo, bot - top)
-		ci.draw_rect(r, Color(col, (0.14 + 0.1 * pulse) * strength))
-		# Diagonal hatching crawling over the land, so it never reads as scenery.
-		var h := bot - top
-		var x := lo - 30.0 + fmod(t * 40.0, 30.0)
-		while x + h < hi:
-			if x > lo:
-				ci.draw_line(Vector2(x, bot), Vector2(x + h, top), Color(col, 0.35 * strength), 2.0)
-			x += 30.0
-		ci.draw_rect(r, Color(col, 0.6 * strength), false, 3.0)
-		# The back edge is the countdown bar.
-		if progress >= 0.0:
-			ci.draw_line(Vector2(lo, top), Vector2(lo + (hi - lo) * progress, top), Color(col.lightened(0.3), 0.95 * strength), 8.0)
-		# A stake and a pennant at every corner.
-		for corner in [Vector2(lo, top), Vector2(hi, top), Vector2(lo, bot), Vector2(hi, bot)]:
-			var up: float = 46.0 if corner.y == top else 34.0
-			var inward: float = 1.0 if corner.x == lo else -1.0
-			ci.draw_line(corner, corner + Vector2(0, -up), Color(col, 0.95 * strength), 4.0)
-			ci.draw_colored_polygon(PackedVector2Array([corner + Vector2(0, -up), corner + Vector2(inward * 20.0, -up + 6.0), corner + Vector2(0, -up + 14.0)]), Color(col, 0.9 * strength))
-
-
-func _draw_telegraphs(ci: CanvasItem, t: float) -> void:
-	var sim := view.sim
-	for e in _marked_effects():
-		var def: AbilityDef = e.def
-		var progress := 1.0
-		if e.pulse == 0:
-			progress = clampf(1.0 - (e.next_t - sim.time) / maxf(0.05, def.telegraph), 0.0, 1.0)
-		_mark(ci, e.lo, e.hi, SkillLook.footprint(def.id), _warn_color(e.side), t, progress, 1.0)
-
-
-func _draw_reticle(ci: CanvasItem, t: float) -> void:
+## What the reticle adds above the ground: a beam for a circle, and a marker over every unit it would hit.
+func _draw_reticle_overlay(ci: CanvasItem, t: float) -> void:
 	var aim := view.aim
 	if not aim.active:
 		return
@@ -984,17 +1010,12 @@ func _draw_reticle(ci: CanvasItem, t: float) -> void:
 	if pv.is_empty():
 		return
 	var z: Array = pv.zone
-	var hits: bool = pv.count > 0
-	var col := Color("ffc61a") if hits else Color("ff5a4a")
-	var kind := SkillLook.footprint(view.sim.ability_def(aim.side).id)
-	_mark(ci, z[0], z[1], kind, col, t, -1.0, 1.3)
+	var col := Color("ffc61a") if pv.count > 0 else Color("ff5a4a")
 	var mid: float = (z[0] + z[1]) * 0.5
-	if kind == "circle":
-		# A beam down from the sky onto the target.
+	if SkillLook.footprint(view.sim.ability_def(aim.side).id) == "circle":
 		for k in 12:
 			var y := -300.0 + k * 90.0
-			ci.draw_line(Vector2(mid, y + fmod(t * 120.0, 90.0)), Vector2(mid, y + 40.0 + fmod(t * 120.0, 90.0)), Color(col, 0.35), 2.0)
-	# A marker over every unit the shot would hit.
+			ci.draw_line(Vector2(mid, y + fmod(t * 120.0, 90.0)), Vector2(mid, y + 40.0 + fmod(t * 120.0, 90.0)), Color(col, 0.3), 2.0)
 	var sim := view.sim
 	var enemy := 1 - aim.side
 	for u in sim.sides[enemy].units:
@@ -1028,11 +1049,3 @@ func _glow_charge(ci: CanvasItem, ch: Dictionary, t: float) -> void:
 			pts.append(Vector2(mid + cos(a) * rx, GROUND_Y + 6 + sin(a) * rx * 0.2))
 		ci.draw_polyline(pts, Color(glow, 0.55 * ph), 3.0)
 	ci.draw_rect(Rect2(mid - half * 0.16, -600, half * 0.32, GROUND_Y + 610), Color(glow, 0.06 + 0.22 * f * f))
-	if look.get("shot", "") == "bolt":
-		# The rune wakes: a star drawn inside the circle, turning.
-		var pts := PackedVector2Array()
-		for i in 6:
-			var a := t * 1.2 + TAU * i / 6.0
-			pts.append(Vector2(mid + cos(a) * half * 0.9, GROUND_Y + 6 + sin(a) * half * 0.9 * 0.2))
-		for i in 6:
-			ci.draw_line(pts[i], pts[(i + 2) % 6], Color(glow, 0.25 + 0.6 * f), 2.5)
