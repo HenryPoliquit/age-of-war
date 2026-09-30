@@ -54,38 +54,22 @@ func test_area_lands_on_densest_group() -> void:
 	check_near(sim.ability_zone_value(0), 3.0 * pack[0].cost_paid, 0.01, "value = the pack")
 
 
-func test_strip_starts_at_enemy_front() -> void:
+func test_volley_is_an_aimed_field_wider_than_a_circle() -> void:
+	var gd := GameData.get_default()
+	var volley := gd.age(3).ability
+	check_eq(volley.shape, "area")
+	check(volley.is_targeted(), "the player aims Volley")
+	check(volley.width > gd.age(2).ability.width, "a field of land is wider than Rockfall's circle")
+	# It falls where it is aimed, not at the enemy's front.
 	var sim := new_sim()
 	sim.sides[0].age = 3
 	sim.sides[1].age = 3
-	var def := sim.data.age(3).ability
-	check_eq(def.shape, "strip")
-	var front := place(sim, 1, "vanguard", 900.0, 3)
-	place(sim, 1, "vanguard", 500.0, 3)
-	var zone := sim.ability_zone(0)
-	var fx := sim.to_world(1, front.progress)
-	var lead := front.def.speed * def.telegraph
-	check(lead > 0.0)
-	check_near(zone[0], fx - lead, 0.01, "starts at the front unit, ahead by what it walks during the telegraph")
-	check_near(zone[1], fx - lead + def.width, 0.01, "extends toward the enemy base")
-	var mine := place(sim, 0, "vanguard", 700.0, 3)
-	var z1 := sim.ability_zone(1)
-	check_near(z1[1], 700.0 + mine.def.speed * def.telegraph, 0.01, "mirrored for the right side")
-	check_near(z1[0], z1[1] - def.width, 0.01)
-
-
-func test_the_strip_still_holds_the_front_unit_when_the_first_pulse_lands() -> void:
-	var sim := new_sim()
-	sim.sides[0].age = 3
-	sim.sides[1].age = 3
-	var front := place(sim, 1, "vanguard", 1000.0, 3)
-	front.hp = 1e6
-	front.max_hp = 1e6
-	check(sim.fire_ability(0))
-	# Not pinned: it walks toward us during the telegraph and the first pulse must still find it.
-	var def := sim.data.age(3).ability
-	run_for(sim, def.telegraph + 0.15)
-	check(front.hp < front.max_hp, "the walking front unit is hit by the first volley")
+	var front := _tough(place(sim, 1, "vanguard", 1000.0, 3))  # x = 1400
+	var back := _tough(place(sim, 1, "vanguard", 300.0, 3))    # x = 2100
+	check(sim.fire_ability(0, sim.to_world(1, back.progress)))
+	run_pinned(sim, 4.0, [front, back])
+	check(back.hp < back.max_hp, "the aimed field is hit")
+	check_near(front.hp, front.max_hp, 0.001, "the enemy's front unit, outside the field, is not")
 
 
 func test_skills_never_hit_structures() -> void:
@@ -295,32 +279,6 @@ func test_percent_damage_can_kill_and_is_counted() -> void:
 
 # ---------------------------------------------------------------------------
 # Slow and reporting
-
-func test_rockfall_slows_what_it_hits_for_a_while() -> void:
-	var sim := new_sim()
-	sim.sides[0].age = 2
-	var def := sim.data.age(2).ability
-	check(def.slow > 0.0 and def.slow_time > 0.0, "Rockfall slows")
-	var hit := _tough(place(sim, 1, "vanguard", 900.0, 2))
-	var missed := _tough(place(sim, 1, "vanguard", 1900.0, 2))
-	check(sim.fire_ability(0, sim.to_world(1, hit.progress)))
-	run_pinned(sim, def.telegraph + def.pulse_interval * def.pulses + 0.3, [hit, missed])
-	check_near(hit.slow, def.slow, 0.001, "slowed right after the rocks land")
-	check_near(missed.slow, 0.0, 0.001, "units outside are not")
-	run_pinned(sim, def.slow_time + 0.5, [hit, missed])
-	check_near(hit.slow, 0.0, 0.001, "the slow wears off")
-
-
-func test_a_slowed_unit_walks_slower() -> void:
-	var sim := new_sim()
-	var slowed := place(sim, 1, "vanguard", 100.0)
-	var normal := place(sim, 0, "vanguard", 100.0)
-	slowed.skill_slow = 0.5
-	slowed.skill_slow_until = 100.0
-	slowed.progress = 100.0
-	normal.progress = 100.0
-	run_for(sim, 1.0)
-	check(slowed.progress - 100.0 < 0.6 * (normal.progress - 100.0), "half speed")
 
 
 func test_skill_hits_are_recorded_for_the_view() -> void:

@@ -8,7 +8,6 @@ const STAT_ICON := {"attack": "⚔", "health": "♥", "defence": "🛡", "range"
 const STAT_NAME := {"attack": "Attack", "health": "Health", "defence": "Defence", "range": "Range", "income": "Income"}
 const SHAPE_TEXT := {
 	"area": "strikes the biggest enemy group",
-	"strip": "hits the enemy line from its front unit back toward their base",
 	"sweep": "sweeps the whole lane from your gate to theirs",
 }
 
@@ -87,7 +86,7 @@ static func _effect(sim: MatchSim, stat: String, level: int) -> String:
 			return "+%d%% passive income" % roundi(r.income_upgrade_bonus * level * 100.0)
 
 
-## What a skill does to each unit it hits, in words: damage mode, hits per unit, slow, knockback.
+## What a skill does to each unit it hits, in words: damage mode, hits per unit, knockback.
 static func skill_effect_text(ab: AbilityDef) -> String:
 	# A sweep's slices cross each unit once; every other shape hits it on every pulse.
 	var hits := 1 if ab.shape == "sweep" else ab.pulses
@@ -100,8 +99,6 @@ static func skill_effect_text(ab: AbilityDef) -> String:
 			text = "%d true damage%s, ignoring armour and Defence" % [roundi(ab.damage), times]
 		_:
 			text = "%d %s damage%s (armour applies)" % [roundi(ab.damage), ab.damage_type, times]
-	if ab.slow > 0.0:
-		text += "; survivors are slowed %d%% for %d s" % [roundi(ab.slow * 100.0), roundi(ab.slow_time)]
 	if ab.knockback >= 20.0:
 		text += "; shoves units back"
 	return text
@@ -110,7 +107,8 @@ static func skill_effect_text(ab: AbilityDef) -> String:
 ## Where the skill lands, in words.
 static func skill_aim_text(ab: AbilityDef) -> String:
 	if ab.is_targeted():
-		return "aimed: press it, then click a spot on the lane (%d px wide). Press Space again to let the game aim" % roundi(ab.width)
+		var shape := "a circle" if SkillLook.footprint(ab.id) == "circle" else "a field of land"
+		return "aimed: press it, then click a spot on the lane (%s, %d px wide). Press Space again to let the game aim" % [shape, roundi(ab.width)]
 	return SHAPE_TEXT[ab.shape]
 
 

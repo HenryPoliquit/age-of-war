@@ -13,6 +13,11 @@ const INK := Color(0.06, 0.05, 0.05, 0.85)
 ## How long a projectile spends in the air, by launch style (a launch is delayed to land on time).
 const FLIGHT := {"sky": 0.42, "diag": 0.7, "home": 0.65}
 const MAX_POPUPS := 40
+## The ground is seen at a slant: a circle on it is drawn as an ellipse this flat.
+const CIRCLE_SQUASH := 0.30
+## A field of land reaches from just behind the units' feet to well in front of them.
+const FIELD_BACK := -12.0
+const FIELD_FRONT := 62.0
 
 var fxl: FxLayer
 var items: Array[Dictionary] = []
@@ -80,6 +85,20 @@ func _ground(x: float, depth := 12.0) -> Vector2:
 	return Vector2(x, GROUND_Y - rng.randf_range(0.0, depth))
 
 
+## A landing spot inside a circle's footprint (the i-th of n, spread round it).
+func _in_circle(c: Dictionary, i: int, n: int) -> Vector2:
+	var mid: float = (c.lo + c.hi) * 0.5
+	var half: float = (c.hi - c.lo) * 0.5
+	var a := TAU * (i + rng.randf_range(0.0, 0.8)) / n + rng.randf() * 0.3
+	var r := sqrt(rng.randf_range(0.15, 1.0))
+	return Vector2(mid + cos(a) * r * (half - 24.0), GROUND_Y + 10.0 + sin(a) * r * (half * CIRCLE_SQUASH - 8.0))
+
+
+## A landing spot inside a field of land (the i-th of n across its width, anywhere in its depth).
+func _in_field(c: Dictionary, i: int, n: int) -> Vector2:
+	return Vector2(lerpf(c.lo + 10.0, c.hi - 10.0, (i + rng.randf_range(0.1, 0.9)) / n), GROUND_Y + rng.randf_range(FIELD_BACK + 6.0, FIELD_FRONT - 8.0))
+
+
 ## Launches one projectile so that it lands at pulse `k` (a little early, never late).
 func _launch(c: Dictionary, k: int, to: Vector2, opts := {}) -> void:
 	var look: Dictionary = c.look
@@ -128,9 +147,11 @@ func _cast_stampede(c: Dictionary) -> void:
 	var look: Dictionary = c.look
 	var lead := 0.25
 	var beasts := []
-	for i in _n(9):
-		beasts.append({"back": (i % 3) * 84.0 + rng.randf_range(0.0, 30.0) + (i / 3) * 10.0, "y": GROUND_Y + ((i * 7) % 23) - 11.0,
-			"ph": rng.randf() * TAU, "s": rng.randf_range(1.25, 1.5)})
+	for i in _n(12):
+		beasts.append({"back": (i % 4) * 70.0 + rng.randf_range(0.0, 34.0) + (i / 4) * 8.0, "y": GROUND_Y + ((i * 7) % 29) - 14.0,
+			"ph": rng.randf() * TAU, "s": rng.randf_range(1.25, 1.55)})
+	# Far beasts first, so the near ones stand in front of them.
+	beasts.sort_custom(func(a, b): return a.y < b.y)
 	fxl.later(maxf(0.0, def.telegraph - lead), func():
 		items.append({"k": "herd", "born": fxl.now(), "dir": dir, "x0": c.home - dir * v * lead, "v": v, "look": look, "beasts": beasts,
 			"life": (c.hi - c.lo) / v + lead + 0.5, "side": c.side})
@@ -152,11 +173,9 @@ func _cast_rockfall(c: Dictionary) -> void:
 	for k in def.pulses:
 		var n := _n(3)
 		for i in n:
-			var x := lerpf(c.lo + 30.0, c.hi - 30.0, (i + rng.randf_range(0.15, 0.85)) / n)
-			_launch(c, k, _ground(x, 8.0), {"last": k == def.pulses - 1})
+			_launch(c, k, _in_circle(c, i, n), {"last": k == def.pulses - 1})
 		fxl.later(_t(c, k), func():
-			view.add_shake(6.0)
-			fxl.ring(Vector2((c.lo + c.hi) * 0.5, GROUND_Y + 4), (c.hi - c.lo) * 0.62, Color(c.glow, 0.5), 0.4, 6.0))
+			view.add_shake(6.0))
 
 
 # --- Volley -----------------------------------------------------------------
@@ -164,12 +183,13 @@ func _cast_rockfall(c: Dictionary) -> void:
 func _cast_volley(c: Dictionary) -> void:
 	var def: AbilityDef = c.def
 	var look: Dictionary = c.look
-	var count := {"pilum": 12, "arrow": 26, "axe": 11}.get(look.shot, 14) as int
+	var count := {"pilum": 16, "arrow": 34, "axe": 14}.get(look.shot, 16) as int
 	for k in def.pulses:
-		for i in _n(count):
-			_launch(c, k, _ground(rng.randf_range(c.lo + 10.0, c.hi - 10.0), 26.0), {"shadow": false})
+		var n := _n(count)
+		for i in n:
+			_launch(c, k, _in_field(c, i, n), {"shadow": false})
 		fxl.later(_t(c, k), func():
-			# The zone the volley falls on, as a curtain of shafts.
+			# The field the volley falls on, as a curtain of shafts.
 			items.append({"k": "curtain", "born": fxl.now(), "life": 0.5, "lo": c.lo, "hi": c.hi, "col": c.glow})
 			fxl.sound("bow", Vector2((c.lo + c.hi) * 0.5, GROUND_Y - 200), -2.0)
 			view.add_shake(2.0))
@@ -193,13 +213,17 @@ func _cast_bombardment(c: Dictionary) -> void:
 
 func _cast_cannonade(c: Dictionary) -> void:
 	var def: AbilityDef = c.def
+	# Signal flares planted in the field: coloured smoke marks where the guns are about to fall.
+	var last_pulse := _t(c, def.pulses - 1)
+	for f in 3:
+		items.append({"k": "flare", "born": fxl.now(), "life": last_pulse + 0.4, "x": lerpf(c.lo + 50.0, c.hi - 50.0, (f + 0.5) / 3.0),
+			"y": GROUND_Y + 24.0, "col": c.glow})
 	for k in def.pulses:
-		var n := _n(3)
+		var n := _n(4)
 		for i in n:
-			_launch(c, k, _ground(lerpf(c.lo + 30.0, c.hi - 30.0, (i + rng.randf_range(0.15, 0.85)) / n), 6.0), {"last": k == def.pulses - 1})
+			_launch(c, k, _in_field(c, i, n), {"last": k == def.pulses - 1})
 		fxl.later(_t(c, k), func():
-			view.add_shake(5.0)
-			fxl.ring(Vector2((c.lo + c.hi) * 0.5, GROUND_Y + 4), (c.hi - c.lo) * 0.55, Color(c.glow, 0.45), 0.4, 6.0))
+			view.add_shake(5.0))
 
 
 # --- Starfall ---------------------------------------------------------------
@@ -213,7 +237,7 @@ func _cast_starfall(c: Dictionary) -> void:
 	for k in def.pulses:
 		var last := k == def.pulses - 1
 		var x: float = mid + w * (offsets[k % 3] if def.pulses > 1 else 0.0)
-		_launch(c, k, Vector2(x, GROUND_Y - 4), {"last": last, "r": float(c.look.r) * (1.35 if last else 1.0)})
+		_launch(c, k, Vector2(x, GROUND_Y + 8), {"last": last, "r": float(c.look.r) * (1.35 if last else 1.0)})
 		if last:
 			fxl.later(_t(c, k), func():
 				view.add_shake(16.0)
@@ -437,6 +461,10 @@ func step(_dt: float) -> void:
 				if t - it.born > it.life:
 					continue
 				_charge_motes(it)
+			"flare":
+				if t - it.born > it.life:
+					continue
+				_flare_smoke(it)
 			_:
 				if t - it.born > it.life:
 					continue
@@ -475,6 +503,7 @@ func _trail(p: Dictionary, u: float) -> void:
 func _herd_dust(h: Dictionary, t: float) -> void:
 	var look: Dictionary = h.look
 	var front: float = h.x0 + h.dir * h.v * (t - h.born)
+	view.add_shake(0.5)  # the ground shakes under the herd
 	if rng.randf() > 0.7 * fxl.intensity + 0.15:
 		return
 	var b: Dictionary = h.beasts[rng.randi_range(0, h.beasts.size() - 1)]
@@ -489,6 +518,15 @@ func _herd_dust(h: Dictionary, t: float) -> void:
 			fxl.particle({"kind": "spark", "pos": pos, "vel": Vector2(-h.dir * 120, rng.randf_range(-120, -30)), "life": 0.35, "size": 2.6, "col": Color(1.0, 0.7, 0.3), "g": 500.0,
 				"add": true, "rot": 0.0, "spin": 0.0})
 			fxl.particle({"kind": "smoke", "pos": pos, "vel": Vector2(-h.dir * 60, -10), "life": 0.6, "size": 12.0, "col": look.dust, "g": -10.0, "add": false, "rot": 0.0, "spin": 0.0})
+
+
+## Coloured smoke rising from a signal flare.
+func _flare_smoke(f: Dictionary) -> void:
+	if rng.randf() > 0.95 * fxl.intensity + 0.05:
+		return
+	var col: Color = f.col
+	fxl.particle({"kind": "smoke", "pos": Vector2(f.x + rng.randf_range(-4.0, 4.0), f.y - 34.0), "vel": Vector2(rng.randf_range(-10, 10), rng.randf_range(-170, -110)),
+		"life": 2.2, "size": 13.0, "col": Color(col.r, col.g, col.b, 0.62), "g": -4.0, "add": false, "rot": 0.0, "spin": 0.0})
 
 
 ## Motes drawn in toward a charging Starfall.
@@ -513,7 +551,7 @@ func draw_under(ci: CanvasItem, t: float) -> void:
 				if it.shadow:
 					var u: float = clampf((t - it.born) / it.dur, 0.0, 1.0)
 					var rx: float = lerpf(5.0, it.r * 1.2 + 8.0, u * u)
-					FkPaint.ellipse(ci, Vector2(it.to.x, GROUND_Y + 8), Vector2(rx, rx * 0.24), Color(0, 0, 0, lerpf(0.08, 0.5, u)))
+					FkPaint.ellipse(ci, Vector2(it.to.x, it.to.y + 8), Vector2(rx, rx * 0.24), Color(0, 0, 0, lerpf(0.08, 0.5, u)))
 			"stuck":
 				_draw_stuck(ci, it, t)
 			"crack":
@@ -525,24 +563,50 @@ func draw_under(ci: CanvasItem, t: float) -> void:
 					ci.draw_polyline(pts, Color(0.05, 0.04, 0.03, 0.75 * a), 3.0)
 			"herd":
 				_draw_herd(ci, it, t)
+			"flare":
+				ci.draw_line(Vector2(it.x, it.y), Vector2(it.x, it.y - 30.0), INK, 6.0)
+				ci.draw_line(Vector2(it.x, it.y), Vector2(it.x, it.y - 30.0), Color("8a7a66"), 3.0)
 
 
-## A dark plate under every warning marker and the aim reticle: the coloured band is additive light and
-## would vanish on bright ground, so it sits on a dark base with dark edge posts.
-func _draw_zone_shadows(ci: CanvasItem) -> void:
-	var zones: Array[Vector2] = []
+## The skills on their way that mark the ground (aimed ones; a sweep needs no warning).
+func _marked_effects() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
 	for e in view.sim.effects:
-		if e.pulse > 0 and e.def.shape != "sweep" and e.def.pulses <= 1:
-			continue
-		zones.append(_telegraph_zone(e))
+		if SkillLook.footprint(e.def.id) != "":
+			out.append(e)
+	return out
+
+
+## A dark plate under every ground mark: the coloured mark is additive light and would vanish on bright
+## ground, so it sits on a dark base with a dark outline.
+func _draw_zone_shadows(ci: CanvasItem) -> void:
+	for e in _marked_effects():
+		_mark_under(ci, e.lo, e.hi, SkillLook.footprint(e.def.id))
 	if view.aim.active:
 		var pv := view.aim.preview()
 		if not pv.is_empty():
-			zones.append(Vector2(pv.zone[0], pv.zone[1]))
-	for z in zones:
-		ci.draw_rect(Rect2(z.x, GROUND_Y - 5, z.y - z.x, 22), Color(0, 0, 0, 0.38))
-		for edge in [z.x, z.y]:
-			ci.draw_line(Vector2(edge, GROUND_Y + 18), Vector2(edge, GROUND_Y - 88), Color(0, 0, 0, 0.55), 7.0)
+			_mark_under(ci, pv.zone[0], pv.zone[1], SkillLook.footprint(view.sim.ability_def(view.aim.side).id))
+
+
+func _mark_under(ci: CanvasItem, lo: float, hi: float, kind: String) -> void:
+	if kind == "circle":
+		var c := Vector2((lo + hi) * 0.5, GROUND_Y + 10.0)
+		var half := (hi - lo) * 0.5
+		FkPaint.ellipse(ci, c, Vector2(half, half * CIRCLE_SQUASH), Color(0, 0, 0, 0.32))
+		ci.draw_polyline(_ring(c, half, half * CIRCLE_SQUASH), Color(0, 0, 0, 0.5), 8.0)
+	else:
+		var r := Rect2(lo, GROUND_Y + FIELD_BACK, hi - lo, FIELD_FRONT - FIELD_BACK)
+		ci.draw_rect(r, Color(0, 0, 0, 0.3))
+		ci.draw_rect(r, Color(0, 0, 0, 0.5), false, 8.0)
+
+
+## A closed ellipse as a polyline.
+func _ring(c: Vector2, rx: float, ry: float, n := 64) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	for i in n + 1:
+		var a := TAU * i / n
+		pts.append(c + Vector2(cos(a) * rx, sin(a) * ry))
+	return pts
 
 
 func _draw_stuck(ci: CanvasItem, s: Dictionary, t: float) -> void:
@@ -581,7 +645,7 @@ func _draw_herd(ci: CanvasItem, h: Dictionary, t: float) -> void:
 		var s: float = b.s
 		FkPaint.ellipse(ci, Vector2(x, b.y + 6), Vector2(46.0 * s, 8.0 * s), Color(0, 0, 0, 0.3))
 		FkPaint.begin(ci, Transform2D(0.0, Vector2(h.dir * s, s), 0.0, Vector2(x, b.y)))
-		FkMounts.quadruped(ci, look.beast, look.body, {"moving": true, "walk": t * 26.0 + b.ph, "t": t}, i, Color("a5a9ae"), {"yaw": UnitArt.view_yaw})
+		FkMounts.quadruped(ci, look.beast, look.body, {"moving": true, "walk": t * 30.0 + b.ph, "t": t}, i, Color("a5a9ae"), {"yaw": UnitArt.view_yaw})
 		ci.draw_set_transform(Vector2.ZERO)
 
 
@@ -730,14 +794,11 @@ func _streak(ci: CanvasItem, p: Dictionary, u: float, span: float, col: Color, w
 		ci.draw_line(pts[i], pts[i + 1], Color(col, col.a * (1.0 - f)), maxf(0.6, w * (1.0 - 0.8 * f)))
 
 
-func _draw_labels(ci: CanvasItem, t: float) -> void:
+func _draw_labels(ci: CanvasItem, _t: float) -> void:
 	var sim := view.sim
 	var f := UiStyle.font("bold")
-	for e in sim.effects:
-		if e.pulse > 0 and not (e.def.pulses > 1 and e.def.shape == "sweep"):
-			continue
+	for e in _marked_effects():
 		var def: AbilityDef = e.def
-		var z := _telegraph_zone(e)
 		var remain: float = maxf(0.0, e.next_t - sim.time)
 		var name := view.race_def(e.side).ability_name(def).to_upper()
 		var col := _warn_color(e.side)
@@ -745,7 +806,7 @@ func _draw_labels(ci: CanvasItem, t: float) -> void:
 		if e.pulse == 0:
 			text += "  %.1f" % remain
 		var w := f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 28).x
-		var at := Vector2((z.x + z.y) * 0.5 - w * 0.5, GROUND_Y - 122.0)
+		var at := Vector2((e.lo + e.hi) * 0.5 - w * 0.5, GROUND_Y - 150.0)
 		ci.draw_string_outline(f, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 28, 9, Color(0, 0, 0, 0.9))
 		ci.draw_string(f, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 28, col.lightened(0.3))
 	var aim := view.aim
@@ -804,6 +865,10 @@ func draw_glow(ci: CanvasItem, t: float) -> void:
 					ci.draw_polyline(pts, Color(it.col, 0.6 * a), 2.0)
 			"charge":
 				_glow_charge(ci, it, t)
+			"flare":
+				var flick := 0.7 + 0.3 * sin(t * 30.0 + it.x)
+				ci.draw_circle(Vector2(it.x, it.y - 32.0), 16.0 * flick, Color(it.col, 0.3))
+				ci.draw_circle(Vector2(it.x, it.y - 32.0), 6.0, Color(1, 1, 1, 0.9))
 			"herd":
 				var front: float = it.x0 + it.dir * it.v * (t - it.born)
 				for b in it.beasts:
@@ -848,51 +913,67 @@ func _glow_proj(ci: CanvasItem, p: Dictionary, t: float) -> void:
 			ci.draw_circle(pos, w * 0.9, Color(glow, 0.5))
 
 
-func _warn_color(side: int) -> Color:
-	return view.team_color(0).lightened(0.4) if side == 0 else SkillLook.DANGER
-
-
-## [lo, hi] of the ground a pending skill is about to hit: the next slice for a sweep, the zone otherwise.
-func _telegraph_zone(e: Dictionary) -> Vector2:
-	var def: AbilityDef = e.def
-	if def.shape == "sweep" and def.pulses > 1:
-		return _slice({"def": def, "side": e.side, "lo": e.lo, "hi": e.hi}, mini(e.pulse, def.pulses - 1))
-	return Vector2(e.lo, e.hi)
-
-
-func _band(ci: CanvasItem, lo: float, hi: float, col: Color, t: float, strength: float) -> void:
-	var pulse := 0.5 + 0.5 * sin(t * 12.0)
-	ci.draw_rect(Rect2(lo, GROUND_Y - 4, hi - lo, 20), Color(col, (0.22 + 0.16 * pulse) * strength))
-	# Diagonal hatching that crawls along the zone, so it never reads as scenery.
-	var off := fmod(t * 46.0, 22.0)
-	var x := lo - 22.0 + off
-	while x < hi:
-		var x0 := maxf(lo, x)
-		var x1 := minf(hi, x + 14.0)
-		if x1 > x0:
-			ci.draw_line(Vector2(x0, GROUND_Y + 15), Vector2(x1, GROUND_Y - 5), Color(col, 0.5 * strength), 2.0)
-		x += 22.0
-	for edge in [lo, hi]:
-		ci.draw_line(Vector2(edge, GROUND_Y + 16), Vector2(edge, GROUND_Y - 84), Color(col, 0.85 * strength), 3.0)
-		ci.draw_colored_polygon(PackedVector2Array([Vector2(edge - 7, GROUND_Y - 84), Vector2(edge + 7, GROUND_Y - 84), Vector2(edge, GROUND_Y - 70)]), Color(col, 0.9 * strength))
+## The mark on the ground for a zone [lo, hi]: a circle (a small round target) or a field (a piece of land).
+## `progress` (0..1) fills the outline as a warning runs out; -1 = a steady mark (the aim reticle).
+func _mark(ci: CanvasItem, lo: float, hi: float, kind: String, col: Color, t: float, progress: float, strength: float) -> void:
+	var pulse := 0.5 + 0.5 * sin(t * 10.0)
+	var half := (hi - lo) * 0.5
+	if kind == "circle":
+		var c := Vector2((lo + hi) * 0.5, GROUND_Y + 10.0)
+		var ry := half * CIRCLE_SQUASH
+		var ring := _ring(c, half, ry)
+		ci.draw_colored_polygon(ring.slice(0, ring.size() - 1), Color(col, (0.16 + 0.12 * pulse) * strength))
+		ci.draw_polyline(ring, Color(col, 0.5 * strength), 4.0)
+		if progress >= 0.0:
+			# The outline fills clockwise from the top as the warning runs out.
+			var arc := PackedVector2Array()
+			var n := maxi(2, int(64 * progress))
+			for i in n + 1:
+				var a := -PI * 0.5 + TAU * progress * i / n
+				arc.append(c + Vector2(cos(a) * half, sin(a) * ry))
+			ci.draw_polyline(arc, Color(col.lightened(0.3), 0.95 * strength), 7.0)
+		# A dashed inner ring, turning, and the crosshair the rocks fall on.
+		for i in 24:
+			if i % 2 == 0:
+				var a0 := TAU * i / 24.0 + t * 0.9
+				var a1 := TAU * (i + 1) / 24.0 + t * 0.9
+				ci.draw_line(c + Vector2(cos(a0) * half * 0.6, sin(a0) * ry * 0.6), c + Vector2(cos(a1) * half * 0.6, sin(a1) * ry * 0.6), Color(col, 0.7 * strength), 3.0)
+		ci.draw_line(c + Vector2(-16, 0), c + Vector2(16, 0), Color(col.lightened(0.4), 0.9 * strength), 3.0)
+		ci.draw_line(c + Vector2(0, -6), c + Vector2(0, 6), Color(col.lightened(0.4), 0.9 * strength), 3.0)
+		for d in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
+			ci.draw_line(c + Vector2(d.x * half, d.y * ry), c + Vector2(d.x * (half + 14.0), d.y * (ry + 5.0)), Color(col, 0.9 * strength), 4.0)
+	else:
+		var top := GROUND_Y + FIELD_BACK
+		var bot := GROUND_Y + FIELD_FRONT
+		var r := Rect2(lo, top, hi - lo, bot - top)
+		ci.draw_rect(r, Color(col, (0.14 + 0.1 * pulse) * strength))
+		# Diagonal hatching crawling over the land, so it never reads as scenery.
+		var h := bot - top
+		var x := lo - 30.0 + fmod(t * 40.0, 30.0)
+		while x + h < hi:
+			if x > lo:
+				ci.draw_line(Vector2(x, bot), Vector2(x + h, top), Color(col, 0.35 * strength), 2.0)
+			x += 30.0
+		ci.draw_rect(r, Color(col, 0.6 * strength), false, 3.0)
+		# The back edge is the countdown bar.
+		if progress >= 0.0:
+			ci.draw_line(Vector2(lo, top), Vector2(lo + (hi - lo) * progress, top), Color(col.lightened(0.3), 0.95 * strength), 8.0)
+		# A stake and a pennant at every corner.
+		for corner in [Vector2(lo, top), Vector2(hi, top), Vector2(lo, bot), Vector2(hi, bot)]:
+			var up: float = 46.0 if corner.y == top else 34.0
+			var inward: float = 1.0 if corner.x == lo else -1.0
+			ci.draw_line(corner, corner + Vector2(0, -up), Color(col, 0.95 * strength), 4.0)
+			ci.draw_colored_polygon(PackedVector2Array([corner + Vector2(0, -up), corner + Vector2(inward * 20.0, -up + 6.0), corner + Vector2(0, -up + 14.0)]), Color(col, 0.9 * strength))
 
 
 func _draw_telegraphs(ci: CanvasItem, t: float) -> void:
 	var sim := view.sim
-	for e in sim.effects:
+	for e in _marked_effects():
 		var def: AbilityDef = e.def
-		if e.pulse > 0 and def.shape != "sweep" and def.pulses <= 1:
-			continue
-		var z := _telegraph_zone(e)
-		var col := _warn_color(e.side)
-		_band(ci, z.x, z.y, col, t, 1.0)
-		# A ring that fills as the warning runs out, over the middle of the zone.
-		if e.pulse == 0 and def.telegraph >= 0.4:
-			var f: float = clampf(1.0 - (e.next_t - sim.time) / def.telegraph, 0.0, 1.0)
-			var c := Vector2((z.x + z.y) * 0.5, GROUND_Y - 38.0)
-			ci.draw_arc(c, 24.0, 0.0, TAU, 32, Color(col, 0.25), 3.0)
-			ci.draw_arc(c, 24.0, -PI * 0.5, -PI * 0.5 + TAU * f, 32, Color(col.lightened(0.3), 0.95), 5.0)
-			ci.draw_circle(c, 4.0 + 3.0 * (0.5 + 0.5 * sin(t * 14.0)), Color(col.lightened(0.4), 0.9))
+		var progress := 1.0
+		if e.pulse == 0:
+			progress = clampf(1.0 - (e.next_t - sim.time) / maxf(0.05, def.telegraph), 0.0, 1.0)
+		_mark(ci, e.lo, e.hi, SkillLook.footprint(def.id), _warn_color(e.side), t, progress, 1.0)
 
 
 func _draw_reticle(ci: CanvasItem, t: float) -> void:
@@ -905,19 +986,14 @@ func _draw_reticle(ci: CanvasItem, t: float) -> void:
 	var z: Array = pv.zone
 	var hits: bool = pv.count > 0
 	var col := Color("ffc61a") if hits else Color("ff5a4a")
-	_band(ci, z[0], z[1], col, t, 1.3)
+	var kind := SkillLook.footprint(view.sim.ability_def(aim.side).id)
+	_mark(ci, z[0], z[1], kind, col, t, -1.0, 1.3)
 	var mid: float = (z[0] + z[1]) * 0.5
-	var half: float = (z[1] - z[0]) * 0.5
-	# The footprint on the ground as a slowly turning dashed ellipse, and a beam down from the sky.
-	var n := 36
-	for i in n:
-		if i % 2 == 0:
-			var a0 := TAU * i / n + t * 0.8
-			var a1 := TAU * (i + 1) / n + t * 0.8
-			ci.draw_line(Vector2(mid + cos(a0) * half, GROUND_Y + 6 + sin(a0) * 22.0), Vector2(mid + cos(a1) * half, GROUND_Y + 6 + sin(a1) * 22.0), Color(col, 0.85), 3.0)
-	for k in 12:
-		var y := -300.0 + k * 90.0
-		ci.draw_line(Vector2(mid, y + fmod(t * 120.0, 90.0)), Vector2(mid, y + 40.0 + fmod(t * 120.0, 90.0)), Color(col, 0.35), 2.0)
+	if kind == "circle":
+		# A beam down from the sky onto the target.
+		for k in 12:
+			var y := -300.0 + k * 90.0
+			ci.draw_line(Vector2(mid, y + fmod(t * 120.0, 90.0)), Vector2(mid, y + 40.0 + fmod(t * 120.0, 90.0)), Color(col, 0.35), 2.0)
 	# A marker over every unit the shot would hit.
 	var sim := view.sim
 	var enemy := 1 - aim.side
@@ -930,6 +1006,10 @@ func _draw_reticle(ci: CanvasItem, t: float) -> void:
 		var pos := view.world.unit_pos(u)
 		var top := pos.y - UnitArt.height_for(u.def, view.race_of(enemy)) * WorldLayer.draw_scale(u.def) - 16.0 - 3.0 * sin(t * 9.0 + u.id)
 		ci.draw_colored_polygon(PackedVector2Array([Vector2(pos.x - 9, top - 12), Vector2(pos.x + 9, top - 12), Vector2(pos.x, top)]), Color(col, 0.95))
+
+
+func _warn_color(side: int) -> Color:
+	return view.team_color(0).lightened(0.4) if side == 0 else SkillLook.DANGER
 
 
 func _glow_charge(ci: CanvasItem, ch: Dictionary, t: float) -> void:

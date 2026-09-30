@@ -14,9 +14,6 @@ var base_damage: float
 var cost_paid: float
 var cooldown: float = 0.0
 var slow: float = 0.0
-## A skill's slow (fraction of speed lost) and the match time it lasts until; folded into `slow` each tick.
-var skill_slow: float = 0.0
-var skill_slow_until: float = -1.0
 ## Presentation hooks — the sim never reads these.
 var state: StringName = &"walk"
 var last_hit_time: float = -10.0

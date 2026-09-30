@@ -70,6 +70,8 @@ class LaneMap extends Control:
 				draw_circle(Vector2(x, size.y * 0.5 + (u.id % 3 - 1) * 4), r, hud.view.team_color(u.side).lightened(0.3))
 		# Skills on their way (the enemy's too), and where an aimed skill would land.
 		for e in sim.effects:
+			if SkillLook.footprint(e.def.id) == "":
+				continue  # a sweep runs gate to gate and needs no marker
 			var zone := Rect2(e.lo / lane * size.x, 0, (e.hi - e.lo) / lane * size.x, size.y)
 			var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 90.0)
 			draw_rect(zone, Color(hud.view.team_color(e.side).lightened(0.3), 0.3 + 0.3 * pulse))

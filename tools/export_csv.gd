@@ -19,7 +19,7 @@ func _init() -> void:
 			f.store_csv_line(PackedStringArray(["turret", age.index, t.id, t.display_name, t.kind, "structure", t.damage_type, t.cost, t.hp, t.damage, t.attack_interval, t.range, t.min_range, "", "", "splash=%s aura=%s slow=%s" % [t.splash, t.aura_radius, t.aura_slow]]))
 		var ab := age.ability
 		var dmg: Variant = ab.damage if ab.damage_mode != "percent" else "%d%% max HP" % roundi(ab.damage_pct * 100.0)
-		f.store_csv_line(PackedStringArray(["ability", age.index, ab.id, ab.display_name, "%s/%s" % [ab.shape, ab.aim], "", ab.damage_type, ab.xp_cost, "", dmg, ab.pulse_interval, ab.width, "", "", "", "mode=%s pulses=%d telegraph=%s knockback=%s slow=%s/%ss" % [ab.damage_mode, ab.pulses, ab.telegraph, ab.knockback, ab.slow, ab.slow_time]]))
+		f.store_csv_line(PackedStringArray(["ability", age.index, ab.id, ab.display_name, "%s/%s" % [ab.shape, ab.aim], "", ab.damage_type, ab.xp_cost, "", dmg, ab.pulse_interval, ab.width, "", "", "", "mode=%s pulses=%d telegraph=%s knockback=%s" % [ab.damage_mode, ab.pulses, ab.telegraph, ab.knockback]]))
 		f.store_csv_line(PackedStringArray(["age", age.index, age.display_name.to_lower(), age.display_name, "", "", "", age.evolve_cost, age.base_max_hp, "", "", "", "", "", "", ""]))
 	f.close()
 	print("wrote ", out)

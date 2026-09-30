@@ -361,18 +361,10 @@ func ability_zone(side: int, aim_x: float = NAN) -> Array:
 	if def.is_targeted():
 		var c := ability_default_aim(side) if is_nan(aim_x) else clampf(aim_x, 0.0, rules.lane_length)
 		return [c - def.width * 0.5, c + def.width * 0.5]
-	match def.shape:
-		"sweep":
-			return [0.0, rules.lane_length]
-		"strip":
-			# From the enemy's front unit back toward the enemy base, shifted by how far that unit walks
-			# during the telegraph so it is still inside when the first pulse lands.
-			var lead := front.def.speed * (1.0 - front.slow) * def.telegraph
-			var x := to_world(enemy, front.progress)
-			return [x - lead, x - lead + def.width] if enemy == RIGHT else [x + lead - def.width, x + lead]
-		_:
-			var c := _densest_window(enemy, def.width)
-			return [c - def.width * 0.5, c + def.width * 0.5]
+	if def.shape == "sweep":
+		return [0.0, rules.lane_length]
+	var c := _densest_window(enemy, def.width)
+	return [c - def.width * 0.5, c + def.width * 0.5]
 
 
 ## World x an aimed skill lands on when the caster gives no aim (the densest enemy group); NAN if the
@@ -535,7 +527,7 @@ func _front_unit(side: int) -> SimUnit:
 func _apply_auras() -> void:
 	for s in sides:
 		for u in s.units:
-			u.slow = u.skill_slow if time < u.skill_slow_until else 0.0
+			u.slow = 0.0
 	for s in sides:
 		for t in s.turrets:
 			if t == null or t.def.kind != "support":
@@ -779,9 +771,6 @@ func _ability_pulse(e: Dictionary) -> void:
 		else:
 			if def.knockback > 0.0:
 				u.progress = maxf(0.0, u.progress - def.knockback)
-			if def.slow > 0.0:
-				u.skill_slow = def.slow
-				u.skill_slow_until = maxf(u.skill_slow_until, time + def.slow_time)
 		if record_fx:
 			fx.append({"type": "skill_hit", "x": x, "side": target_side, "dealt": dealt, "killed": killed, "mode": def.damage_mode,
 				"pct": def.damage_pct, "ability": String(def.id), "unit_id": u.id, "def": u.def})

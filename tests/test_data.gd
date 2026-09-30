@@ -42,7 +42,7 @@ func test_evolution_costs_increase() -> void:
 func test_every_skill_has_shape_and_cost() -> void:
 	for a in GameData.get_default().ages:
 		var ab := a.ability
-		check(ab.shape in ["area", "strip", "sweep"], "age %d shape" % a.index)
+		check(ab.shape in ["area", "sweep"], "age %d shape" % a.index)
 		check(ab.xp_cost > 0, "age %d xp cost" % a.index)
 		check(ab.pulses >= 1, "age %d pulses" % a.index)
 		check(ab.aim in ["auto", "target"], "age %d aim" % a.index)

@@ -55,7 +55,7 @@ func test_races_never_change_what_a_skill_does() -> void:
 	for a in GameData.get_default().ages:
 		for race in RACES:
 			var look := SkillLook.for_skill(race, String(a.ability.id))
-			for k in ["damage", "damage_pct", "width", "pulses", "xp_cost", "slow", "telegraph"]:
+			for k in ["damage", "damage_pct", "width", "pulses", "xp_cost", "telegraph"]:
 				check(not look.has(k), "%s / %s carries %s" % [race, a.ability.id, k])
 
 
@@ -104,4 +104,57 @@ func test_skill_hits_become_numbers_coloured_by_mode() -> void:
 		check_eq(p.col, cases[p.mode], p.mode)
 	check_eq(view.fx.skills.popups[0].text, "−123")
 	check_eq(view.fx.skills.popups[2].text, "−18%")
+	_free(view)
+
+
+# ---------------------------------------------------------------------------
+# Ground marks: circle, field, or nothing for a sweep
+
+func test_aimed_skills_mark_the_ground_and_sweeps_do_not() -> void:
+	var gd := GameData.get_default()
+	var widths := {"circle": [], "field": []}
+	for a in gd.ages:
+		var kind := SkillLook.footprint(a.ability.id)
+		if a.ability.aim == "target":
+			check(kind in ["circle", "field"], "%s is aimed, so it needs a mark" % a.ability.id)
+			widths[kind].append(a.ability.width)
+		elif a.ability.shape == "sweep":
+			check_eq(kind, "", "%s runs gate to gate: no warning" % a.ability.id)
+	check_eq(SkillLook.footprint(&"rockfall"), "circle")
+	check_eq(SkillLook.footprint(&"volley"), "field")
+	for c in widths.circle:
+		for f in widths.field:
+			check(c < f, "a circle (%d px) is smaller than a field of land (%d px)" % [c, f])
+
+
+func test_only_marked_skills_get_a_warning_on_the_ground() -> void:
+	var view := _view(1)
+	var sim := view.sim
+	place(sim, 1, "vanguard", 1000.0)
+	check(sim.fire_ability(0), "Stampede fires")
+	check(view.fx.skills._marked_effects().is_empty(), "a sweep has no warning")
+	_free(view)
+	view = _view(2)
+	place(view.sim, 1, "vanguard", 1000.0, 2)
+	check(view.sim.fire_ability(0, view.sim.to_world(1, 1000.0)), "Rockfall fires")
+	check_eq(view.fx.skills._marked_effects().size(), 1)
+	_free(view)
+
+
+func test_landing_spots_stay_inside_the_mark() -> void:
+	var view := _view(2)
+	var sk := view.fx.skills
+	var c := {"lo": 1000.0, "hi": 1260.0}
+	var mid := 1130.0
+	var half := 130.0
+	for i in 40:
+		var p: Vector2 = sk._in_circle(c, i % 4, 4)
+		var nx := (p.x - mid) / half
+		var ny := (p.y - (SkillFx.GROUND_Y + 10.0)) / (half * SkillFx.CIRCLE_SQUASH)
+		check(nx * nx + ny * ny <= 1.0, "boulder %d lands inside the circle (%s)" % [i, p])
+	var f := {"lo": 1000.0, "hi": 1420.0}
+	for i in 60:
+		var p: Vector2 = sk._in_field(f, i % 6, 6)
+		check(p.x >= 1000.0 and p.x <= 1420.0, "arrow %d lands inside the field's width" % i)
+		check(p.y >= SkillFx.GROUND_Y + SkillFx.FIELD_BACK and p.y <= SkillFx.GROUND_Y + SkillFx.FIELD_FRONT, "and its depth (%s)" % p.y)
 	_free(view)

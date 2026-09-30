@@ -6,16 +6,15 @@ extends Resource
 @export var id: StringName
 @export var display_name: String
 @export var age: int = 1
-## area: one window on the lane. strip: from the enemy's front unit back toward their base.
-## sweep: travels from our gate to the enemy gate, one slice per pulse.
-@export_enum("area", "strip", "sweep") var shape: String = "area"
-## auto: the sim picks the spot from the shape (area: the densest enemy group; strip: the enemy front;
-## sweep: the whole lane) and one click fires it. target: the caster clicks a point on the lane and an
-## area lands centred there (only area skills can be aimed).
+## area: one window on the lane. sweep: travels from our gate to the enemy gate, one slice per pulse.
+@export_enum("area", "sweep") var shape: String = "area"
+## auto: the sim picks the spot from the shape (area: the densest enemy group; sweep: the whole lane) and
+## one click fires it. target: the caster clicks a point on the lane and an area lands centred there
+## (only area skills can be aimed).
 @export_enum("auto", "target") var aim: String = "auto"
 ## XP spent to fire it.
 @export var xp_cost: int = 0
-## Zone length in px for area and strip (a sweep always covers the whole lane).
+## Zone length in px for an area (a sweep always covers the whole lane).
 @export var width: float = 300.0
 ## Delay between firing and the first pulse (telegraph).
 @export var telegraph: float = 0.5
@@ -32,9 +31,6 @@ extends Resource
 ## Flat skills go through the matrix with this type; true and percent skills only use it for the impact look.
 @export_enum("slash", "pierce", "blast", "siege") var damage_type: String = "blast"
 @export var knockback: float = 0.0
-## Speed lost by every unit hit (0.4 = 40% slower) for `slow_time` seconds; 0 = no slow.
-@export_range(0.0, 0.9, 0.05) var slow: float = 0.0
-@export var slow_time: float = 0.0
 
 
 func is_targeted() -> bool:

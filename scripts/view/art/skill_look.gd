@@ -76,6 +76,16 @@ const LOOKS := {
 ## The colour of an enemy skill's warning marker, whatever the enemy's team colour.
 const DANGER := Color(1.0, 0.36, 0.28)
 
+## The mark a skill puts on the ground, for the aim reticle and the warning. A **circle** is a small round
+## target (Rockfall, Starfall); a **field** is a piece of land (Volley, Cannonade). A sweep (Stampede,
+## Bombardment) runs from the caster's gate to the enemy's and needs no mark at all.
+const FOOTPRINT := {"rockfall": "circle", "starfall": "circle", "volley": "field", "cannonade": "field"}
+
+
+## "circle", "field", or "" for a skill with no mark.
+static func footprint(ability_id: Variant) -> String:
+	return FOOTPRINT.get(String(ability_id), "")
+
 
 static func for_skill(race: StringName, ability_id: String) -> Dictionary:
 	var table: Dictionary = LOOKS.get(race, LOOKS[&"human"])

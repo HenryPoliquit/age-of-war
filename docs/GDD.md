@@ -12,10 +12,12 @@
 
 From the owner's request to make skills more playable: every skill was auto-aimed, hit the same way, and several were hard to read on screen. Spec of the change is §7; the balance evidence is in `docs/balance_log.md` (B20+).
 
-- **Aimed skills (§7, §10):** three of the six skills are aimed — click the Skill button or press Space, then click the lane (or the lane map). The other three stay one-click and aim themselves. Space twice lets the game aim an aimed skill.
-- **Three damage rules (§7):** *flat* (armour and Defence apply, like a unit), *true* (ignores both) and *percent* (a share of each victim's max health, ignores both). Rockfall also slows.
-- **Readable skills (§13.4):** a ground warning with a countdown ring and the skill's name (red and "ENEMY …" for the opponent's), the aim reticle with a target count and markers, shots that land exactly when the damage does, and damage numbers coloured by rule. Each race has its own look for every skill, with identical footprint, timing and damage (§5.7).
-- **Fixes:** a strip skill no longer starts exactly on the enemy's front unit (it had walked out of it by the first pulse); an area skill's zone is centred on the group it found, not pinned to its edge; a skill that would hit nothing fails without cost.
+- **Aimed skills (§7, §10):** four of the six skills are aimed — click the Skill button or press Space, then click the lane (or the lane map). The two sweeps stay one-click. Space twice lets the game aim an aimed skill.
+- **Two marks on the ground (§7):** a **circle** for the small targets (Rockfall, Starfall) and a **field of land** for the wide ones (Volley's arrow rain, Cannonade). The same mark is the aim reticle and, after firing, the warning, so you always see where a skill will land. The skills that run from your base to theirs (Stampede, Bombardment) put no mark on the ground.
+- **Three damage rules (§7):** *flat* (armour and Defence apply, like a unit), *true* (ignores both) and *percent* (a share of each victim's max health, ignores both).
+- **Readable skills (§13.4):** a countdown that fills the mark's outline, the skill's name (red and "ENEMY …" for the opponent's), a target count and markers while aiming, shots that land inside the mark exactly when the damage does, and damage numbers coloured by rule. Each race has its own look for every skill, with identical footprint, timing and damage (§5.7).
+- **Simpler:** the *strip* shape is gone (Volley was the only one; it is an aimed field now) and so is Rockfall's slow. A sweep's herd moves at 1,200 px/s instead of 2,000, so a Stampede can be followed.
+- **Fixes:** an area skill's zone is centred on the group it found, not pinned to its edge; a skill that would hit nothing fails without cost.
 
 ### What changed in v3
 
@@ -302,10 +304,20 @@ The six skills differ in two ways: **how you aim them** and **how they hurt**.
 
 | Aim | How it works |
 | --- | --- |
-| **Auto** | One click on ☄ Skill (or Space) and it fires. The game picks the spot from the skill's shape: **area** — the densest enemy group (most enemy unit value within its width); **strip** — from the enemy's front unit back toward their base, shifted by how far that unit walks while the skill winds up; **sweep** — travels from your gate to the enemy gate, one slice per pulse, hitting every enemy unit it passes |
-| **Aimed** | Click ◎ Skill (or Space) to enter aim mode. A reticle follows the cursor — the zone on the ground, a number for the enemy units inside it and a marker over each. **Left-click the lane** (or the **lane map**, on or off screen) to fire. **Space again** fires at the spot the game would pick (the densest group); **Esc**, a **right-click** (not a camera drag) or the button again cancels. A click that would hit nothing fails and keeps aiming. The game never pauses; aim mode ends by itself if the skill stops being available (XP spent, era changed, no enemy left). An aimed skill is an area of fixed width centred on the click |
+| **Auto** | One click on ☄ Skill (or Space) and it fires. The game picks the spot from the skill's shape: **area** — the densest enemy group (most enemy unit value within its width); **sweep** — travels from your gate to the enemy gate, one slice per pulse, hitting every enemy unit it passes |
+| **Aimed** | Click ◎ Skill (or Space) to enter aim mode. A reticle follows the cursor — the skill's mark on the ground, a number for the enemy units inside it and a marker over each. **Left-click the lane** (or the **lane map**, on or off screen) to fire. **Space again** fires at the spot the game would pick (the densest group); **Esc**, a **right-click** (not a camera drag) or the button again cancels. A click that would hit nothing fails and keeps aiming. The game never pauses; aim mode ends by itself if the skill stops being available (XP spent, era changed, no enemy left). An aimed skill is an area of fixed width centred on the click |
 
 The AI aims the same skills through the same command: at the densest group, off by up to 220 / 140 / 70 / 30 / 0 px on Easy / Normal / Hard / Brutal / Nightmare.
+
+### The mark on the ground
+
+| Mark | Skills | What it looks like |
+| --- | --- | --- |
+| **Circle** | Rockfall, Starfall (small: 200–260 px) | A ring on the ground with a dashed inner ring and a crosshair; its outline fills clockwise as the warning runs out. What falls lands inside it |
+| **Field of land** | Volley, Cannonade (wide: 420–500 px) | A hatched piece of land with a stake and pennant at each corner; its back edge is the countdown bar. Arrows or shells land anywhere across it, and shafts stay standing in it for a moment |
+| **None** | Stampede, Bombardment | Sweeps run from your gate to theirs and need no marker; the herd or the barrage is the picture |
+
+The mark is drawn in your colour for your skills and in red, labelled "ENEMY …", for the opponent's, and pending marks also show on the lane map.
 
 ### Damage
 
@@ -317,23 +329,23 @@ The AI aims the same skills through the same command: at the densest group, off 
 
 Balance caution (balance log B20): anything that blunts Heavy pushes without killing lengthens matches, so percent numbers must stay small.
 
-A skill can also **slow** what it hits (a share of speed for a few seconds, alongside the Support aura; the larger wins) and **shove** units back.
+A skill can also **shove** the units it hits back toward their base.
 
 | Era | Skill | Aim | Shape | Damage (per unit hit) | XP (starting) |
 | --- | --- | --- | --- | --- | --- |
-| Stone | **Stampede** — a herd charges down the lane | Auto | Sweep | Flat Slash 35, shoves back 60 px | 60 |
-| Bronze | **Rockfall** — boulders crash on a spot; survivors are slowed | **Aimed** | Area, 260 px | Flat Blast 90 × 3 pulses; −30% speed for 2 s | 75 |
-| Iron | **Volley** — three volleys along the enemy line | Auto | Strip, 350 px | **True** 123 × 3 pulses (Pierce look) | 175 |
+| Stone | **Stampede** — a herd charges down the lane at 1,200 px/s | Auto | Sweep | Flat Slash 35, shoves back 60 px | 60 |
+| Bronze | **Rockfall** — boulders crash inside a circle | **Aimed** | Circle, 260 px | Flat Blast 90 × 3 pulses | 75 |
+| Iron | **Volley** — three waves of arrows rain on a field of land | **Aimed** | Field, 420 px | **True** 123 × 3 pulses (Pierce look) | 175 |
 | Medieval | **Bombardment** — a walking barrage from gate to gate | Auto | Sweep | **Percent** 12% of max HP, shoves back 12 px | 275 |
-| Gunpowder | **Cannonade** — a heavy carpet of shells on a spot, after a long warning | **Aimed** | Area, 500 px | Flat Blast 912 × 5 pulses | 700 |
-| Arcane | **Starfall** — three strikes on a spot after a 1.5 s warning | **Aimed** | Area, 200 px | **Percent** 36% of max HP × 3 pulses | 1,000 |
+| Gunpowder | **Cannonade** — signal flares mark a field, then heavy shells carpet it | **Aimed** | Field, 500 px | Flat Blast 912 × 5 pulses | 700 |
+| Arcane | **Starfall** — three strikes on a circle after a 1.5 s warning | **Aimed** | Circle, 200 px | **Percent** 36% of max HP × 3 pulses | 1,000 |
 
 A sweep's slices cross each unit once, so its damage is per unit, not per pulse. Every other shape hits a unit on every pulse it stands in.
 
 ### What you see
 
-- **Warning.** While a skill winds up, its zone is marked on the ground (hatched band, edge posts) with a ring that fills as the warning runs out and the skill's name above it: in your colour for your skills, red with "ENEMY" for the opponent's. The lane map marks pending zones too, so a skill off-screen is never a surprise.
-- **Landing.** Shots are launched early enough to land at the instant their pulse resolves; incoming shots cast a growing shadow on the ground, volleys leave shafts standing for a moment, and a light curtain marks a volley's strip.
+- **Warning.** While an aimed skill winds up, its mark stays on the ground (§ The mark on the ground) with the outline filling as the warning runs out and the skill's name and seconds left above it: in your colour for your skills, red with "ENEMY" for the opponent's. The lane map marks pending zones too, so a skill off-screen is never a surprise. Sweeps show no warning.
+- **Landing.** Shots are launched early enough to land at the instant their pulse resolves, and inside the mark; incoming boulders and shells cast a growing shadow on the ground, arrows and thorns stay standing for a moment, and a light curtain falls over a volley's field. Cannonade plants three coloured signal flares in its field during the warning.
 - **Numbers.** Every unit a skill hits shows what it took, coloured by rule: orange for flat, cyan with a diamond for true, green with a percent sign for percent; bigger when it kills. A setting turns them off.
 - **Result.** When your skill finishes, a line reports it: "Rockfall: 4 hit, 1 killed", or "Rockfall: missed".
 
@@ -345,7 +357,7 @@ Each race names and dresses the same skill; footprint, timing and damage never c
 | --- | --- | --- | --- |
 | Stone | **Stampede** — a herd of boars in road dust | **Wild Hunt** — stags trailing petals and light | **Ram Charge** — rams striking sparks |
 | Bronze | **Rockfall** — quarried boulders, burning at the edges, from above | **Stone Rain** — mint crystal shards streaking in slantwise | **Boulder Toss** — rune-carved boulders lobbed from behind the lines |
-| Iron | **Pilum Volley** — heavy javelins | **Arrow Rain** — a swarm of glowing arrows | **Axe Storm** — spinning throwing axes |
+| Iron | **Pilum Volley** — heavy javelins on the field | **Arrow Rain** — a swarm of glowing arrows | **Axe Storm** — spinning throwing axes |
 | Medieval | **Trebuchet Barrage** — flaming stones lobbed from your walls | **Hail of Thorns** — briar spikes raining down | **Rockslide** — an avalanche of tumbling boulders |
 | Gunpowder | **Cannonade** — iron round shot with smoke and a muzzle flash | **Moonfire** — silver orbs in pillars of moonlight | **Grand Cannonade** — rune-forged shells trailing furnace fire |
 | Arcane | **Arcane Lance** — a spear of light hurled from the sky | **Starfall** — stars falling from the night | **Thunder Rune** — a rune circle wakes and lightning strikes it |
@@ -515,7 +527,7 @@ Effects are built per damage type, so the counter system is visible:
 | Lights | Muzzle flashes, explosions and abilities spawn short-lived 2D lights that shade nearby units |
 | Glow | Emissive effects (muzzle flashes, Arcane-age magic weapons, ability beams) glow; confirm how 2D glow behaves in the chosen renderer during M2 |
 | Knockback | Blast damage pushes units back a few pixels with a small hop |
-| Telegraphs | Ground marker before every skill (hatched band, posts, filling countdown ring, the skill's name; red and "ENEMY" for the opponent's); Starfall also charges (converging rings, a rising column, motes) |
+| Telegraphs | A circle or a field of land on the ground for every aimed skill, its outline filling as the warning runs out, with the skill's name (red and "ENEMY" for the opponent's); none for the base-to-base sweeps; Starfall also charges (converging rings, a rising column, motes) and Cannonade plants signal flares |
 | Damage numbers | Optional, off by default for units and turrets; skill numbers (coloured by damage rule, §7) are on by default and have their own toggle |
 
 ### 13.5 The Evolution Moment

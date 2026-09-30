@@ -84,9 +84,9 @@ func test_aim_mode_ends_when_the_skill_is_no_longer_available() -> void:
 	check(not aim.active, "not enough XP any more")
 	sim.sides[0].xp = 99999.0
 	aim.press()
-	sim.sides[0].age = 3
+	sim.sides[0].age = 4
 	aim.tick()
-	check(not aim.active, "the new era's skill is not aimed")
+	check(not aim.active, "the new era's skill (a sweep) is not aimed")
 	sim.sides[0].age = 2
 	aim.press()
 	sim.sides[1].units.clear()
@@ -155,7 +155,13 @@ func test_the_skill_tooltip_says_what_the_damage_does() -> void:
 	sim.sides[0].age = 3
 	check(HudModel.skill_state(sim, 0, _race()).tooltip.contains("ignoring armour"), "true damage says so")
 	sim.sides[0].age = 2
-	check(HudModel.skill_state(sim, 0, _race()).tooltip.contains("slowed 30%"), "Rockfall says it slows")
+	var rock: String = HudModel.skill_state(sim, 0, _race()).tooltip
+	check(rock.contains("click a spot on the lane"), rock)
+	check(not rock.contains("slow"), "Rockfall is plain damage")
+	check(rock.contains("a circle"), rock)
+	sim.sides[0].age = 3
+	var volley: String = HudModel.skill_state(sim, 0, _race()).tooltip
+	check(volley.contains("a field of land") and volley.contains("true damage"), volley)
 
 
 func test_the_aim_hint_reports_targets() -> void:
