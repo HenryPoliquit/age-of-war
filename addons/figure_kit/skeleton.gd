@@ -217,12 +217,12 @@ const GAITS := {
 	"patrol": {"arc": 0.8, "stride": 10.5, "lift": 3.0, "heel": 0.05, "toe": 0.4, "swing": 0.0, "twist": 0.1,
 		"carry": {"h": Vector2(4, 12), "f": Vector2(10, 13), "s": Vector2.ZERO, "sf": Vector2.ZERO, "a": 0.785, "lean": 0.17,
 			"crouch": 2.5}},
-	# Shield wall: low guarded advance in measured wide steps, shield fixed across the chest (eyes over
+	# Shield wall: low guarded advance in short, measured steps, shield fixed across the chest (eyes over
 	# the rim), weapon held ready up-and-forward at chest height with the shoulder and elbow relaxed
-	# (clear of the face), minimal bob.
+	# (clear of the face), minimal bob. (No `wide` here: it sets one foot ahead of the other, which on the march is a limp.)
 	"wall": {"arc": 0.7, "stride": 9.0, "lift": 2.0, "heel": 0.04, "toe": 0.3, "clear": 0.1, "swing": 0.0, "twist": 0.1,
 		"carry": {"h": Vector2(9, 8), "a": -0.9, "s": Vector2(0, 1), "rim": Vector2(10, -9.5), "lean": 0.08, "crouch": 4.0,
-			"wide": 8.0, "elbow_out": 0.0}},
+			"elbow_out": 0.0}},
 }
 
 ## Far-hand shield grip (relative to sh) for shield bearers: holds the shield in front of the chest.
@@ -417,9 +417,12 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 			var pos := FkGait.stride_pos(ph)
 			var lift: float = g.lift * FkGait.swing_lift(pos) * mv
 			rot = FkGait.ankle(pos, g) * mv
-			fx += k.wide * (0.5 if i == 0 else -0.5)
+			# A fighting stance puts the near foot ahead of the far one; on the march that offset would hold one leg a few px
+			# further forward than the other through the whole stride (a limp), so the walk takes none of it.
+			var stand := 1.0 - mv
+			fx += k.wide * (0.5 if i == 0 else -0.5) * stand
 			if i == 0:
-				fx += lunge * 1.6 / b * (1.0 - k.step)
+				fx += lunge * 1.6 / b * (1.0 - k.step) * stand
 			else:
 				fx = lerpf(fx, 2.8 + lunge * 1.6 / b, k.step)
 				lift += 4.0 * k.step_lift

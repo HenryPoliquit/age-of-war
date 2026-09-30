@@ -55,6 +55,26 @@ func test_each_gait_has_its_own_hip_curve() -> void:
 	check(human.hip.y != 0.0)
 
 
+func test_the_two_legs_step_alike_in_every_walk() -> void:
+	# The far leg half a stride on is the near leg's mirror: no gait may hold one foot further ahead than the other (a limp).
+	# (A shield unit's wide stance used to, by 8 px, all the way through the march.)
+	var arms := [["sword", ""], ["sword", "round"], ["spear", ""], ["spear", "round"], ["throwing_axe", ""], ["sling", ""], ["bow", ""],
+		["rifle", ""], ["axe", ""], ["axe", "round"], ["halberd", ""]]
+	for arm in arms:
+		var worst := 0.0
+		for i in 64:
+			var p := TAU * i / 64.0
+			var a := FkSkeleton.solve(1.0, arm[0], {"walk": p, "move": 1.0, "t": 0.0}, arm[1])
+			var b := FkSkeleton.solve(1.0, arm[0], {"walk": p + PI, "move": 1.0, "t": 0.0}, arm[1])
+			for pair in [["knee_n", "knee_f"], ["foot_n", "foot_f"]]:
+				var va: Vector3 = a.p3[pair[0]]
+				var vb: Vector3 = b.p3[pair[1]]
+				var ha: Vector3 = a.p3.hip
+				var hb: Vector3 = b.p3.hip
+				worst = maxf(worst, Vector2(va.x - ha.x, va.y - ha.y).distance_to(Vector2(vb.x - hb.x, vb.y - hb.y)))
+		check(worst < 0.05, "%s %s: the legs differ by %.2f px" % [arm[0], arm[1], worst])
+
+
 func test_giants_stand_on_the_ground_with_the_feet_flat_when_still() -> void:
 	for kind in GAITS:
 		var cfg: Dictionary = FkMachines.GIANT_GAITS[kind]
