@@ -194,8 +194,17 @@ func can_evolve(side: int) -> bool:
 	return not is_over() and not s.is_evolving() and s.age < GameData.AGE_COUNT and s.xp >= evolve_cost(side)
 
 
+func ability_def(side: int) -> AbilityDef:
+	return data.age(sides[side].age).ability
+
+
 func ability_cost(side: int) -> float:
-	return float(data.age(sides[side].age).ability.xp_cost)
+	return float(ability_def(side).xp_cost)
+
+
+## True when this side's current skill is aimed by the caster (`fire_ability` takes an aim point).
+func ability_is_targeted(side: int) -> bool:
+	return ability_def(side).is_targeted()
 
 
 func can_fire_ability(side: int) -> bool:
@@ -321,73 +330,115 @@ func first_free_slot(side: int) -> int:
 	return -1
 
 
-## Fires this side's current-era skill where its shape lands now (PLAN D20). Fails, costing nothing,
-## when there is nothing to hit (D21).
-func fire_ability(side: int) -> bool:
+## Fires this side's current-era skill (PLAN D20). Auto skills land where their shape says; an aimed
+## skill (`ability_is_targeted`) lands centred on `aim_x`, a world x, or on the densest enemy group when
+## no aim is given. Fails, costing nothing, when no enemy unit would be inside the zone (D21).
+func fire_ability(side: int, aim_x: float = NAN) -> bool:
 	if not can_fire_ability(side):
 		return false
-	var zone := ability_zone(side)
-	if zone.is_empty():
+	var zone := ability_zone(side, aim_x)
+	if zone.is_empty() or _units_in_zone(enemy_of(side), zone).is_empty():
 		return false
 	var s := sides[side]
-	var def := data.age(s.age).ability
+	var def := ability_def(side)
 	s.xp -= def.xp_cost
 	s.ability_cooldown = rules.ability_cooldown
 	var center: float = (zone[0] + zone[1]) * 0.5
-	effects.append({"side": side, "def": def, "lo": zone[0], "hi": zone[1], "next_t": time + def.telegraph, "pulse": 0, "kills": 0})
-	_emit({"type": "ability", "side": side, "ability": String(def.id), "x": center, "lo": zone[0], "hi": zone[1]})
+	effects.append({"side": side, "def": def, "lo": zone[0], "hi": zone[1], "next_t": time + def.telegraph, "pulse": 0,
+		"kills": 0, "hits": 0, "damage": 0.0})
+	_emit({"type": "ability", "side": side, "ability": String(def.id), "x": center, "lo": zone[0], "hi": zone[1], "aimed": def.is_targeted()})
 	return true
 
 
 ## [lo, hi] in world x where this side's skill would land now, or [] if no enemy unit is on the lane.
-func ability_zone(side: int) -> Array:
-	var def := data.age(sides[side].age).ability
+## `aim_x` only matters to aimed skills; without it they use `ability_default_aim`.
+func ability_zone(side: int, aim_x: float = NAN) -> Array:
+	var def := ability_def(side)
 	var enemy := enemy_of(side)
 	var front := _front_unit(enemy)
 	if front == null:
 		return []
+	if def.is_targeted():
+		var c := ability_default_aim(side) if is_nan(aim_x) else clampf(aim_x, 0.0, rules.lane_length)
+		return [c - def.width * 0.5, c + def.width * 0.5]
 	match def.shape:
 		"sweep":
 			return [0.0, rules.lane_length]
 		"strip":
-			# From the enemy's front unit back toward the enemy base.
+			# From the enemy's front unit back toward the enemy base, shifted by how far that unit walks
+			# during the telegraph so it is still inside when the first pulse lands.
+			var lead := front.def.speed * (1.0 - front.slow) * def.telegraph
 			var x := to_world(enemy, front.progress)
-			return [x, x + def.width] if enemy == RIGHT else [x - def.width, x]
+			return [x - lead, x - lead + def.width] if enemy == RIGHT else [x + lead - def.width, x + lead]
 		_:
 			var c := _densest_window(enemy, def.width)
 			return [c - def.width * 0.5, c + def.width * 0.5]
 
 
-## Gold value of the enemy units inside this side's skill zone right now.
-func ability_zone_value(side: int) -> float:
-	var zone := ability_zone(side)
+## World x an aimed skill lands on when the caster gives no aim (the densest enemy group); NAN if the
+## enemy has no unit on the lane. The AI aims with this, and a player's "let the game aim" press.
+func ability_default_aim(side: int) -> float:
+	if _front_unit(enemy_of(side)) == null:
+		return NAN
+	return _densest_window(enemy_of(side), ability_def(side).width)
+
+
+## Living units of `of_side` inside a [lo, hi] world-x zone.
+func _units_in_zone(of_side: int, zone: Array) -> Array[SimUnit]:
+	var out: Array[SimUnit] = []
+	for u in sides[of_side].units:
+		if not u.alive():
+			continue
+		var x := to_world(of_side, u.progress)
+		if x >= zone[0] and x <= zone[1]:
+			out.append(u)
+	return out
+
+
+## What firing at `aim_x` would hit right now: {zone, count, value} (value = gold paid for those units).
+## For the aim reticle and the AI; the sim itself only reads the zone when the skill fires.
+func ability_preview(side: int, aim_x: float = NAN) -> Dictionary:
+	var zone := ability_zone(side, aim_x)
 	if zone.is_empty():
-		return 0.0
-	var enemy := enemy_of(side)
+		return {"zone": zone, "count": 0, "value": 0.0}
+	var hit := _units_in_zone(enemy_of(side), zone)
 	var v := 0.0
-	for u in sides[enemy].units:
-		var x := to_world(enemy, u.progress)
-		if u.alive() and x >= zone[0] and x <= zone[1]:
-			v += u.cost_paid
-	return v
+	for u in hit:
+		v += u.cost_paid
+	return {"zone": zone, "count": hit.size(), "value": v}
+
+
+## Gold value of the enemy units inside this side's skill zone right now.
+func ability_zone_value(side: int, aim_x: float = NAN) -> float:
+	return ability_preview(side, aim_x).value
 
 
 ## Centre of the `width` window holding the most gold of `of_side`'s units. Candidate windows start or
-## end at a unit; the first best window in unit order wins ties (deterministic).
+## end at a unit; the first best window in unit order wins ties (deterministic). The result is re-centred
+## on the units inside the winning window, so the group sits in the middle of the zone, not on its edge.
 func _densest_window(of_side: int, width: float) -> float:
 	var best := NAN
 	var best_v := -1.0
+	var best_lo := 0.0
+	var best_hi := 0.0
 	for u in sides[of_side].units:
 		var start := to_world(of_side, u.progress)
 		for c in [start + width * 0.5, start - width * 0.5]:
 			var v := 0.0
+			var lo := INF
+			var hi := -INF
 			for w in sides[of_side].units:
-				if w.alive() and absf(to_world(of_side, w.progress) - c) <= width * 0.5:
+				var x := to_world(of_side, w.progress)
+				if w.alive() and absf(x - c) <= width * 0.5:
 					v += w.cost_paid
+					lo = minf(lo, x)
+					hi = maxf(hi, x)
 			if v > best_v:
 				best_v = v
 				best = c
-	return best
+				best_lo = lo
+				best_hi = hi
+	return best if is_nan(best) or is_inf(best_lo) else (best_lo + best_hi) * 0.5
 
 
 # ---------------------------------------------------------------------------
@@ -484,7 +535,7 @@ func _front_unit(side: int) -> SimUnit:
 func _apply_auras() -> void:
 	for s in sides:
 		for u in s.units:
-			u.slow = 0.0
+			u.slow = u.skill_slow if time < u.skill_slow_until else 0.0
 	for s in sides:
 		for t in s.turrets:
 			if t == null or t.def.kind != "support":
@@ -557,10 +608,11 @@ func _hit_unit(attacker: SimUnit, target: SimUnit, raw: float, dtype: String) ->
 
 
 ## Applies matrix + buffs; returns damage actually dealt. Kill rewards go to `by_side`.
-func _damage_unit(target: SimUnit, raw: float, dtype: String, by_side: int) -> float:
+## `true_damage` skips the armour matrix and the Defence upgrades (true and percent skills).
+func _damage_unit(target: SimUnit, raw: float, dtype: String, by_side: int, true_damage := false) -> float:
 	if not target.alive():
 		return 0.0
-	var dmg := raw * rules.matrix(dtype, target.def.armour) * defence_mult(target.side, target.def.role)
+	var dmg := raw if true_damage else raw * rules.matrix(dtype, target.def.armour) * defence_mult(target.side, target.def.role)
 	dmg = minf(dmg, target.hp)
 	target.hp -= dmg
 	target.stat_damage_taken += dmg
@@ -695,7 +747,8 @@ func _resolve_effects() -> void:
 		if e.pulse < def.pulses:
 			keep.append(e)
 		else:
-			_emit({"type": "ability_end", "side": e.side, "ability": String(def.id), "kills": e.kills})
+			_emit({"type": "ability_end", "side": e.side, "ability": String(def.id), "kills": e.kills, "hits": e.hits,
+				"damage": snappedf(e.damage, 0.1)})
 	effects = keep
 
 
@@ -711,18 +764,27 @@ func _ability_pulse(e: Dictionary) -> void:
 		hi = lo + slice
 	var target_side := enemy_of(e.side)
 	if record_fx:
-		fx.append({"type": "ability_pulse", "lo": lo, "hi": hi, "side": e.side, "ability": String(def.id)})
-	for u in sides[target_side].units:
-		if not u.alive():
-			continue
+		fx.append({"type": "ability_pulse", "lo": lo, "hi": hi, "side": e.side, "ability": String(def.id), "pulse": e.pulse, "pulses": def.pulses})
+	for u in _units_in_zone(target_side, [lo, hi]):
+		var raw := def.damage
+		if def.damage_mode == "percent":
+			raw = def.damage_pct * u.max_hp
 		var x := to_world(u.side, u.progress)
-		if x < lo or x > hi:
-			continue
-		_damage_unit(u, def.damage, def.damage_type, e.side)
-		if not u.alive():
+		var dealt := _damage_unit(u, raw, def.damage_type, e.side, def.ignores_armour())
+		e.hits += 1
+		e.damage += dealt
+		var killed := not u.alive()
+		if killed:
 			e.kills += 1
-		elif def.knockback > 0.0:
-			u.progress = maxf(0.0, u.progress - def.knockback)
+		else:
+			if def.knockback > 0.0:
+				u.progress = maxf(0.0, u.progress - def.knockback)
+			if def.slow > 0.0:
+				u.skill_slow = def.slow
+				u.skill_slow_until = maxf(u.skill_slow_until, time + def.slow_time)
+		if record_fx:
+			fx.append({"type": "skill_hit", "x": x, "side": target_side, "dealt": dealt, "killed": killed, "mode": def.damage_mode,
+				"pct": def.damage_pct, "ability": String(def.id), "unit_id": u.id, "def": u.def})
 	match_log.count_ability_damage(e.side)
 
 

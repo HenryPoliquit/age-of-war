@@ -44,4 +44,22 @@ func test_every_skill_has_shape_and_cost() -> void:
 		var ab := a.ability
 		check(ab.shape in ["area", "strip", "sweep"], "age %d shape" % a.index)
 		check(ab.xp_cost > 0, "age %d xp cost" % a.index)
-		check(ab.pulses >= 1 and ab.damage > 0, "age %d pulses/damage" % a.index)
+		check(ab.pulses >= 1, "age %d pulses" % a.index)
+		check(ab.aim in ["auto", "target"], "age %d aim" % a.index)
+		check(ab.aim == "auto" or ab.shape == "area", "age %d: only an area skill can be aimed" % a.index)
+		check(ab.damage_mode in ["flat", "true", "percent"], "age %d damage mode" % a.index)
+		if ab.damage_mode == "percent":
+			check(ab.damage_pct > 0.0 and ab.damage_pct <= 1.0, "age %d percent" % a.index)
+		else:
+			check(ab.damage > 0.0, "age %d damage" % a.index)
+
+
+func test_skills_mix_aims_and_damage_modes() -> void:
+	# The point of the skill set: some skills aim themselves, some are aimed, and the damage rules differ.
+	var aims := {}
+	var modes := {}
+	for a in GameData.get_default().ages:
+		aims[a.ability.aim] = true
+		modes[a.ability.damage_mode] = true
+	check_eq(aims.size(), 2, "both auto and aimed skills exist")
+	check_eq(modes.size(), 3, "flat, true and percent skills all exist")

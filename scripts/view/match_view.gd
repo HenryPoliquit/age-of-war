@@ -20,6 +20,13 @@ var start_age := 1
 var races: Array[StringName] = [&"human", &"elf"]
 
 var sim: MatchSim
+## The player's aim mode for an aimed skill (created on first use, so a view given a new sim gets a fresh one).
+var _aim: SkillAim
+var aim: SkillAim:
+	get:
+		if _aim == null or _aim.sim != sim:
+			_aim = SkillAim.new(sim, 0)
+		return _aim
 var ai: UtilityAI
 ## Debug/demo: `-- --autoplay` lets a Tactician play the left side too.
 var left_ai: UtilityAI
@@ -52,6 +59,8 @@ var _punch := 0.0
 var _slowmo_until := -1.0
 var _cam_x := 900.0
 var _drag_pan := false
+## Sideways mouse travel during the current right-button press; a press that barely moved is a click.
+var _drag_travel := 0.0
 var _logged := false
 ## Demo/autoplay: the camera tracks the front line.
 var _follow_front := false
@@ -210,6 +219,7 @@ func _process(delta: float) -> void:
 		_prune_prev()
 	_pan(delta)
 	_place_camera(delta)
+	_update_aim()
 	var cam_x := camera.get_screen_center_position().x
 	for b in backdrops + fronts:
 		b.cam_x = cam_x
@@ -304,14 +314,51 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_RIGHT:
 			_drag_pan = event.pressed
+			if event.pressed:
+				_drag_travel = 0.0
+			elif aim.active and _drag_travel < 8.0:
+				aim.cancel()  # a right-click (not a camera drag) backs out of aiming
+		elif event.button_index == MOUSE_BUTTON_LEFT and event.pressed and aim.active:
+			if _over_hud():
+				return
+			hud.feedback(aim.confirm(get_global_mouse_position().x))
+			get_viewport().set_input_as_handled()
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
 			_cam_x -= 120.0
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
 			_cam_x += 120.0
 	elif event is InputEventMouseMotion and _drag_pan:
 		_cam_x -= event.relative.x
+		_drag_travel += absf(event.relative.x)
 	elif event is InputEventKey and event.pressed and not event.echo:
 		_hotkey(event.physical_keycode)
+
+
+## True when the pointer is over a HUD control (a click there is the HUD's, not the battlefield's).
+func _over_hud() -> bool:
+	return get_viewport().gui_get_hovered_control() != null
+
+
+## Keeps the aim cursor on the world point under the mouse (or the lane-map point it hovers) every frame,
+## so it follows the camera pan, and ends aim mode when the skill stops being available.
+func _update_aim() -> void:
+	if not aim.active:
+		return
+	aim.tick()
+	if not aim.active:
+		return
+	var over := get_viewport().gui_get_hovered_control()
+	if over is LanePanel.LaneMap:
+		aim.cursor_x = over.world_x(over.get_local_mouse_position().x)
+	elif over != null:
+		aim.cursor_x = NAN
+	else:
+		aim.cursor_x = get_global_mouse_position().x
+
+
+## The Skill button and Space (`from_key`): fire an auto skill, or open, cancel or auto-complete aim mode.
+func skill_pressed(from_key := false) -> void:
+	hud.feedback(aim.hotkey() if from_key else aim.press())
 
 
 func _hotkey(k: Key) -> void:
@@ -326,9 +373,12 @@ func _hotkey(k: Key) -> void:
 		KEY_T:
 			hud.feedback(sim.evolve(0))
 		KEY_SPACE:
-			hud.feedback(sim.fire_ability(0))
+			skill_pressed(true)
 		KEY_ESCAPE:
-			hud.open_settings()
+			if aim.active:
+				aim.cancel()
+			else:
+				hud.open_settings()
 
 
 # ---------------------------------------------------------------------------
@@ -351,9 +401,10 @@ func _on_event(ev: Dictionary) -> void:
 			base_rebuilt[side] = anim_time
 			hud.banner("%s Age" % sim.data.age(ev.age).display_name, team_color(side), side)
 		"ability":
-			fx.ability_cast(ev.ability, ev.x, ev.side, race_of(ev.side))
+			var def := sim.data.age(sim.sides[ev.side].age).ability
+			fx.skills.cast(ev, def, race_of(ev.side))
 			audio.play("ability_cast", Vector2(ev.x, GROUND_Y - 100))
-			hud.banner(race_def(ev.side).ability_name(sim.data.age(sim.sides[ev.side].age).ability) + "!", team_color(ev.side), ev.side, true)
+			hud.banner(race_def(ev.side).ability_name(def) + "!", team_color(ev.side), ev.side, true)
 		"ability_end":
 			if ev.side == 0 and ev.kills > 0:
 				for a in sim.data.ages:
@@ -375,8 +426,9 @@ func _consume_fx() -> void:
 				_on_turret_shot(f)
 			"death":
 				_on_death(f)
+			"skill_hit":
+				fx.skills.hit(f)
 			"ability_pulse":
-				fx.ability_pulse(f.ability, f.lo, f.hi, f.side, team_color(f.side), race_of(f.side))
 				for u in sim.sides[1 - f.side].units:
 					var x := sim.to_world(u.side, u.progress)
 					if x >= f.lo and x <= f.hi:

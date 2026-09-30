@@ -6,3 +6,4 @@
 script = ExtResource("1_tvi8c")
 id = &"normal"
 display_name = "Normal"
+skill_aim_error = 140.0

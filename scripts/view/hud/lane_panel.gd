@@ -42,9 +42,17 @@ func refresh() -> void:
 class LaneMap extends Control:
 	var hud: MatchHud
 
+	## World x under a local x on the map.
+	func world_x(local_x: float) -> float:
+		return clampf(local_x / size.x, 0.0, 1.0) * hud.sim.rules.lane_length
+
 	func _gui_input(e: InputEvent) -> void:
 		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
-			hud.view._cam_x = e.position.x / size.x * hud.sim.rules.lane_length
+			if hud.view.aim.active:
+				# Aiming: a click here aims the skill at that point of the lane, on or off screen.
+				hud.feedback(hud.view.aim.confirm(world_x(e.position.x)))
+			else:
+				hud.view._cam_x = world_x(e.position.x)
 
 	func _draw() -> void:
 		var sim := hud.sim
@@ -60,6 +68,18 @@ class LaneMap extends Control:
 				var x := sim.to_world(u.side, u.progress) / lane * size.x
 				var r := 3.5 if u.def.role == "heavy" else 2.5
 				draw_circle(Vector2(x, size.y * 0.5 + (u.id % 3 - 1) * 4), r, hud.view.team_color(u.side).lightened(0.3))
+		# Skills on their way (the enemy's too), and where an aimed skill would land.
+		for e in sim.effects:
+			var zone := Rect2(e.lo / lane * size.x, 0, (e.hi - e.lo) / lane * size.x, size.y)
+			var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 90.0)
+			draw_rect(zone, Color(hud.view.team_color(e.side).lightened(0.3), 0.3 + 0.3 * pulse))
+			draw_rect(zone, Color(1, 1, 1, 0.9), false, 1.0)
+		var pv := hud.view.aim.preview()
+		if not pv.is_empty():
+			var z: Array = pv.zone
+			var r := Rect2(z[0] / lane * size.x, 0, (z[1] - z[0]) / lane * size.x, size.y)
+			draw_rect(r, Color(1, 1, 1, 0.22) if pv.count > 0 else Color(1, 0.4, 0.4, 0.22))
+			draw_rect(r, Color(1, 1, 1, 0.95) if pv.count > 0 else Color(1, 0.4, 0.4, 0.95), false, 2.0)
 		draw_line(Vector2(fx, 0), Vector2(fx, size.y), Color.WHITE, 2.0)
 		var vp := hud.view.get_viewport_rect().size
 		var cx := hud.view.camera.get_screen_center_position().x

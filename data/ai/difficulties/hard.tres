@@ -9,3 +9,4 @@ display_name = "Hard"
 decision_interval = 0.75
 counter_level = 2
 skill_min_value = 100.0
+skill_aim_error = 70.0

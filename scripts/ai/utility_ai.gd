@@ -374,7 +374,9 @@ func _apply_counters(sim: MatchSim, weights: Dictionary) -> void:
 func _try_ability(sim: MatchSim, pressure: bool) -> void:
 	if not sim.can_fire_ability(side):
 		return
-	var value := sim.ability_zone_value(side)
+	# An aimed skill is judged where it would land with perfect aim (the densest enemy group).
+	var aim := sim.ability_default_aim(side) if sim.ability_is_targeted(side) else NAN
+	var value := sim.ability_zone_value(side, aim)
 	if value <= 0.0:
 		return
 	if not personality.skill_eager and not pressure:
@@ -382,7 +384,12 @@ func _try_ability(sim: MatchSim, pressure: bool) -> void:
 			return
 		if _evolve_soon(sim):
 			return
-	sim.fire_ability(side)
+	if not is_nan(aim) and difficulty.skill_aim_error > 0.0:
+		# Lower difficulties aim loosely; a shot that misses everything is retried on the spot.
+		var loose := aim + rng.randf_range(-difficulty.skill_aim_error, difficulty.skill_aim_error)
+		if sim.fire_ability(side, loose):
+			return
+	sim.fire_ability(side, aim)
 
 
 ## True if an evolution is due within ~10 s at the current XP rate (spending XP on a skill would delay it).

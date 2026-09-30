@@ -23,6 +23,8 @@ var _units: UnitBar
 var _lane: LanePanel
 var _banner: Label
 var _banner_sub: Label
+var _aim_hint: Label
+var _aim_panel: PanelContainer
 var _banner_t := -10.0
 var _post: PanelContainer
 var _flash := 0.0
@@ -45,6 +47,7 @@ func _ready() -> void:
 	_turrets = TurretBar.new(self)
 	_root.add_child(_turrets)
 	_build_banner()
+	_build_aim_hint()
 	_grid = UpgradeGrid.new(self)
 	_root.add_child(_grid)
 	_top.upgrades_button.toggled.connect(func(on: bool): _grid.visible = on)
@@ -116,6 +119,20 @@ func _build_banner() -> void:
 	_banner_sub = _label(v, "", 20)
 	_banner_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.modulate.a = 0.0
+
+
+## The strip under the top bar that says what an aimed skill would hit while the player is aiming.
+func _build_aim_hint() -> void:
+	_aim_panel = PanelContainer.new()
+	_aim_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_aim_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_aim_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_aim_panel.offset_top = 66
+	_aim_panel.add_theme_stylebox_override("panel", _box(PANEL_BG, ACCENT, 8, 2))
+	_aim_hint = _label(_aim_panel, "", 18, UiStyle.TEXT)
+	_aim_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_aim_panel.visible = false
+	_root.add_child(_aim_panel)
 
 
 func banner(text: String, col: Color, side: int, small := false) -> void:
@@ -194,6 +211,11 @@ func _process(delta: float) -> void:
 	_units.refresh()
 	_lane.refresh()
 	_flash = maxf(0.0, _flash - delta)
+	var aiming := view.aim.active
+	_aim_panel.visible = aiming
+	if aiming:
+		_aim_hint.text = HudModel.aim_hint(sim, 0, view.race_def(0), view.aim.preview())
+		_aim_panel.reset_size()
 	var bt := view.anim_time - _banner_t
 	var bv: Control = _banner.get_parent()
 	bv.modulate.a = clampf(minf(bt / 0.15, (2.6 - bt) / 0.6), 0.0, 1.0)

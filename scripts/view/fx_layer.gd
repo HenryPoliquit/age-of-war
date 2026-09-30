@@ -13,12 +13,16 @@ var lights: LightPool
 var particles: Array[Dictionary] = []
 var projectiles: Array[Dictionary] = []
 var decals: Array[Dictionary] = []
-var actors: Array[Dictionary] = []    # stampede beasts, beams
+var skills: SkillFx                   # everything a skill looks like (GDD §7)
 var scheduled: Array[Dictionary] = [] # {at, fn: Callable}
 var glow: Node2D
 var rng := RandomNumberGenerator.new()
 var intensity := 1.0                  # VFX preset scale (Low halves particle counts)
 var flash_scale := 1.0                # 0.5 with "Reduce flashing" (GDD §14)
+
+
+func _init() -> void:
+	skills = SkillFx.new(self)
 
 
 func _ready() -> void:
@@ -36,6 +40,19 @@ func now() -> float:
 
 func later(delay: float, fn: Callable) -> void:
 	scheduled.append({"at": now() + delay, "fn": fn})
+
+
+## Public hooks for SkillFx.
+func sound(name: String, pos: Vector2, db := 0.0) -> void:
+	_sound(name, pos, db)
+
+
+func light(pos: Vector2, col: Color, energy: float, radius: float, life: float) -> void:
+	_light(pos, col, energy, radius, life)
+
+
+func particle(d: Dictionary) -> void:
+	_p(d)
 
 
 # ---------------------------------------------------------------------------
@@ -162,75 +179,7 @@ func _streak(ci: CanvasItem, p: Dictionary, u: float, span: float, col: Color, w
 		ci.draw_line(pts[i], pts[i + 1], Color(col, col.a * (1.0 - f)), maxf(0.6, w * (1.0 - 0.8 * f)))
 
 
-# ---------------------------------------------------------------------------
-# Abilities (GDD §7)
-
-## Race flavour for the shared abilities: same footprint and timing, different stuff falling.
-const STAMPEDE_BEAST := {&"human": "boar", &"elf": "stag", &"dwarf": "ram"}
-const VOLLEY_SHOT := {&"human": "javelin", &"elf": "arrow", &"dwarf": "axe"}
-const BOMBARD_SHOT := {&"human": "shell", &"elf": "javelin", &"dwarf": "shell"}
-const CANNONADE_SHOT := {&"human": "ball", &"elf": "orb", &"dwarf": "ball"}
-
-
-func ability_pulse(ability: String, lo: float, hi: float, side: int, team: Color, race: StringName = &"human") -> void:
-	var dir := 1.0 if side == 0 else -1.0
-	var magic: Color = RaceLook.look(race).glow
-	match ability:
-		"stampede":
-			_sound("stampede", Vector2((lo + hi) * 0.5, GROUND_Y))
-			for i in 8:
-				var start := (lo if dir > 0 else hi) - dir * rng.randf_range(80, 220)
-				actors.append({"kind": "beast", "beast": STAMPEDE_BEAST.get(race, "boar"), "x": start, "y": GROUND_Y + rng.randf_range(-6, 8), "vx": dir * rng.randf_range(620, 760),
-					"until_x": hi + 120 if dir > 0 else lo - 120, "born": now(), "life": 1.2, "side": side})
-			for k in 10:
-				burst("smoke", Vector2(rng.randf_range(lo, hi), GROUND_Y), 2, Color(0.7, 0.58, 0.42, 0.55), Vector2(20, 80), Vector2(0.6, 1.1), Vector2(10, 22), -20.0)
-			view.add_shake(8.0)
-		"rockfall":
-			for i in 7:
-				var x := rng.randf_range(lo, hi)
-				var to := Vector2(x, GROUND_Y - rng.randf_range(2, 16))
-				var from := to + Vector2(rng.randf_range(-40, 40), -rng.randf_range(560, 680))
-				later(rng.randf_range(0.0, 0.25), func(): shoot("stone", from, to, "blast", func(): impact("blast", to, true)))
-			view.add_shake(6.0)
-		"volley":
-			var kind: String = VOLLEY_SHOT.get(race, "arrow")
-			for i in 22:
-				var x := rng.randf_range(lo, hi)
-				var to := Vector2(x, GROUND_Y - rng.randf_range(4, 30))
-				var from := to + Vector2(-dir * rng.randf_range(160, 260), -rng.randf_range(520, 640))
-				later(rng.randf_range(0.0, 0.3), func(): shoot(kind, from, to, "pierce", func(): impact("pierce", to)))
-		"bombardment", "cannonade":
-			var n := 4 if ability == "bombardment" else 3
-			var kind: String = (BOMBARD_SHOT if ability == "bombardment" else CANNONADE_SHOT).get(race, "shell")
-			for i in n:
-				var x := rng.randf_range(lo, hi)
-				var to := Vector2(x, GROUND_Y - 6)
-				# Siege shot arcs in from the home lines; elven moonfire drops from high above.
-				var from := to + (Vector2(-dir * 60, -620) if kind == "orb" else Vector2(-dir * 900, -300 if kind != "shell" else -420))
-				later(rng.randf_range(0.0, 0.25), func():
-					shoot(kind, from, to, "blast", func(): impact("blast", to, true))
-					if kind == "orb":
-						projectiles[-1]["col"] = magic)
-		"starfall":
-			var c := Vector2((lo + hi) * 0.5, GROUND_Y)
-			actors.append({"kind": "beam", "x": c.x, "w": hi - lo, "born": now(), "life": 0.6, "col": magic})
-			_light(c + Vector2(0, -60), magic.lightened(0.3), 2.5, 700.0, 0.8)
-			impact("blast", c + Vector2(0, -10), true)
-			ring(c, 260, Color(magic.lightened(0.3), 0.8), 0.6, 8.0)
-			for k in 10:
-				burst("spark", c + Vector2(rng.randf_range(-60, 60), -rng.randf_range(0, 120)), 2, magic.lightened(0.3), Vector2(80, 260), Vector2(0.3, 0.7), Vector2(2, 3.5), 300.0, PI, -PI * 0.5, true)
-			view.add_shake(16.0)
-			view.zoom_punch(0.06)
-
-
-func ability_cast(ability: String, x: float, side: int, race: StringName = &"human") -> void:
-	# A beacon at the caster's base marks the call (the effect itself arrives with the pulses).
-	var dir := 1.0 if side == 0 else -1.0
-	var magic: Color = RaceLook.look(race).glow
-	if ability in ["starfall", "cannonade"]:
-		flash(Vector2(view.sim.to_world(side, 0.0) + dir * 60.0, GROUND_Y - 200), 90, Color(magic, 0.5), 0.35)
-	if ability == "starfall":
-		ring(Vector2(x, GROUND_Y - 20), 120, Color(magic, 0.7), 0.8, 4.0)
+# Skills are in SkillFx (skill_fx.gd); FxLayer only lends it the particle pool and the draw passes.
 
 
 func _light(pos: Vector2, col: Color, energy: float, radius: float, life: float) -> void:
@@ -285,16 +234,7 @@ func step(dt: float) -> void:
 		live.append(p)
 	projectiles = live
 	decals = decals.filter(func(d): return t - d.born < d.life)
-	var act: Array[Dictionary] = []
-	for a in actors:
-		if t - a.born > a.life:
-			continue
-		if a.has("vx"):
-			a.x += a.vx * dt
-			if a.kind == "beast" and rng.randf() < 0.3:
-				_p({"kind": "smoke", "pos": Vector2(a.x, GROUND_Y), "vel": Vector2(-a.vx * 0.05, -20), "life": 0.6, "size": 10.0, "col": Color(0.7, 0.58, 0.42, 0.45), "g": 0.0, "add": false, "rot": 0.0, "spin": 0.0})
-		act.append(a)
-	actors = act
+	skills.step(dt)
 	queue_redraw()
 	glow.queue_redraw()
 
@@ -304,8 +244,7 @@ func _draw() -> void:
 	for d in decals:
 		var a: float = 1.0 - (t - d.born) / d.life
 		FkPaint.ellipse(self, Vector2(d.x, GROUND_Y + 6), Vector2(d.w, 6), Color(0.08, 0.06, 0.05, 0.5 * a))
-	for a in actors:
-		_draw_actor(a, t)
+	skills.draw_under(self, t)
 	for p in particles:
 		if p.add:
 			continue
@@ -317,6 +256,11 @@ func _draw() -> void:
 			"chunk":
 				draw_set_transform(p.pos, p.rot)
 				draw_rect(Rect2(-p.size * 0.5, -p.size * 0.5, p.size, p.size), Color(c, 1.0 - u * u))
+				draw_set_transform(Vector2.ZERO)
+			"leaf":
+				draw_set_transform(p.pos, p.rot)
+				var lf: float = p.size
+				draw_colored_polygon(PackedVector2Array([Vector2(-lf, 0), Vector2(0, -lf * 0.45), Vector2(lf, 0), Vector2(0, lf * 0.45)]), Color(c, 1.0 - u * u))
 				draw_set_transform(Vector2.ZERO)
 			_:
 				draw_circle(p.pos, p.size * (1.0 - u), Color(c, c.a * (1.0 - u)))
@@ -385,18 +329,7 @@ func _draw() -> void:
 				var back := _proj_pos(p, maxf(0.0, u - 40.0 / maxf(1.0, (p.to as Vector2).distance_to(p.from))))
 				draw_line(back, pos, Color(1, 1, 1, 0.95), 2.4)
 				draw_circle(pos, 3.6, Color(1, 1, 1))
-
-
-func _draw_actor(a: Dictionary, t: float) -> void:
-	var u: float = (t - a.born) / a.life
-	match a.kind:
-		"beast":
-			var dir := signf(a.vx)
-			FkPaint.begin(self, Transform2D(0.0, Vector2(dir * 0.9, 0.9), 0.0, Vector2(a.x, a.y)))
-			FkMounts.quadruped(self, a.get("beast", "boar"), Color("5b4130"), {"moving": true, "walk": t * 26.0 + a.y, "t": t}, 0, Color("a5a9ae"), {"yaw": UnitArt.view_yaw})
-			draw_set_transform(Vector2.ZERO)
-		"beam":
-			pass
+	skills.draw_over(self, t)
 
 
 func _draw_glow() -> void:
@@ -419,6 +352,12 @@ func _draw_glow() -> void:
 				glow.draw_colored_polygon(PackedVector2Array([p.pos, p.pos + d * p.size + d.orthogonal() * p.size * 0.35, p.pos + d * p.size * 1.3, p.pos + d * p.size - d.orthogonal() * p.size * 0.35]), Color(c, 0.9 * (1.0 - u)))
 			"spark":
 				glow.draw_line(p.pos, p.pos - p.vel * 0.03, Color(c, 1.0 - u), p.size)
+			"flare":
+				# A four-pointed glint: two crossed slivers, turning as they fade.
+				var fl: float = p.size * (1.0 - u * 0.4)
+				for k in 2:
+					var d := Vector2.from_angle(p.rot + k * PI * 0.5 + u * p.spin)
+					glow.draw_colored_polygon(PackedVector2Array([p.pos + d * fl, p.pos + d.orthogonal() * fl * 0.07, p.pos - d * fl, p.pos - d.orthogonal() * fl * 0.07]), Color(c, 0.9 * (1.0 - u)))
 			"fire":
 				glow.draw_circle(p.pos, p.size * (1.0 - u * 0.6), Color(c, 0.8 * (1.0 - u)))
 			_:
@@ -447,24 +386,4 @@ func _draw_glow() -> void:
 				glow.draw_circle(pos, 10.0, Color(1.0, 0.97, 0.88, 0.13))
 			"arrow", "javelin", "axe":
 				glow.draw_circle(pos, 8.0, Color(1.0, 0.97, 0.88, 0.14))
-	for a in actors:
-		if a.kind == "beam":
-			var u: float = (t - a.born) / a.life
-			var c: Color = a.col.lightened(0.6)
-			var w: float = a.w * (1.0 - u * 0.7)
-			glow.draw_rect(Rect2(a.x - w * 0.5, -600, w, GROUND_Y + 600), Color(c, 0.35 * (1.0 - u)))
-			glow.draw_rect(Rect2(a.x - w * 0.18, -600, w * 0.36, GROUND_Y + 600), Color(1, 1, 1, 0.8 * (1.0 - u)))
-	# Telegraphs for pending abilities (GDD §13.4: ground decal before every ability).
-	for e in view.sim.effects:
-		var def: AbilityDef = e.def
-		if e.pulse > 0 and def.shape != "sweep":
-			continue
-		var c := view.team_color(e.side).lightened(0.4)
-		var pulse := 0.5 + 0.5 * sin(t * 18.0)
-		var lo: float = e.lo
-		var hi: float = e.hi
-		var mid := (lo + hi) * 0.5
-		glow.draw_rect(Rect2(lo, GROUND_Y - 4, hi - lo, 14), Color(c, 0.25 + 0.2 * pulse))
-		if def.id == &"starfall":
-			glow.draw_arc(Vector2(mid, GROUND_Y), 40.0 + 20.0 * pulse, 0, TAU, 40, Color(c, 0.8), 2.0)
-			glow.draw_line(Vector2(mid, -400), Vector2(mid, GROUND_Y), Color(c, 0.35 * pulse), 2.0)
+	skills.draw_glow(glow, t)

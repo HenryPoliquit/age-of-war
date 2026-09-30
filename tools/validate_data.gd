@@ -28,8 +28,14 @@ func _init() -> void:
 		_check(a.ability != null and a.ability.age == a.index, tag + " ability")
 		if a.ability != null:
 			var ab := a.ability
-			_check(ab.shape in ["area", "strip", "sweep"] and ab.xp_cost > 0 and ab.pulses >= 1 and ab.damage > 0, tag + " skill shape/cost/pulses/damage")
+			_check(ab.shape in ["area", "strip", "sweep"] and ab.xp_cost > 0 and ab.pulses >= 1, tag + " skill shape/cost/pulses")
 			_check(ab.shape == "sweep" or ab.width > 0, tag + " skill width")
+			_check(ab.aim in ["auto", "target"], tag + " skill aim")
+			_check(ab.aim == "auto" or ab.shape == "area", tag + " only an area skill can be aimed")
+			_check(ab.damage_mode in ["flat", "true", "percent"], tag + " skill damage mode")
+			_check(ab.damage_mode == "percent" or ab.damage > 0, tag + " flat/true skill has damage")
+			_check(ab.damage_mode != "percent" or (ab.damage_pct > 0.0 and ab.damage_pct <= 1.0), tag + " percent skill has damage_pct in (0, 1]")
+			_check((ab.slow > 0.0) == (ab.slow_time > 0.0), tag + " slow and slow_time go together")
 		var roles := {}
 		for u in a.units:
 			var ut := "unit %s" % u.id

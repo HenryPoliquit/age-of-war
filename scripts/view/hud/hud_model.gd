@@ -11,6 +11,7 @@ const SHAPE_TEXT := {
 	"strip": "hits the enemy line from its front unit back toward their base",
 	"sweep": "sweeps the whole lane from your gate to theirs",
 }
+const DAMAGE_WORD := {"slash": "slash", "pierce": "pierce", "blast": "blast", "siege": "siege"}
 
 
 static func pips(level: int, levels: int) -> String:
@@ -87,18 +88,59 @@ static func _effect(sim: MatchSim, stat: String, level: int) -> String:
 			return "+%d%% passive income" % roundi(r.income_upgrade_bonus * level * 100.0)
 
 
-static func skill_state(sim: MatchSim, side: int, race: RaceDef) -> Dictionary:
+## What a skill does to each unit it hits, in words: damage mode, hits per unit, slow, knockback.
+static func skill_effect_text(ab: AbilityDef) -> String:
+	# A sweep's slices cross each unit once; every other shape hits it on every pulse.
+	var hits := 1 if ab.shape == "sweep" else ab.pulses
+	var times := "" if hits == 1 else " × %d" % hits
+	var text := ""
+	match ab.damage_mode:
+		"percent":
+			text = "%d%% of each unit's max health%s, ignoring armour" % [roundi(ab.damage_pct * 100.0), times]
+		"true":
+			text = "%d true damage%s, ignoring armour and Defence" % [roundi(ab.damage), times]
+		_:
+			text = "%d %s damage%s (armour applies)" % [roundi(ab.damage), DAMAGE_WORD.get(ab.damage_type, ab.damage_type), times]
+	if ab.slow > 0.0:
+		text += "; survivors are slowed %d%% for %d s" % [roundi(ab.slow * 100.0), roundi(ab.slow_time)]
+	if ab.knockback >= 20.0:
+		text += "; shoves units back"
+	return text
+
+
+## Where the skill lands, in words.
+static func skill_aim_text(ab: AbilityDef) -> String:
+	if ab.is_targeted():
+		return "aimed: press it, then click a spot on the lane (%d px wide). Press Space again to let the game aim" % roundi(ab.width)
+	return SHAPE_TEXT[ab.shape]
+
+
+## The Skill button: {text, tooltip, enabled}. `aiming` = aim mode is open (the button then cancels it).
+static func skill_state(sim: MatchSim, side: int, race: RaceDef, aiming := false) -> Dictionary:
 	var s := sim.sides[side]
-	var ab := sim.data.age(s.age).ability
+	var ab := sim.ability_def(side)
 	var skill := race.ability_name(ab)
 	var has_target := not sim.ability_zone(side).is_empty()
-	var text := "☄ %s · %d XP" % [skill, ab.xp_cost]
-	if s.ability_cooldown > 0.0:
+	var text := "%s %s · %d XP" % ["◎" if ab.is_targeted() else "☄", skill, ab.xp_cost]
+	if aiming:
+		text = "✕ Cancel aim"
+	elif s.ability_cooldown > 0.0:
 		text += " · %ds" % ceili(s.ability_cooldown)
-	var tip := "%s [Space]: %s. Costs %d XP; %d s cooldown." % [skill, SHAPE_TEXT[ab.shape], ab.xp_cost, roundi(sim.rules.ability_cooldown)]
+	var tip := "%s [Space]: %s.\nDeals %s.\nCosts %d XP; %d s cooldown." % [skill, skill_aim_text(ab), skill_effect_text(ab), ab.xp_cost, roundi(sim.rules.ability_cooldown)]
 	if not has_target:
 		tip += "\nNo enemy units to hit."
-	return {"text": text, "tooltip": tip, "enabled": sim.can_fire_ability(side) and has_target}
+	return {"text": text, "tooltip": tip, "enabled": (sim.can_fire_ability(side) and has_target) or aiming}
+
+
+## The line shown while aiming: what the cursor would hit. `preview` is SkillAim.preview().
+static func aim_hint(sim: MatchSim, side: int, race: RaceDef, preview: Dictionary) -> String:
+	var skill := race.ability_name(sim.ability_def(side))
+	var head := "AIM %s  ·  click to fire  ·  Space: aim for me  ·  Esc: cancel" % skill.to_upper()
+	if preview.is_empty():
+		return head + "\nMove the cursor over the battlefield"
+	if preview.count == 0:
+		return head + "\nNo enemy units in the zone"
+	return head + "\n%d enemy unit%s in the zone (%d g of army)" % [preview.count, "" if preview.count == 1 else "s", roundi(preview.value)]
 
 
 static func evolve_state(sim: MatchSim, side: int) -> Dictionary:

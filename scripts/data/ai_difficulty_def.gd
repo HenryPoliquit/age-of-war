@@ -9,4 +9,6 @@ extends Resource
 @export var counter_level: int = 1
 ## Enemy value (Age 1 gold, scaled by the era cost multiplier) a skill must hit before the AI fires it.
 @export var skill_min_value: float = 60.0
+## Aimed skills land this many px (at most) off the densest enemy group; 0 = perfectly aimed.
+@export var skill_aim_error: float = 0.0
 @export var income_bonus: float = 0.0

@@ -51,7 +51,7 @@ func _init(p_hud: MatchHud) -> void:
 	_evolve_meter.col = MatchHud.XP
 	_evolve_meter.custom_minimum_size = Vector2(0, 4)
 	ev.add_child(_evolve_meter)
-	_skill = hud._btn(left, "", func(): hud.feedback(hud.sim.fire_ability(0)))
+	_skill = hud._btn(left, "", func(): hud.view.skill_pressed())
 	_skill.custom_minimum_size = Vector2(250, 34)
 
 	var mid := HBoxContainer.new()
@@ -125,7 +125,7 @@ func refresh() -> void:
 	_evolve.tooltip_text = ev.tooltip
 	_evolve.disabled = not ev.enabled
 	_evolve_meter.value = ev.progress
-	var sk := HudModel.skill_state(sim, 0, race)
+	var sk := HudModel.skill_state(sim, 0, race, hud.view.aim.active)
 	_skill.text = sk.text
 	_skill.tooltip_text = sk.tooltip
 	_skill.disabled = not sk.enabled
