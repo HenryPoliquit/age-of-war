@@ -406,15 +406,22 @@ func _on_event(ev: Dictionary) -> void:
 			audio.play("ability_cast", Vector2(ev.x, GROUND_Y - 100))
 			hud.banner(race_def(ev.side).ability_name(def) + "!", team_color(ev.side), ev.side, true)
 		"ability_end":
-			if ev.side == 0 and ev.kills > 0:
+			if ev.side == 0:
 				for a in sim.data.ages:
 					if String(a.ability.id) == ev.ability:
-						hud.banner("%s: %d killed" % [race_def(0).ability_name(a.ability), ev.kills], team_color(0), 0, true)
+						hud.banner(skill_report(race_def(0).ability_name(a.ability), ev.hits, ev.kills), team_color(0), 0, true)
 		"match_end":
 			audio.target_intensity = 0.0
 		"turret_destroyed":
 			var gate := sim.to_world(ev.side, 0.0)
 			fx.impact("blast", Vector2(gate + (-80.0 if ev.side == 0 else 80.0), GROUND_Y - 140), true, true)
+
+
+## The line shown when the player's skill has finished: what it did, or that it missed.
+static func skill_report(name: String, hits: int, kills: int) -> String:
+	if hits == 0:
+		return "%s: missed" % name
+	return "%s: %d hit%s" % [name, hits, ", %d killed" % kills if kills > 0 else ""]
 
 
 func _consume_fx() -> void:

@@ -14,6 +14,6 @@ telegraph = 0.6
 pulses = 8
 pulse_interval = 0.3
 damage_mode = "percent"
-damage_pct = 0.18
+damage_pct = 0.12
 damage_type = "blast"
 knockback = 12.0

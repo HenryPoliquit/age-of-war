@@ -17,5 +17,5 @@ pulse_interval = 0.35
 damage_mode = "flat"
 damage = 90.0
 damage_type = "blast"
-slow = 0.4
-slow_time = 3.0
+slow = 0.3
+slow_time = 2.0

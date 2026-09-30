@@ -12,6 +12,7 @@ const DEFAULTS := {
 	"vfx_preset": 2,  # 0 Low, 1 Medium, 2 High (GDD §16)
 	"colourblind": false,
 	"day_night": true,
+	"skill_numbers": true,  # damage numbers over the units a skill hits
 }
 
 static var values: Dictionary = {}
@@ -106,7 +107,7 @@ static func make_panel(on_close: Callable, extra: Control = null) -> PanelContai
 	vfx.select(int(get_value("vfx_preset")))
 	vfx.item_selected.connect(func(i): set_value("vfx_preset", i))
 	v.add_child(vfx)
-	for spec in [["Day/night cycle", "day_night"], ["Reduce flashing", "flash_reduction"], ["Colour-blind team palette", "colourblind"]]:
+	for spec in [["Day/night cycle", "day_night"], ["Reduce flashing", "flash_reduction"], ["Colour-blind team palette", "colourblind"], ["Skill damage numbers", "skill_numbers"]]:
 		var c := CheckBox.new()
 		c.text = spec[0]
 		c.button_pressed = get_value(spec[1])

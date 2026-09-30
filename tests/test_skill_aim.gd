@@ -155,7 +155,7 @@ func test_the_skill_tooltip_says_what_the_damage_does() -> void:
 	sim.sides[0].age = 3
 	check(HudModel.skill_state(sim, 0, _race()).tooltip.contains("ignoring armour"), "true damage says so")
 	sim.sides[0].age = 2
-	check(HudModel.skill_state(sim, 0, _race()).tooltip.contains("slowed 40%"), "Rockfall says it slows")
+	check(HudModel.skill_state(sim, 0, _race()).tooltip.contains("slowed 30%"), "Rockfall says it slows")
 
 
 func test_the_aim_hint_reports_targets() -> void:
@@ -169,3 +169,9 @@ func test_the_aim_hint_reports_targets() -> void:
 	check(on.contains("2 enemy units in the zone"), on)
 	aim.cursor_x = 20.0
 	check(HudModel.aim_hint(sim, 0, _race(), aim.preview()).contains("No enemy units in the zone"))
+
+
+func test_the_skill_report_says_what_happened() -> void:
+	check_eq(MatchView.skill_report("Rockfall", 0, 0), "Rockfall: missed")
+	check_eq(MatchView.skill_report("Rockfall", 3, 0), "Rockfall: 3 hit")
+	check_eq(MatchView.skill_report("Rockfall", 5, 2), "Rockfall: 5 hit, 2 killed")

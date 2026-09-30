@@ -404,10 +404,11 @@ func hit(f: Dictionary) -> void:
 	var col := {"flat": Color("ffb45e"), "true": Color("8fe4ff"), "percent": Color("9df08a")}.get(mode, Color.WHITE) as Color
 	var text := "−%d%%" % roundi(f.pct * 100.0) if mode == "percent" else "−%d" % roundi(f.dealt)
 	var killed: bool = f.killed
-	if popups.size() >= MAX_POPUPS:
-		popups.pop_front()
-	popups.append({"x": x + rng.randf_range(-10.0, 10.0), "y": GROUND_Y - h - 8.0 - (int(f.unit_id) % 3) * 17.0, "text": text, "col": col, "mode": mode,
-		"born": fxl.now(), "life": 1.25 if killed else 1.0, "size": 32 if killed else 25})
+	if GameSettings.get_value("skill_numbers"):
+		if popups.size() >= MAX_POPUPS:
+			popups.pop_front()
+		popups.append({"x": x + rng.randf_range(-10.0, 10.0), "y": GROUND_Y - h - 8.0 - (int(f.unit_id) % 3) * 17.0, "text": text, "col": col,
+			"mode": mode, "born": fxl.now(), "life": 1.25 if killed else 1.0, "size": 32 if killed else 25})
 	# A mark on the unit itself, coloured like the number.
 	var pos := Vector2(x, GROUND_Y - h * 0.55)
 	fxl.flash(pos, 26.0, Color(col, 0.55), 0.14)
@@ -417,7 +418,7 @@ func hit(f: Dictionary) -> void:
 # ---------------------------------------------------------------------------
 # Per frame
 
-func step(dt: float) -> void:
+func step(_dt: float) -> void:
 	var t := fxl.now()
 	var keep: Array[Dictionary] = []
 	for it in items:
@@ -427,15 +428,15 @@ func step(dt: float) -> void:
 				if u >= 1.0:
 					_land(it)
 					continue
-				_trail(it, u, dt)
+				_trail(it, u)
 			"herd":
 				if t - it.born > it.life:
 					continue
-				_herd_dust(it, t, dt)
+				_herd_dust(it, t)
 			"charge":
 				if t - it.born > it.life:
 					continue
-				_charge_motes(it, t, dt)
+				_charge_motes(it)
 			_:
 				if t - it.born > it.life:
 					continue
@@ -449,7 +450,7 @@ func _pos(p: Dictionary, u: float) -> Vector2:
 	return (p.from as Vector2).lerp(p.to, e) + Vector2(0, -4.0 * p.arc * u * (1.0 - u))
 
 
-func _trail(p: Dictionary, u: float, dt: float) -> void:
+func _trail(p: Dictionary, u: float) -> void:
 	var look: Dictionary = p.look
 	var pos := _pos(p, u)
 	var glow: Color = look.get("glow", Color.WHITE)
@@ -471,7 +472,7 @@ func _trail(p: Dictionary, u: float, dt: float) -> void:
 				"col": glow.lightened(0.3), "g": 200.0, "add": true, "rot": 0.0, "spin": 0.0})
 
 
-func _herd_dust(h: Dictionary, t: float, _dt: float) -> void:
+func _herd_dust(h: Dictionary, t: float) -> void:
 	var look: Dictionary = h.look
 	var front: float = h.x0 + h.dir * h.v * (t - h.born)
 	if rng.randf() > 0.7 * fxl.intensity + 0.15:
@@ -491,7 +492,7 @@ func _herd_dust(h: Dictionary, t: float, _dt: float) -> void:
 
 
 ## Motes drawn in toward a charging Starfall.
-func _charge_motes(ch: Dictionary, t: float, _dt: float) -> void:
+func _charge_motes(ch: Dictionary) -> void:
 	if rng.randf() > 0.85 * fxl.intensity:
 		return
 	var look: Dictionary = ch.look
@@ -505,7 +506,7 @@ func _charge_motes(ch: Dictionary, t: float, _dt: float) -> void:
 # Drawing: under the particles (shadows, things stuck in the ground, the herd)
 
 func draw_under(ci: CanvasItem, t: float) -> void:
-	_draw_zone_shadows(ci, t)
+	_draw_zone_shadows(ci)
 	for it in items:
 		match it.k:
 			"proj":
@@ -528,7 +529,7 @@ func draw_under(ci: CanvasItem, t: float) -> void:
 
 ## A dark plate under every warning marker and the aim reticle: the coloured band is additive light and
 ## would vanish on bright ground, so it sits on a dark base with dark edge posts.
-func _draw_zone_shadows(ci: CanvasItem, _t: float) -> void:
+func _draw_zone_shadows(ci: CanvasItem) -> void:
 	var zones: Array[Vector2] = []
 	for e in view.sim.effects:
 		if e.pulse > 0 and e.def.shape != "sweep" and e.def.pulses <= 1:

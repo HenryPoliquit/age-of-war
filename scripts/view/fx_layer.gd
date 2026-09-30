@@ -236,7 +236,8 @@ func step(dt: float) -> void:
 	decals = decals.filter(func(d): return t - d.born < d.life)
 	skills.step(dt)
 	queue_redraw()
-	glow.queue_redraw()
+	if glow != null:
+		glow.queue_redraw()
 
 
 func _draw() -> void:
