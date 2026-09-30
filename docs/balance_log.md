@@ -33,7 +33,7 @@ Every change from the GDD baselines, and why. Harness numbers are from `run_sim.
 
 ## Findings for the design docs
 
-- **Damage rules and stalemates (B20–B22).** Anything that blunts Heavy pushes without killing lengthens matches, and matches are already too long. Percent skills scale with the percentage (escalation +4 points per 4% of max HP on Bombardment), so percent numbers must stay small; the biggest win of a percent or true skill is being *strong against big units*, which is exactly what makes it a defender's tool on one lane. If stalemates are solved later (waves, escalation), percent skills can be raised.
+- **Damage rules and stalemates (B20–B22).** Anything that blunts Heavy pushes without killing lengthens matches, and matches are already too long. Percent skills scale with the percentage (on Bombardment, about +1 point of mirror escalation per 1% of max HP: 32% at 10% up to 68% at 40%), so percent numbers must stay small; the biggest win of a percent or true skill is being *strong against big units*, which is exactly what makes it a defender's tool on one lane. If stalemates are solved later (waves, escalation), percent skills can be raised.
 - **Ranged spam gets stronger when skills turn anti-Heavy.** Heavies are the Tactician's answer to Ranged; percent and true skills hit Heavies harder than Blast and Pierce did, so they protect the swarm. Its target (< 30%) was already failing (43–55%).
 
 - **Army size.** The GDD economy gives about 2–10 units per side on the lane, not the 30-vs-30 that PRD §6 and §11 budget for. See PLAN §9.

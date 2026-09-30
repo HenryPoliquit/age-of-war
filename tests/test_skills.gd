@@ -388,3 +388,17 @@ func test_easier_ais_aim_loosely_but_still_hit() -> void:
 		if err > 40.0:
 			loose += 1
 	check(loose > 0, "some easy shots really are off-centre")
+
+
+func test_a_skill_counts_each_unit_it_hit_once_however_many_pulses() -> void:
+	var sim := new_sim()
+	sim.sides[0].age = 2
+	var a := _tough(place(sim, 1, "vanguard", 900.0, 2))
+	var b := _tough(place(sim, 1, "vanguard", 920.0, 2))
+	var def := sim.data.age(2).ability
+	check(def.pulses > 1, "Rockfall pulses more than once")
+	check(sim.fire_ability(0, sim.to_world(1, 910.0)))
+	run_pinned(sim, 4.0, [a, b])
+	var end: Dictionary = sim.match_log.events.filter(func(ev): return ev.type == "ability_end")[0]
+	check_eq(end.hits, 2, "two units, hit on every pulse")
+	check_near(end.damage, 2.0 * def.pulses * def.damage * sim.rules.matrix(def.damage_type, "light"), 0.5)

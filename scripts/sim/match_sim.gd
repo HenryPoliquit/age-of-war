@@ -345,7 +345,7 @@ func fire_ability(side: int, aim_x: float = NAN) -> bool:
 	s.ability_cooldown = rules.ability_cooldown
 	var center: float = (zone[0] + zone[1]) * 0.5
 	effects.append({"side": side, "def": def, "lo": zone[0], "hi": zone[1], "next_t": time + def.telegraph, "pulse": 0,
-		"kills": 0, "hits": 0, "damage": 0.0})
+		"kills": 0, "hit_ids": {}, "damage": 0.0})
 	_emit({"type": "ability", "side": side, "ability": String(def.id), "x": center, "lo": zone[0], "hi": zone[1], "aimed": def.is_targeted()})
 	return true
 
@@ -747,7 +747,7 @@ func _resolve_effects() -> void:
 		if e.pulse < def.pulses:
 			keep.append(e)
 		else:
-			_emit({"type": "ability_end", "side": e.side, "ability": String(def.id), "kills": e.kills, "hits": e.hits,
+			_emit({"type": "ability_end", "side": e.side, "ability": String(def.id), "kills": e.kills, "hits": e.hit_ids.size(),
 				"damage": snappedf(e.damage, 0.1)})
 	effects = keep
 
@@ -771,7 +771,7 @@ func _ability_pulse(e: Dictionary) -> void:
 			raw = def.damage_pct * u.max_hp
 		var x := to_world(u.side, u.progress)
 		var dealt := _damage_unit(u, raw, def.damage_type, e.side, def.ignores_armour())
-		e.hits += 1
+		e.hit_ids[u.id] = true
 		e.damage += dealt
 		var killed := not u.alive()
 		if killed:
