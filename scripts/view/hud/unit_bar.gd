@@ -63,7 +63,7 @@ class UnitCard extends Button:
 		var race := hud.view.race_of(0)
 		var h := UnitArt.height_for(u, race)
 		var sc := clampf((size.y - 46.0) / h, 0.35, 1.0)
-		UnitArt.begin(self, Transform2D(0.0, Vector2(sc, sc), 0.0, Vector2(size.x * 0.5, size.y - 36.0)))
+		FkPaint.begin(self, Transform2D(0.0, Vector2(sc, sc), 0.0, Vector2(size.x * 0.5, size.y - 36.0)))
 		UnitArt.draw_unit(self, u, hud.view.team_color(0), {"walk": 0.0, "moving": false, "atk": -1.0, "t": Time.get_ticks_msec() / 1000.0, "flash": 0.0}, index + 3, race)
 		draw_set_transform(Vector2.ZERO)
 		var col := Color.WHITE if not disabled else Color(1, 1, 1, 0.7)

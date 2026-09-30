@@ -182,7 +182,38 @@ func build(p_race: StringName, p_age: int) -> void:
 				5: _gunpowder()
 				6: _arcane()
 	_front()
+	_anim_bounds()
 	weather = palette.weather
+
+
+## Gives each animation that stays in one place the horizontal extent it needs, so the backdrop can skip it off screen.
+func _anim_bounds() -> void:
+	for a in anims:
+		var lo := INF
+		var hi := -INF
+		var pad := 120.0
+		match a.type:
+			"smoke", "flag", "lamp", "glow", "sails", "wheel":
+				lo = a.pos.x
+				hi = a.pos.x
+				pad = 260.0 if a.type in ["smoke", "drift_smoke"] else 90.0
+			"cart", "rune":
+				for v in a.pts:
+					lo = minf(lo, v.x)
+					hi = maxf(hi, v.x)
+			"bucket":
+				lo = minf(a.a.x, a.b.x)
+				hi = maxf(a.a.x, a.b.x)
+			"fall":
+				lo = a.top.x
+				hi = a.top.x
+			"drift_smoke":
+				lo = a.pos.x
+				hi = a.pos.x
+				pad = 260.0
+		if lo < INF:
+			a["ax0"] = lo - pad
+			a["ax1"] = hi + pad
 
 
 # ---------------------------------------------------------------------------
@@ -204,6 +235,31 @@ func _add(layer: int, shape: Dictionary) -> void:
 				var k := (v.y - lo) / (hi - lo)
 				cols.append(col.lightened(0.1 * (1.0 - k)).darkened(0.16 * k))
 			shape["cols"] = cols
+	# Horizontal extent, so the backdrop can skip shapes that are off screen.
+	var lo_x := INF
+	var hi_x := -INF
+	if shape.has("poly"):
+		for v in shape.poly:
+			lo_x = minf(lo_x, v.x)
+			hi_x = maxf(hi_x, v.x)
+	elif shape.has("circle"):
+		lo_x = shape.circle.x - shape.r
+		hi_x = shape.circle.x + shape.r
+	elif shape.has("line"):
+		lo_x = minf(shape.line.x, shape.to.x) - shape.w
+		hi_x = maxf(shape.line.x, shape.to.x) + shape.w
+	elif shape.has("polyline"):
+		for v in shape.polyline:
+			lo_x = minf(lo_x, v.x)
+			hi_x = maxf(hi_x, v.x)
+		lo_x -= shape.w
+		hi_x += shape.w
+	elif shape.has("grad"):
+		lo_x = shape.grad.position.x
+		hi_x = shape.grad.end.x
+	if lo_x < INF:
+		shape["x0"] = lo_x
+		shape["x1"] = hi_x
 	layers[layer].shapes.append(shape)
 
 
@@ -277,8 +333,134 @@ func _pine(layer: int, x: float, y: float, s: float, col: Color, snow := false) 
 # ---------------------------------------------------------------------------
 # Humans
 
+# --- Human scenery helpers -------------------------------------------------
+
+func _tent(layer: int, x: float, y: float, s: float, col: Color) -> void:
+	_tri(layer, Vector2(x - 34 * s, y), Vector2(x + 34 * s, y), Vector2(x, y - 58 * s), col)
+	_tri(layer, Vector2(x + 4 * s, y), Vector2(x + 34 * s, y), Vector2(x, y - 58 * s), col.darkened(0.16))
+	_add(layer, {"poly": PackedVector2Array([Vector2(x - 8 * s, y), Vector2(x - 2 * s, y - 24 * s), Vector2(x + 6 * s, y)]), "col": Color(0.08, 0.06, 0.05)})
+	_line(layer, Vector2(x, y - 58 * s), Vector2(x - 4 * s, y - 72 * s), 2.0, col.darkened(0.4))
+	_line(layer, Vector2(x, y - 58 * s), Vector2(x + 6 * s, y - 72 * s), 2.0, col.darkened(0.4))
+
+
+func _mammoth(layer: int, x: float, y: float, s: float, col: Color) -> void:
+	_add(layer, {"poly": _blob(Vector2(x, y - 26 * s), Vector2(34 * s, 20 * s), 12), "col": col})
+	_add(layer, {"poly": _blob(Vector2(x + 26 * s, y - 34 * s), Vector2(15 * s, 17 * s), 10), "col": col})
+	_add(layer, {"poly": PackedVector2Array([Vector2(x + 36 * s, y - 34 * s), Vector2(x + 48 * s, y - 14 * s), Vector2(x + 44 * s, y - 6 * s), Vector2(x + 38 * s, y - 20 * s)]), "col": col})
+	_add(layer, {"poly": PackedVector2Array([Vector2(x + 34 * s, y - 24 * s), Vector2(x + 52 * s, y - 20 * s), Vector2(x + 44 * s, y - 27 * s)]), "col": Color("d8cbb0")})
+	for lx in [-22.0, -8.0, 10.0, 24.0]:
+		_line(layer, Vector2(x + lx * s, y - 14 * s), Vector2(x + lx * s, y), 7.0 * s, col.darkened(0.1))
+
+
+func _volcano(layer: int, x: float, base_y: float, w: float, h: float, col: Color) -> void:
+	_add(layer, {"poly": PackedVector2Array([Vector2(x - w, base_y), Vector2(x - w * 0.16, base_y - h), Vector2(x + w * 0.16, base_y - h), Vector2(x + w, base_y)]), "col": col})
+	_add(layer, {"poly": PackedVector2Array([Vector2(x + w * 0.16, base_y - h), Vector2(x + w, base_y), Vector2(x + w * 0.2, base_y)]), "col": col.darkened(0.18)})
+	_add(layer, {"poly": PackedVector2Array([Vector2(x - w * 0.16, base_y - h), Vector2(x, base_y - h - 10), Vector2(x + w * 0.16, base_y - h), Vector2(x, base_y - h + 8)]), "col": Color(1.0, 0.5, 0.2)})
+	for k in 3:
+		_add(layer, {"polyline": PackedVector2Array([Vector2(x - w * 0.05 + k * w * 0.08, base_y - h + 10), Vector2(x - w * 0.2 + k * w * 0.2, base_y - h * 0.5), Vector2(x - w * 0.3 + k * w * 0.32, base_y - h * 0.1)]), "w": 3.0, "col": Color(1.0, 0.5, 0.2, 0.7)})
+	_glow(layer, Vector2(x, base_y - h), 60.0, Color(1.0, 0.5, 0.2))
+	anims.append({"type": "smoke", "layer": layer, "pos": Vector2(x, base_y - h - 8), "col": Color(0.3, 0.26, 0.26, 0.5), "rate": 1.0})
+
+
+func _hill_town(layer: int, x0: float, x1: float, y_top: float) -> void:
+	var cx := x0
+	while cx < x1 - 24.0:
+		var bw := rng.randf_range(22, 40)
+		var bh := rng.randf_range(20, 36)
+		var wall := Color("f0ece0").darkened(rng.randf() * 0.08)
+		_rect(layer, Rect2(cx, y_top - bh, bw, bh), wall)
+		_rect(layer, Rect2(cx + bw * 0.6, y_top - bh, bw * 0.4, bh), wall.darkened(0.1))
+		_rect(layer, Rect2(cx + bw * 0.2, y_top - bh * 0.6, 5, 9), Color(0.16, 0.2, 0.3))
+		if rng.randf() < 0.35:
+			_add(layer, {"poly": PackedVector2Array([Vector2(cx + 3, y_top - bh), Vector2(cx + bw * 0.5, y_top - bh - bw * 0.42), Vector2(cx + bw - 3, y_top - bh)]), "col": Color("3f7fc0")})
+		cx += bw + rng.randf_range(1, 6)
+
+
+func _lighthouse(layer: int, x: float, y: float, s: float, col: Color) -> void:
+	_add(layer, {"poly": PackedVector2Array([Vector2(x - 16 * s, y), Vector2(x - 9 * s, y - 150 * s), Vector2(x + 9 * s, y - 150 * s), Vector2(x + 16 * s, y)]), "col": col})
+	for k in 3:
+		_rect(layer, Rect2(x - (14 - k * 2.4) * s, y - (40 + k * 40) * s, (28 - k * 4.8) * s, 12 * s), Color("b8503a"))
+	_rect(layer, Rect2(x - 12 * s, y - 166 * s, 24 * s, 16 * s), Color(1.0, 0.9, 0.6))
+	_tri(layer, Vector2(x - 15 * s, y - 166 * s), Vector2(x + 15 * s, y - 166 * s), Vector2(x, y - 190 * s), Color("b8503a"))
+	_glow(layer, Vector2(x, y - 158 * s), 46.0 * s, Color(1.0, 0.9, 0.6))
+	anims.append({"type": "lamp", "layer": layer, "pos": Vector2(x, y - 158 * s), "col": Color(1.0, 0.9, 0.6), "r": 70.0 * s})
+
+
+func _windmill(layer: int, x: float, y: float, s: float, col: Color) -> void:
+	_add(layer, {"poly": PackedVector2Array([Vector2(x - 20 * s, y), Vector2(x - 12 * s, y - 70 * s), Vector2(x + 12 * s, y - 70 * s), Vector2(x + 20 * s, y)]), "col": col})
+	_add(layer, {"poly": PackedVector2Array([Vector2(x + 2 * s, y), Vector2(x + 12 * s, y - 70 * s), Vector2(x + 20 * s, y)]), "col": col.darkened(0.14)})
+	_tri(layer, Vector2(x - 16 * s, y - 70 * s), Vector2(x + 16 * s, y - 70 * s), Vector2(x, y - 90 * s), col.darkened(0.3))
+	_rect(layer, Rect2(x - 4 * s, y - 20 * s, 8 * s, 20 * s), Color(0.15, 0.12, 0.1))
+	anims.append({"type": "sails", "layer": layer, "pos": Vector2(x, y - 66 * s), "len": 46.0 * s, "col": Color("e8dcc0")})
+
+
+func _church(layer: int, x: float, y: float, s: float, col: Color) -> void:
+	_rect(layer, Rect2(x - 40 * s, y - 40 * s, 80 * s, 40 * s), col)
+	_tri(layer, Vector2(x - 46 * s, y - 40 * s), Vector2(x + 46 * s, y - 40 * s), Vector2(x, y - 66 * s), col.darkened(0.3))
+	_rect(layer, Rect2(x + 30 * s, y - 100 * s, 22 * s, 100 * s), col.lightened(0.04))
+	_tri(layer, Vector2(x + 27 * s, y - 100 * s), Vector2(x + 55 * s, y - 100 * s), Vector2(x + 41 * s, y - 148 * s), col.darkened(0.32))
+	_line(layer, Vector2(x + 41 * s, y - 148 * s), Vector2(x + 41 * s, y - 162 * s), 2.0, Color("d9b25c"))
+	_line(layer, Vector2(x + 35 * s, y - 158 * s), Vector2(x + 47 * s, y - 158 * s), 2.0, Color("d9b25c"))
+	_rect(layer, Rect2(x + 37 * s, y - 84 * s, 8 * s, 14 * s), Color(0.12, 0.1, 0.1))
+	for k in 3:
+		_rect(layer, Rect2(x - 30 * s + k * 22 * s, y - 28 * s, 8 * s, 14 * s), Color(0.12, 0.1, 0.1))
+
+
+func _village(layer: int, x: float, y: float, n: int, roof: Color, wall: Color) -> void:
+	var hx := x
+	for k in n:
+		var w := rng.randf_range(30, 46)
+		var h := rng.randf_range(22, 34)
+		_rect(layer, Rect2(hx, y - h, w, h), wall.darkened(rng.randf() * 0.1))
+		_rect(layer, Rect2(hx + w * 0.5, y - h, w * 0.5, h), wall.darkened(0.16))
+		_tri(layer, Vector2(hx - 5, y - h), Vector2(hx + w + 5, y - h), Vector2(hx + w * 0.5, y - h - w * 0.42), roof)
+		_rect(layer, Rect2(hx + w * 0.16, y - h * 0.62, 6, 10), Color(1.0, 0.85, 0.5, 0.75))
+		_rect(layer, Rect2(hx + w * 0.72, y - h - w * 0.36, 6, 14), roof.darkened(0.3))
+		if rng.randf() < 0.4:
+			anims.append({"type": "smoke", "layer": layer, "pos": Vector2(hx + w * 0.75, y - h - w * 0.4), "col": Color(0.85, 0.85, 0.85, 0.3), "rate": 0.6})
+		hx += w + rng.randf_range(6, 18)
+
+
+func _roman_city(layer: int, x: float, y: float, col: Color) -> void:
+	_rect(layer, Rect2(x - 150, y - 56, 300, 56), col)
+	for r in 4:
+		_line(layer, Vector2(x - 150, y - 46 + r * 12), Vector2(x + 150, y - 46 + r * 12), 1.0, col.darkened(0.12))
+	for k in 24:
+		_rect(layer, Rect2(x - 150 + k * 12.5, y - 62, 7, 6), col)
+	for tx in [-150.0, -50.0, 50.0, 150.0]:
+		_rect(layer, Rect2(x + tx - 14, y - 96, 28, 96), col.darkened(0.06))
+		_tri(layer, Vector2(x + tx - 18, y - 96), Vector2(x + tx + 18, y - 96), Vector2(x + tx, y - 124), Color("b0583a"))
+	# Inside: red-tiled roofs, a domed hall, a column.
+	for k in 5:
+		var hx := x - 120 + k * 50
+		_rect(layer, Rect2(hx, y - 84, 36, 28), Color("e6dcc6"))
+		_tri(layer, Vector2(hx - 4, y - 84), Vector2(hx + 40, y - 84), Vector2(hx + 18, y - 102), Color("b0583a"))
+	_add(layer, {"poly": PackedVector2Array([Vector2(x - 26, y - 84), Vector2(x - 22, y - 116), Vector2(x, y - 130), Vector2(x + 22, y - 116), Vector2(x + 26, y - 84)]), "col": Color("d8ccb0")})
+	_rect(layer, Rect2(x - 12, y - 30, 24, 30), Color(0.14, 0.1, 0.08))
+
+
+func _factory(layer: int, x: float, y: float, w: float, h: float, col: Color, smoke: Color) -> void:
+	_rect(layer, Rect2(x, y - h, w, h), col)
+	for k in int(w / 26.0):
+		_tri(layer, Vector2(x + k * 26, y - h), Vector2(x + k * 26 + 26, y - h), Vector2(x + k * 26 + 26, y - h - 14), col.darkened(0.18))
+	for r in int(h / 26.0):
+		for k in int(w / 24.0):
+			_rect(layer, Rect2(x + 6 + k * 24, y - h + 10 + r * 26, 10, 12), Color(1.0, 0.75, 0.4, rng.randf_range(0.2, 0.7)))
+	for k in rng.randi_range(1, 3):
+		var cx := x + rng.randf_range(10, w - 20)
+		var ch := rng.randf_range(60, 130)
+		_rect(layer, Rect2(cx, y - h - ch, 12, ch), col.darkened(0.1))
+		_rect(layer, Rect2(cx - 2, y - h - ch, 16, 5), col.darkened(0.3))
+		anims.append({"type": "drift_smoke", "layer": layer, "pos": Vector2(cx + 6, y - h - ch), "col": smoke})
+
+
 func _stone() -> void:
 	var p := palette
+	# A great range of red mesas, a smoking volcano far off, herds on the plain, stone circles and hide camps.
+	for x: float in _xs(560, 180):
+		_massif(0, x, 650, rng.randf_range(200, 300), rng.randf_range(200, 320), _haze(p.far, 0.5), Color(0, 0, 0, 0), 0.0)
+	for x: float in _xs(2300, 700):
+		_volcano(0, x, 660, rng.randf_range(260, 340), rng.randf_range(300, 380), _haze(Color("6a4a4a"), 0.4))
 	_ridge(0, 600, 70, 260, _haze(p.far, 0.45), 6)            # distant mesas
 	for x: float in _xs(700, 200):
 		var w := rng.randf_range(120, 260)
@@ -294,6 +476,25 @@ func _stone() -> void:
 	for x: float in _xs(900, 250):
 		anims.append({"type": "smoke", "layer": 2, "pos": Vector2(x, 716), "col": Color(0.85, 0.8, 0.75, 0.35), "rate": 0.6})
 		_circle(2, Vector2(x, 718), 6, Color("ff9a3c"))
+	for x: float in _xs(700, 220):
+		for k in rng.randi_range(2, 4):
+			_mammoth(1, x + k * 74, 690, rng.randf_range(0.8, 1.15), _haze(Color("4a3a30"), 0.3))
+	for x: float in _xs(1000, 260):
+		# A hide camp: tents round a fire, a drying rack.
+		for k in 3:
+			_tent(2, x + k * 84, 728, rng.randf_range(0.85, 1.2), Color("8a6440").darkened(0.05 * k))
+		_line(2, Vector2(x + 250, 728), Vector2(x + 250, 690), 3.0, Color("4a3a2a"))
+		_line(2, Vector2(x + 300, 728), Vector2(x + 300, 690), 3.0, Color("4a3a2a"))
+		_line(2, Vector2(x + 246, 696), Vector2(x + 304, 696), 2.0, Color("4a3a2a"))
+		for k in 4:
+			_rect(2, Rect2(x + 252 + k * 13, 696, 9, 18), Color("b0946a"))
+	for x: float in _xs(1500, 400):
+		# A ring of standing stones with two lintelled trilithons.
+		for k in 6:
+			var sh := rng.randf_range(34, 52)
+			_add(2, {"poly": PackedVector2Array([Vector2(x + k * 34 - 8, 726), Vector2(x + k * 34 - 6, 726 - sh), Vector2(x + k * 34 + 8, 726 - sh + 4), Vector2(x + k * 34 + 9, 726)]), "col": p.mid.darkened(0.3)})
+		_rect(2, Rect2(x + 26, 726 - 62, 48, 9), p.mid.darkened(0.34))
+		_rect(2, Rect2(x + 130, 726 - 62, 48, 9), p.mid.darkened(0.34))
 
 
 func _acacia(layer: int, x: float, y: float, s: float, col: Color) -> void:
@@ -306,7 +507,11 @@ func _acacia(layer: int, x: float, y: float, s: float, col: Color) -> void:
 
 func _bronze() -> void:
 	var p := palette
+	for x: float in _xs(520, 160):
+		_massif(0, x, 566, rng.randf_range(180, 260), rng.randf_range(160, 250), _haze(Color("6a8ab0"), 0.4), Color("f4f4f4"), 0.25)
 	_rect(0, Rect2(X0, 560, X1 - X0, 200), p.far)                   # sea
+	for k in 4:
+		anims.append({"type": "ship", "layer": 0, "pos": Vector2(rng.randf_range(X0, X1), rng.randf_range(600, 690)), "speed": rng.randf_range(6.0, 12.0), "s": rng.randf_range(0.8, 1.2), "hull": Color("5a3a26"), "sail": Color("f2ead8")})
 	for i in 40:
 		var x := rng.randf_range(X0, X1)
 		var y := rng.randf_range(575, 700)
@@ -318,6 +523,11 @@ func _bronze() -> void:
 		var pts := PackedVector2Array([Vector2(x - w * 0.5, 740), Vector2(x - w * 0.42, 700 - h * 0.6), Vector2(x - w * 0.2, 700 - h), Vector2(x + w * 0.25, 704 - h), Vector2(x + w * 0.5, 740)])
 		_add(1, {"poly": pts, "col": _haze(p.mid, 0.15)})
 		_add(1, {"poly": PackedVector2Array([Vector2(x + w * 0.05, 700 - h + 4), Vector2(x + w * 0.25, 704 - h), Vector2(x + w * 0.5, 740), Vector2(x + w * 0.1, 740)]), "col": p.mid.darkened(0.12)})
+		# A white-washed town spilling down the cliff, blue domes, and a lighthouse at its foot.
+		_hill_town(1, x - w * 0.18, x + w * 0.24, 704 - h)
+		_hill_town(1, x - w * 0.3, x + w * 0.4, 704 - h * 0.55)
+		if rng.randf() < 0.5:
+			_lighthouse(1, x + w * 0.46, 740, rng.randf_range(0.8, 1.05), Color("efe8d8"))
 	_ridge(2, 736, 14, 240, p.mid.darkened(0.05), 2)
 	for x: float in _xs(620, 200):
 		_ruin(3, x, 752, p.near)
@@ -341,6 +551,8 @@ func _ruin(layer: int, x: float, y: float, col: Color) -> void:
 
 func _iron() -> void:
 	var p := palette
+	for x: float in _xs(560, 180):
+		_massif(0, x, 640, rng.randf_range(200, 300), rng.randf_range(260, 400), _haze(Color("6a86a8"), 0.35), Color("f4f6fa"), 0.32)
 	_ridge(0, 610, 60, 320, _haze(p.far, 0.35), 3)
 	# Aqueduct marching across the hills: two tiers of arches.
 	_ridge(1, 668, 34, 280, _haze(p.mid, 0.3), 3)
@@ -374,15 +586,52 @@ func _iron() -> void:
 	for x: float in _xs(700, 200):
 		_rect(3, Rect2(x, 734, 10, 18), Color("b8ae98"))
 		_rect(3, Rect2(x - 1, 732, 12, 3), Color("a09680"))
+	# A walled city on the hills, a legion camp with red pennants, vineyards on the slopes.
+	for x: float in _xs(1700, 400):
+		_roman_city(1, x, 668, _haze(Color("d6c8a8"), 0.25))
+	for x: float in _xs(1200, 300):
+		for k in 5:
+			_tent(2, x + k * 60, 726, 0.85, Color("c8c0a8").darkened(0.04 * (k % 2)))
+			_line(2, Vector2(x + k * 60, 726 - 50), Vector2(x + k * 60, 726 - 72), 1.6, Color("4a3a2a"))
+			_tri(2, Vector2(x + k * 60, 726 - 72), Vector2(x + k * 60 + 14, 726 - 68), Vector2(x + k * 60, 726 - 64), Color("a83a32"))
+		_line(2, Vector2(x - 12, 726), Vector2(x + 310, 726), 3.0, Color("6a4a30"))
+	for x: float in _xs(500, 160):
+		for k in 22:
+			_line(2, Vector2(x + k * 7, 730), Vector2(x + k * 7 + 3, 722 - (k % 3)), 1.6, Color("4a6a30"))
 
 
 func _medieval() -> void:
 	var p := palette
+	# Overcast countryside: blue-grey hills far off, then patchwork fields, woods and hamlets. No castles here:
+	# the walled castle is the player's base, and the land around it is farmed and quiet.
+	for x: float in _xs(600, 200):
+		_massif(0, x, 630, rng.randf_range(220, 320), rng.randf_range(260, 380), _haze(Color("7a8898"), 0.4), Color("e8eef4"), 0.28)
 	_ridge(0, 610, 60, 300, _haze(p.far, 0.4), 3)
+	# Far hills: strip fields (light and dark bands laid across the slope) and dark forest belts.
 	_ridge(1, 670, 40, 260, _haze(p.mid, 0.2), 3)
+	for x: float in _xs(520, 160):
+		_fields(1, x, 690, rng.randf_range(220, 340), rng.randf_range(34, 52), _haze(Color("8c9a5a"), 0.3), _haze(Color("b5a866"), 0.3))
+	for x: float in _xs(360, 120):
+		_wood(1, x, 676, rng.randi_range(5, 9), _haze(Color("3c5a3a"), 0.25))
+	# An abbey on a hill: long church with a tower and cloister, no battlements.
 	for x: float in _xs(1500, 300):
-		_castle(1, x, 640, _haze(Color("55585c"), 0.2))
+		_abbey(1, x, 672, _haze(Color("c4bdae"), 0.22))
 	_ridge(2, 725, 18, 180, p.mid.darkened(0.1), 2)
+	# The river, a stone bridge, and boats' sails are left out on purpose: the lane is dry land.
+	for x: float in _xs(1300, 320):
+		_village(2, x, 726, rng.randi_range(4, 6), Color("8a6a3a"), Color("d8ccb0"))
+		_church(2, x + 300, 726, rng.randf_range(0.9, 1.15), Color("bcb8ac"))
+	for x: float in _xs(900, 260):
+		_windmill(2, x, 726, rng.randf_range(0.9, 1.25), Color("cfc4a8"))
+	for x: float in _xs(420, 140):
+		_pine(2, x, 728, rng.randf_range(0.8, 1.2), Color("2f4a34"))
+	# Nearer fields with haystacks, sheep, and fences along the road.
+	for x: float in _xs(760, 220):
+		_fields(2, x, 738, rng.randf_range(200, 320), 12, Color("82944e"), Color("b3a460"))
+	for x: float in _xs(640, 200):
+		_haystack(2, x, 730, rng.randf_range(0.8, 1.2))
+	for x: float in _xs(560, 180):
+		_sheep(2, x, 730, rng.randi_range(3, 6))
 	for x: float in _xs(700, 200):
 		var w := rng.randf_range(160, 300)
 		for k in int(w / 18):
@@ -392,23 +641,78 @@ func _medieval() -> void:
 		anims.append({"type": "flag", "layer": 3, "pos": Vector2(x, 662), "col": Color("8b2d2d") if rng.randf() < 0.5 else Color("2d4a8b")})
 
 
-func _castle(layer: int, x: float, y: float, col: Color) -> void:
-	_rect(layer, Rect2(x - 90, y - 70, 180, 70), col)
-	for r in 6:
-		_line(layer, Vector2(x - 90, y - 64 + r * 11), Vector2(x + 90, y - 64 + r * 11), 1, col.darkened(0.12))
-	for i in 3:
-		var tx := x - 90 + i * 90
-		_rect(layer, Rect2(tx - 16, y - 120, 32, 120), col.darkened(0.06))
-		for r in 9:
-			_line(layer, Vector2(tx - 16, y - 114 + r * 12), Vector2(tx + 16, y - 114 + r * 12), 1, col.darkened(0.16))
-		for k in 3:
-			_rect(layer, Rect2(tx - 16 + k * 12, y - 128, 8, 8), col.darkened(0.06))
-		_tri(layer, Vector2(tx - 19, y - 120), Vector2(tx + 19, y - 120), Vector2(tx, y - 152), col.darkened(0.25))
-		_rect(layer, Rect2(tx - 2, y - 100, 4, 12), col.darkened(0.45))
-		_rect(layer, Rect2(tx - 2, y - 70, 4, 12), col.darkened(0.45))
-	for k in 12:
-		_rect(layer, Rect2(x - 90 + k * 15, y - 78, 9, 8), col)
-	_rect(layer, Rect2(x - 14, y - 34, 28, 34), col.darkened(0.4))
+# Strip fields on a hillside: alternating light and dark furrow bands that narrow toward the horizon.
+func _fields(layer: int, x: float, y: float, w: float, h: float, a: Color, b: Color) -> void:
+	var rows := maxi(3, int(h / 8.0))
+	for r in rows:
+		var t0 := float(r) / rows
+		var t1 := float(r + 1) / rows
+		var col := a if r % 2 == 0 else b
+		var sk := rng.randf_range(-0.12, 0.12) * w
+		# Each row is a slanted band, wider toward the viewer (larger y).
+		var y0 := y - h + t0 * h
+		var y1 := y - h + t1 * h
+		var inset0 := (1.0 - t0) * w * 0.12
+		var inset1 := (1.0 - t1) * w * 0.12
+		_add(layer, {"poly": PackedVector2Array([Vector2(x + inset0 + sk, y0), Vector2(x + w - inset0 + sk, y0), Vector2(x + w - inset1, y1), Vector2(x + inset1, y1)]), "col": col})
+
+
+# A belt of round-headed trees (oak, beech): trunk stub, dark crown, a lit side.
+func _wood(layer: int, x: float, y: float, n: int, col: Color) -> void:
+	for k in n:
+		var tx := x + k * rng.randf_range(16, 24)
+		var s := rng.randf_range(0.8, 1.25)
+		_line(layer, Vector2(tx, y), Vector2(tx, y - 12 * s), 3.0 * s, Color("4a3a2a"))
+		_add(layer, {"poly": _blob(Vector2(tx, y - 24 * s), Vector2(15 * s, 15 * s), 10), "col": col.darkened(rng.randf() * 0.12)})
+		_add(layer, {"poly": _blob(Vector2(tx - 4 * s, y - 28 * s), Vector2(8 * s, 8 * s), 8), "col": col.lightened(0.1)})
+
+
+# An abbey: a long nave under a steep slate roof, a square tower with a small spire, a cloister range, a rose window.
+func _abbey(layer: int, x: float, y: float, col: Color) -> void:
+	var slate := col.darkened(0.42)
+	# Cloister range in front, low and long.
+	_rect(layer, Rect2(x - 150, y - 26, 110, 26), col.darkened(0.05))
+	_tri(layer, Vector2(x - 156, y - 26), Vector2(x - 34, y - 26), Vector2(x - 95, y - 44), slate)
+	for k in 6:
+		_rect(layer, Rect2(x - 142 + k * 18, y - 16, 6, 12), col.darkened(0.42))
+	# Nave: walls, buttresses, a steep roof.
+	_rect(layer, Rect2(x - 40, y - 52, 130, 52), col)
+	_rect(layer, Rect2(x + 50, y - 52, 40, 52), col.darkened(0.1))
+	for k in 5:
+		_rect(layer, Rect2(x - 40 + k * 28, y - 52, 5, 52), col.darkened(0.14))
+		_add(layer, {"poly": PackedVector2Array([Vector2(x - 28 + k * 28, y - 22), Vector2(x - 28 + k * 28, y - 38), Vector2(x - 24 + k * 28, y - 43), Vector2(x - 20 + k * 28, y - 38), Vector2(x - 20 + k * 28, y - 22)]), "col": Color(0.14, 0.15, 0.2)})
+	_add(layer, {"poly": PackedVector2Array([Vector2(x - 46, y - 52), Vector2(x - 20, y - 84), Vector2(x + 70, y - 84), Vector2(x + 96, y - 52)]), "col": slate})
+	_add(layer, {"poly": PackedVector2Array([Vector2(x + 70, y - 84), Vector2(x + 96, y - 52), Vector2(x + 84, y - 52), Vector2(x + 64, y - 80)]), "col": slate.darkened(0.15)})
+	# Crossing tower with a needle spire.
+	_rect(layer, Rect2(x + 4, y - 128, 34, 76), col.lightened(0.03))
+	_rect(layer, Rect2(x + 26, y - 128, 12, 76), col.darkened(0.12))
+	for k in 2:
+		_rect(layer, Rect2(x + 11 + k * 12, y - 112, 6, 18), Color(0.14, 0.15, 0.2))
+	_tri(layer, Vector2(x + 1, y - 128), Vector2(x + 41, y - 128), Vector2(x + 21, y - 178), slate)
+	_tri(layer, Vector2(x + 21, y - 128), Vector2(x + 41, y - 128), Vector2(x + 21, y - 178), slate.darkened(0.15))
+	_line(layer, Vector2(x + 21, y - 178), Vector2(x + 21, y - 190), 2.0, Color("d9b25c"))
+	_line(layer, Vector2(x + 16, y - 186), Vector2(x + 26, y - 186), 2.0, Color("d9b25c"))
+	# Rose window on the west gable and a small door.
+	_circle(layer, Vector2(x + 78, y - 66), 6.0, Color(0.5, 0.6, 0.8, 0.8))
+	_rect(layer, Rect2(x + 72, y - 20, 12, 20), Color(0.16, 0.12, 0.1))
+	# A wall and orchard round the close.
+	_rect(layer, Rect2(x - 190, y - 8, 380, 8), col.darkened(0.16))
+
+
+func _haystack(layer: int, x: float, y: float, s: float) -> void:
+	_add(layer, {"poly": PackedVector2Array([Vector2(x - 16 * s, y), Vector2(x - 12 * s, y - 16 * s), Vector2(x, y - 24 * s), Vector2(x + 12 * s, y - 16 * s), Vector2(x + 16 * s, y)]), "col": Color("c8aa5c")})
+	_add(layer, {"poly": PackedVector2Array([Vector2(x + 4 * s, y - 22 * s), Vector2(x + 12 * s, y - 16 * s), Vector2(x + 16 * s, y), Vector2(x + 2 * s, y)]), "col": Color("a98a42")})
+
+
+# A flock: woolly cream bodies, dark heads and legs.
+func _sheep(layer: int, x: float, y: float, n: int) -> void:
+	for k in n:
+		var sx := x + k * rng.randf_range(12, 20)
+		var sy := y - rng.randf_range(0, 4)
+		_line(layer, Vector2(sx - 3, sy), Vector2(sx - 3, sy - 5), 1.4, Color("2e2a26"))
+		_line(layer, Vector2(sx + 3, sy), Vector2(sx + 3, sy - 5), 1.4, Color("2e2a26"))
+		_add(layer, {"poly": _blob(Vector2(sx, sy - 9), Vector2(8, 5.5), 8), "col": Color("ece6d6")})
+		_add(layer, {"poly": _blob(Vector2(sx + 8, sy - 10), Vector2(3, 3.2), 6), "col": Color("2e2a26")})
 
 
 func _gunpowder() -> void:
@@ -420,6 +724,10 @@ func _gunpowder() -> void:
 		_rect(1, Rect2(x - 10, 470, 20, 90), Color("7a7470"))
 		_circle(1, Vector2(x, 466), 9, Color("f6e7a6"))
 		anims.append({"type": "lamp", "layer": 1, "pos": Vector2(x, 466), "col": Color("fff1b0"), "r": 60.0})
+	for x: float in _xs(400, 130):
+		_factory(1, x, 660, rng.randf_range(80, 160), rng.randf_range(40, 90), _haze(Color("5a4e4a"), 0.25), Color(0.5, 0.48, 0.46, 0.32))
+	for k in 6:
+		anims.append({"type": "ship", "layer": 0, "pos": Vector2(rng.randf_range(X0, X1), rng.randf_range(625, 700)), "speed": rng.randf_range(10.0, 18.0), "s": rng.randf_range(1.0, 1.5), "hull": Color("2e2a2a"), "sail": Color("b8b0a0"), "funnel": true})
 	_ridge(2, 728, 20, 160, p.mid.darkened(0.15), 6, 30)
 	for x: float in _xs(700, 180):
 		for k in rng.randi_range(6, 12):
@@ -456,6 +764,16 @@ func _arcane() -> void:
 			_rect(1, Rect2(x - 3, 690 - h + 20 + k * 40, 6, 12), Color(glow, 0.6))
 		_circle(1, Vector2(x, 690 - h - 66), 5, glow)
 		_glow(1, Vector2(x, 690 - h - 66), 26.0, glow)
+	anims.append({"type": "aurora", "layer": 0, "cols": [Color("6fe0ff"), Color("b070ff"), Color("ff70c8")]})
+	# Ley lines: beams of violet light from the tower tips into the sky.
+	for x: float in _xs(760, 240):
+		_add(0, {"poly": PackedVector2Array([Vector2(x - 6, 200), Vector2(x + 6, 200), Vector2(x + 26, -300), Vector2(x - 26, -300)]), "cols": PackedColorArray([Color(glow, 0.18), Color(glow, 0.18), Color(glow, 0.0), Color(glow, 0.0)])})
+	for x: float in _xs(1300, 400):
+		# A cluster of crystal pylons on the ridge.
+		for k in 5:
+			var ch := rng.randf_range(50, 130)
+			_add(2, {"poly": PackedVector2Array([Vector2(x + k * 16 - 8, 730), Vector2(x + k * 16 - 3, 730 - ch), Vector2(x + k * 16 + 8, 730)]), "col": Color(glow, 0.55).lerp(p.mid, 0.3)})
+		_glow(2, Vector2(x + 32, 690), 46.0, glow)
 	_ridge(2, 730, 14, 200, p.near.darkened(0.05), 2)
 	# Near: crystal lamp posts along a low stone wall.
 	for x: float in _xs(560, 160):
@@ -468,27 +786,184 @@ func _arcane() -> void:
 
 
 # ---------------------------------------------------------------------------
-# Elves: forests through the ages
+# Elves: the world tree and its forest through the ages
+
+## A limb: a tapered ribbon along a quadratic curve a → b → c, `w0` wide at a and `w1` at c.
+func _limb(layer: int, a: Vector2, b: Vector2, c: Vector2, w0: float, w1: float, col: Color) -> void:
+	var left := PackedVector2Array()
+	var right := PackedVector2Array()
+	for i in 13:
+		var t := i / 12.0
+		var pt := a * (1.0 - t) * (1.0 - t) + b * 2.0 * (1.0 - t) * t + c * t * t
+		var tangent := ((b - a) * 2.0 * (1.0 - t) + (c - b) * 2.0 * t).normalized()
+		var nrm := Vector2(-tangent.y, tangent.x)
+		var w := lerpf(w0, w1, t) * 0.5
+		left.append(pt + nrm * w)
+		right.append(pt - nrm * w)
+	right.reverse()
+	left.append_array(right)
+	_add(layer, {"poly": left, "col": col})
+
+
+func _crown_edge(x: float, edge: float, amp: float, ph: Vector2) -> float:
+	return edge + amp * (0.5 * sin(x / 210.0 + ph.x) + 0.5 * sin(x / 71.0 + ph.y))
+
+
+## The crown of the world tree seen from below: a mass hanging from the top of the view with a ragged underside of leaf
+## clusters and lighter clumps on its face. Returns the phases of its edge, for hanging things from it.
+func _crown(layer: int, edge: float, amp: float, col: Color, spacing: float, size: float) -> Vector2:
+	var ph := Vector2(rng.randf() * TAU, rng.randf() * TAU)
+	var pts := PackedVector2Array([Vector2(X0, -420)])
+	var x := X0
+	while x <= X1:
+		pts.append(Vector2(x, _crown_edge(x, edge, amp, ph) + absf(sin(x / 19.0)) * 9.0))
+		x += 30.0
+	pts.append(Vector2(X1, -420))
+	_add(layer, {"poly": pts, "col": col})
+	for cx: float in _xs(spacing, spacing * 0.4):
+		var ey := _crown_edge(cx, edge, amp, ph)
+		var r := rng.randf_range(38, 74) * size
+		_add(layer, {"poly": _blob(Vector2(cx, ey + rng.randf_range(-6, 20)), Vector2(r, r * 0.62), 12), "col": col.darkened(rng.randf_range(0.02, 0.14))})
+		_add(layer, {"poly": _blob(Vector2(cx + rng.randf_range(-40, 40), rng.randf_range(edge - 190, ey - 30)), Vector2(r * 1.1, r * 0.7), 12), "col": col.lightened(rng.randf_range(0.02, 0.16))})
+	# A fringe of small leaf tufts along the ragged underside.
+	x = X0
+	while x <= X1:
+		var ty := _crown_edge(x, edge, amp, ph) + absf(sin(x / 19.0)) * 9.0
+		var l := rng.randf_range(10, 26) * size
+		_add(layer, {"poly": PackedVector2Array([Vector2(x - 9, ty - 6), Vector2(x - 5, ty + l * 0.7), Vector2(x, ty + l), Vector2(x + 6, ty + l * 0.6), Vector2(x + 10, ty - 6)]), "col": col.darkened(rng.randf_range(0.02, 0.2))})
+		x += rng.randf_range(15, 28)
+	return ph
+
+
+## A leafy clump: several overlapping blobs of slightly different tone rather than one flat disc.
+func _leaf_clump(layer: int, c: Vector2, r: Vector2, col: Color) -> void:
+	for k in 5:
+		var o := Vector2(rng.randf_range(-r.x * 0.5, r.x * 0.5), rng.randf_range(-r.y * 0.4, r.y * 0.4))
+		_add(layer, {"poly": _blob(c + o, r * rng.randf_range(0.5, 0.78), 11), "col": col.darkened(rng.randf() * 0.14).lightened(rng.randf() * 0.05)})
+
+
+## Vines hanging from a crown's edge, some ending in a leaf.
+func _vines(layer: int, edge: float, amp: float, ph: Vector2, col: Color, spacing: float) -> void:
+	for x: float in _xs(spacing, spacing * 0.5):
+		var y0 := _crown_edge(x, edge, amp, ph) + 8.0
+		var length := rng.randf_range(30, 130)
+		var sway := rng.randf_range(-12, 12)
+		_add(layer, {"polyline": PackedVector2Array([Vector2(x, y0), Vector2(x + sway * 0.4, y0 + length * 0.5), Vector2(x + sway, y0 + length)]), "w": 2.2, "col": col})
+		if length > 70.0:
+			_add(layer, {"poly": _blob(Vector2(x + sway, y0 + length + 5), Vector2(7, 5), 6), "col": col.lightened(0.12)})
+
+
+## Slanting shafts of light from gaps in the crown down to the ground, fading out.
+func _shafts(layer: int, col: Color, spacing: float, top: float) -> void:
+	for x: float in _xs(spacing, spacing * 0.5):
+		var w := rng.randf_range(30, 70)
+		var dx := rng.randf_range(90, 190)
+		_add(layer, {"poly": PackedVector2Array([Vector2(x, top), Vector2(x + w, top), Vector2(x + w + dx + w, GROUND_Y), Vector2(x + dx, GROUND_Y)]),
+			"cols": PackedColorArray([Color(col, 0.2), Color(col, 0.2), Color(col, 0.0), Color(col, 0.0)])})
+
+
+## A soft band of mist between two heights, fading in toward the bottom.
+func _mist(layer: int, y0: float, y1: float, col: Color, alpha: float) -> void:
+	_add(layer, {"grad": Rect2(X0, y0, X1 - X0, y1 - y0), "top": Color(col, 0.0), "bottom": Color(col, alpha)})
+
+
+## One colossal trunk of the world tree: bark with ridges and a lit flank, buttress roots, great limbs climbing into the
+## crown, foliage where they meet it; from the Iron age the elven city is built into it.
+func _world_trunk(x: float, w: float) -> void:
+	var p := palette
+	var leaf: Color = p.leaf
+	var glow: Color = p.light
+	var tc := _haze((p.near as Color).lightened(0.1), 0.3)
+	_add(1, {"poly": PackedVector2Array([Vector2(x - w * 0.98, 748), Vector2(x - w * 0.62, 690), Vector2(x - w * 0.5, 560), Vector2(x - w * 0.47, 300), Vector2(x - w * 0.5, -300),
+		Vector2(x + w * 0.5, -300), Vector2(x + w * 0.47, 300), Vector2(x + w * 0.5, 560), Vector2(x + w * 0.62, 690), Vector2(x + w * 0.98, 748)]), "col": tc})
+	_add(1, {"poly": PackedVector2Array([Vector2(x - w * 0.5, 560), Vector2(x - w * 0.47, 300), Vector2(x - w * 0.5, -300), Vector2(x - w * 0.18, -300), Vector2(x - w * 0.16, 300), Vector2(x - w * 0.2, 640)]), "col": tc.lightened(0.09)})
+	_add(1, {"poly": PackedVector2Array([Vector2(x + w * 0.32, 690), Vector2(x + w * 0.3, 300), Vector2(x + w * 0.34, -300), Vector2(x + w * 0.5, -300), Vector2(x + w * 0.47, 300), Vector2(x + w * 0.5, 560), Vector2(x + w * 0.62, 690)]), "col": tc.darkened(0.14)})
+	for k in 18:
+		var u := lerpf(-0.46, 0.46, k / 17.0)
+		var line := PackedVector2Array()
+		for j in 9:
+			var y := 700.0 - j * 130.0
+			line.append(Vector2(x + u * w + sin(k * 1.9 + j * 0.9) * 7.0, y))
+		_add(1, {"polyline": line, "w": 2.0 + (k % 3), "col": Color(0, 0, 0, 0.16)})
+	# Buttress roots spreading over the ground, mossy on top.
+	for side in [-1.0, 1.0]:
+		for k in 3:
+			_limb(1, Vector2(x + side * w * 0.42, 610 - k * 12), Vector2(x + side * w * (0.72 + k * 0.2), 715), Vector2(x + side * w * (1.0 + k * 0.32), 750), 52 - k * 10, 8, tc.darkened(0.04 * k))
+			_add(1, {"poly": _blob(Vector2(x + side * w * (0.72 + k * 0.22), 706), Vector2(30, 9), 8), "col": leaf.darkened(0.2)})
+	# Great limbs climbing into the crown.
+	for side in [-1.0, 1.0]:
+		_limb(1, Vector2(x + side * w * 0.4, 340), Vector2(x + side * w * 1.1, 250), Vector2(x + side * w * 1.7, 50), 96, 20, tc.darkened(0.06))
+		_limb(1, Vector2(x + side * w * 0.45, 520), Vector2(x + side * w * 1.25, 470), Vector2(x + side * w * 2.05, 290), 64, 12, tc.darkened(0.1))
+	for k in 16:
+		var side := -1.0 if k % 2 == 0 else 1.0
+		_leaf_clump(1, Vector2(x + side * rng.randf_range(w * 0.3, w * 1.9), rng.randf_range(20, 300)), Vector2(rng.randf_range(60, 100), rng.randf_range(36, 56)), _haze(leaf, 0.25))
+	if age <= 2:
+		# A hollow at the foot with a fire in it.
+		_add(1, {"poly": PackedVector2Array([Vector2(x - 34, 748), Vector2(x - 34, 690), Vector2(x, 660), Vector2(x + 34, 690), Vector2(x + 34, 748)]), "col": Color(0.06, 0.05, 0.04)})
+		_glow(1, Vector2(x, 728), 44.0, Color(1.0, 0.7, 0.35))
+	else:
+		# The elven city: lit windows spiralling up the trunk, timber halls on the flanks with lanterns and stairs.
+		for k in 10:
+			var wx := x + lerpf(-0.36, 0.36, fposmod(k * 0.37, 1.0)) * w
+			var wy := 650.0 - k * 46.0
+			_add(1, {"poly": PackedVector2Array([Vector2(wx - 9, wy + 26), Vector2(wx - 9, wy + 8), Vector2(wx, wy - 4), Vector2(wx + 9, wy + 8), Vector2(wx + 9, wy + 26)]), "col": Color(glow.lerp(Color(1.0, 0.8, 0.45), 0.6), 0.85)})
+			_glow(1, Vector2(wx, wy + 14), 24.0, glow.lerp(Color(1.0, 0.8, 0.45), 0.5))
+		var wood := _haze(Color("7a5a3a"), 0.25)
+		for k in 3:
+			for side in [-1.0, 1.0]:
+				var hx: float = x + side * w * 0.5
+				var hy := 470.0 + k * 90.0 + (0.0 if side < 0.0 else 40.0)
+				var span := 130.0 - k * 20.0
+				var x0: float = hx if side > 0.0 else hx - span
+				_rect(1, Rect2(x0, hy, span, 9), wood)
+				_rect(1, Rect2(x0 + span * 0.15, hy - 44, span * 0.7, 44), wood.lightened(0.06))
+				_add(1, {"poly": PackedVector2Array([Vector2(x0 + span * 0.08, hy - 44), Vector2(x0 + span * 0.5, hy - 78), Vector2(x0 + span * 0.92, hy - 44)]), "col": _haze(leaf, 0.15).darkened(0.1)})
+				_rect(1, Rect2(x0 + span * 0.42, hy - 30, 14, 30), Color(glow.lerp(Color(1.0, 0.8, 0.4), 0.6), 0.75))
+				_line(1, Vector2(x0 + (span if side < 0.0 else 0.0), hy + 9), Vector2(x0 + (span - 26.0 if side < 0.0 else 26.0), hy + 46), 4.0, wood.darkened(0.2))
+				anims.append({"type": "lamp", "layer": 1, "pos": Vector2(x0 + (span - 8.0 if side < 0.0 else 8.0), hy + 20), "col": Color(1.0, 0.85, 0.5), "r": 38.0})
+	if age == 6:
+		# Runes glowing in the bark.
+		for k in 5:
+			var rx := x + rng.randf_range(-w * 0.35, w * 0.35)
+			var ry := rng.randf_range(160, 620)
+			anims.append({"type": "rune", "layer": 1, "pts": PackedVector2Array([Vector2(rx, ry), Vector2(rx + 10, ry - 22), Vector2(rx + 20, ry), Vector2(rx + 30, ry - 22)]), "col": glow})
+
 
 func _forest() -> void:
 	var p := palette
 	var leaf: Color = p.leaf
 	var glow: Color = p.light
+	var bark: Color = p.near
+	var trunks := [-620.0, 1215.0]
 	_ridge(0, 600 if age != 6 else 640, 50, 280, _haze(p.far, 0.4), 4)
 	if age == 2:
 		# River glinting between the hills.
 		_rect(0, Rect2(X0, 640, X1 - X0, 40), _haze(Color("6ab0d8"), 0.2))
 		anims.append({"type": "shimmer", "layer": 0, "col": Color(1, 1, 1, 0.22)})
-	# Distant canopy line.
+	# The far crown of the world tree, hazy, hanging over everything.
+	var far_leaf := _haze(leaf, 0.5).darkened(0.05)
+	_crown(0, 400.0, 60.0, far_leaf, 95.0, 1.3)
+	# Distant canopy line and forest floor.
 	var far_canopy := _haze(p.mid, 0.35)
 	for x: float in _xs(60, 20):
 		var r := rng.randf_range(34, 60)
 		_add(1, {"poly": _blob(Vector2(x, 650 - r * 0.4), Vector2(r, r * 0.8), 10), "col": far_canopy.darkened(rng.randf() * 0.08)})
 	_rect(1, Rect2(X0, 650, X1 - X0, 110), far_canopy.darkened(0.1))
+	# The far forest rises in hazy tiers toward the crown: distant giants, then banks of foliage.
+	for x: float in _xs(190, 70):
+		var tw := rng.randf_range(10, 20)
+		_add(0, {"poly": PackedVector2Array([Vector2(x - tw, 660), Vector2(x - tw * 0.6, 300), Vector2(x + tw * 0.6, 300), Vector2(x + tw, 660)]), "col": _haze(bark, 0.55)})
+	for row in 3:
+		var yb := 610.0 - row * 60.0
+		for x: float in _xs(72, 30):
+			var r := rng.randf_range(44, 84)
+			_add(1, {"poly": _blob(Vector2(x, yb), Vector2(r, r * 0.55), 11), "col": _haze(p.mid, 0.5 + row * 0.06).darkened(rng.randf() * 0.1)})
 	if age == 4 or age == 5:
-		# White elven towers rising above the canopy.
+		# White elven towers rising through the trees toward the crown.
 		for x: float in _xs(900, 260):
-			var h := rng.randf_range(200, 300)
+			if absf(x - trunks[0]) < 420.0 or absf(x - trunks[1]) < 420.0:
+				continue
+			var h := rng.randf_range(300, 420)
 			var tc := _haze(Color("e8e4dc"), 0.3 if age == 4 else 0.45)
 			_rect(1, Rect2(x - 9, 650 - h, 18, h), tc)
 			_add(1, {"poly": PackedVector2Array([Vector2(x - 16, 650 - h), Vector2(x, 650 - h - 70), Vector2(x + 16, 650 - h), Vector2(x, 650 - h + 10)]), "col": tc.lerp(leaf, 0.3)})
@@ -497,31 +972,38 @@ func _forest() -> void:
 				_glow(1, Vector2(x, 650 - h - 20), 20.0, glow)
 	if age == 6:
 		for x: float in _xs(700, 200):
-			var y := rng.randf_range(360, 520)
+			var y := rng.randf_range(330, 520)
 			_add(1, {"poly": PackedVector2Array([Vector2(x, y - 24), Vector2(x + 8, y), Vector2(x, y + 24), Vector2(x - 8, y)]), "col": Color(glow, 0.8)})
 			_glow(1, Vector2(x, y), 34.0, glow)
-	# Mid trunks and canopies.
+	# The world tree itself: colossal trunks behind each base, their limbs lost in the crown.
+	for tx: float in trunks:
+		_world_trunk(tx, 430.0)
+	_mist(1, 470, 700, _haze(p.sky[1], 0.2), 0.25)
+	# Mid forest: trunks climbing into the crown, leafy clumps on their branches.
 	_ridge(2, 736, 12, 200, p.mid.darkened(0.12), 2)
-	var bark: Color = p.near
 	for x: float in _xs(300 if age != 3 else 380, 100):
-		var w := rng.randf_range(16, 28) * (1.6 if age == 3 else 1.0)
+		var w := rng.randf_range(16, 28) * (1.7 if age == 3 else 1.0)
 		var tc := _haze(bark, 0.25)
 		if age == 2:
 			tc = _haze(Color("e8e4d8"), 0.15)
-		_add(2, {"poly": PackedVector2Array([Vector2(x - w * 0.9, 740), Vector2(x - w * 0.5, 700), Vector2(x - w * 0.45, 260), Vector2(x + w * 0.45, 260), Vector2(x + w * 0.5, 700), Vector2(x + w * 0.9, 740)]), "col": tc})
+		_add(2, {"poly": PackedVector2Array([Vector2(x - w * 0.9, 740), Vector2(x - w * 0.5, 700), Vector2(x - w * 0.45, -40), Vector2(x + w * 0.45, -40), Vector2(x + w * 0.5, 700), Vector2(x + w * 0.9, 740)]), "col": tc})
+		_add(2, {"poly": PackedVector2Array([Vector2(x + w * 0.1, 720), Vector2(x + w * 0.1, -40), Vector2(x + w * 0.45, -40), Vector2(x + w * 0.5, 700), Vector2(x + w * 0.9, 740)]), "col": tc.darkened(0.12)})
 		if age == 2:
-			for k in 6:
-				_line(2, Vector2(x - w * 0.4, 300 + k * 70 + rng.randf() * 20), Vector2(x + w * 0.1, 300 + k * 70 + rng.randf() * 20), 2, Color(0.2, 0.2, 0.2, 0.6))
+			for k in 9:
+				_line(2, Vector2(x - w * 0.4, 260 + k * 52 + rng.randf() * 20), Vector2(x + w * 0.1, 260 + k * 52 + rng.randf() * 20), 2, Color(0.2, 0.2, 0.2, 0.6))
 		var lc := _haze(leaf, 0.2)
-		for k in 4:
-			_add(2, {"poly": _blob(Vector2(x + rng.randf_range(-70, 70), rng.randf_range(160, 330)), Vector2(rng.randf_range(60, 100), rng.randf_range(40, 60)), 12), "col": lc.darkened(rng.randf() * 0.12)})
+		for k in 3:
+			var by := rng.randf_range(300, 620)
+			var dir := -1.0 if rng.randf() < 0.5 else 1.0
+			_limb(2, Vector2(x, by), Vector2(x + dir * 30, by - 24), Vector2(x + dir * 76, by - 34), w * 0.45, 4.0, tc.darkened(0.08))
+			_leaf_clump(2, Vector2(x + dir * 80, by - 38), Vector2(rng.randf_range(44, 66), rng.randf_range(26, 38)), lc)
 		if age == 6:
 			for k in 3:
-				_glow(2, Vector2(x + rng.randf_range(-60, 60), rng.randf_range(200, 320)), 18.0, glow)
+				_glow(2, Vector2(x + rng.randf_range(-60, 60), rng.randf_range(220, 420)), 18.0, glow)
 	# Tree-halls on the giant trunks (Iron onward): platforms, rails and lanterns.
 	if age >= 3:
 		for x: float in _xs(760, 200):
-			var y := rng.randf_range(460, 600)
+			var y := rng.randf_range(430, 600)
 			var wood := _haze(Color("7a5a3a"), 0.2)
 			_rect(2, Rect2(x - 60, y, 120, 8), wood)
 			_line(2, Vector2(x - 60, y + 8), Vector2(x - 30, y + 40), 3, wood.darkened(0.2))
@@ -530,18 +1012,28 @@ func _forest() -> void:
 			_add(2, {"poly": PackedVector2Array([Vector2(x - 50, y - 34), Vector2(x, y - 64), Vector2(x + 50, y - 34)]), "col": _haze(leaf, 0.15).darkened(0.1)})
 			_rect(2, Rect2(x - 8, y - 24, 16, 24), Color(glow.lerp(Color(1.0, 0.8, 0.4), 0.6), 0.7))
 			anims.append({"type": "lamp", "layer": 2, "pos": Vector2(x + 44, y + 16), "col": Color(1.0, 0.85, 0.5), "r": 40.0})
+			# A rope walkway with hanging lanterns running off to the next trunk.
+			var bridge := PackedVector2Array()
+			for k in 9:
+				var u := k / 8.0
+				bridge.append(Vector2(x + 60 + u * 190.0, y + 4 + sin(u * PI) * 16.0))
+			_add(2, {"polyline": bridge, "w": 3.0, "col": wood.darkened(0.15)})
+			anims.append({"type": "lamp", "layer": 2, "pos": Vector2(x + 155, y + 24), "col": Color(1.0, 0.85, 0.5), "r": 30.0})
 	if age == 5:
 		for x: float in _xs(500, 160):
 			anims.append({"type": "drift_smoke", "layer": 2, "pos": Vector2(x, 700), "col": Color(0.85, 0.95, 1.0, 0.25)})
-	# Near: mossy trunks, roots, standing stones, undergrowth.
+	_mist(2, 560, 750, _haze(p.sky[1], 0.15), 0.3)
+	# Near: shafts of light, mossy trunks framing the lane, then the near crown with hanging vines.
+	_shafts(3, glow.lerp(Color.WHITE, 0.3), 620.0, 190.0)
 	for x: float in _xs(560, 180):
 		var w := rng.randf_range(30, 46)
 		var nc := bark.darkened(0.15)
-		_add(3, {"poly": PackedVector2Array([Vector2(x - w * 1.3, 754), Vector2(x - w * 0.55, 720), Vector2(x - w * 0.5, 120), Vector2(x + w * 0.5, 120), Vector2(x + w * 0.6, 720), Vector2(x + w * 1.4, 754)]), "col": nc})
-		_line(3, Vector2(x - w * 0.2, 700), Vector2(x - w * 0.25, 200), 2, nc.darkened(0.2))
+		_add(3, {"poly": PackedVector2Array([Vector2(x - w * 1.3, 754), Vector2(x - w * 0.55, 720), Vector2(x - w * 0.5, -60), Vector2(x + w * 0.5, -60), Vector2(x + w * 0.6, 720), Vector2(x + w * 1.4, 754)]), "col": nc})
+		_line(3, Vector2(x - w * 0.2, 700), Vector2(x - w * 0.25, 60), 2, nc.darkened(0.2))
+		_line(3, Vector2(x + w * 0.2, 700), Vector2(x + w * 0.16, 80), 3, nc.darkened(0.25))
 		_add(3, {"poly": _blob(Vector2(x - w * 0.3, 690), Vector2(w * 0.35, 14), 8), "col": leaf.darkened(0.2)})
 		for k in 2:
-			_add(3, {"poly": _blob(Vector2(x + rng.randf_range(-90, 90), rng.randf_range(40, 130)), Vector2(rng.randf_range(90, 140), rng.randf_range(50, 70)), 12), "col": leaf.darkened(0.25 + rng.randf() * 0.1)})
+			_leaf_clump(3, Vector2(x + rng.randf_range(-70, 70), rng.randf_range(300, 560)), Vector2(rng.randf_range(56, 86), rng.randf_range(26, 40)), leaf.darkened(0.32))
 	if age == 2:
 		for x: float in _xs(900, 200):
 			for k in 3:
@@ -550,6 +1042,20 @@ func _forest() -> void:
 				_add(3, {"poly": PackedVector2Array([Vector2(sx - 9, 752), Vector2(sx - 7, 752 - sh), Vector2(sx + 2, 752 - sh - 6), Vector2(sx + 9, 752 - sh + 4), Vector2(sx + 9, 752)]), "col": Color("8a8a80")})
 	for x: float in _xs(160, 60):
 		_fern(3, x, 752, rng.randf_range(0.7, 1.1), leaf.darkened(0.15))
+	var near_leaf := leaf.darkened(0.34)
+	var ph := _crown(3, 140.0, 50.0, near_leaf, 100.0, 1.35)
+	_vines(3, 140.0, 50.0, ph, near_leaf.lightened(0.06), 80.0)
+	if age == 2:
+		# Blossom in the crown.
+		for x: float in _xs(70, 40):
+			_circle(3, Vector2(x, rng.randf_range(20, 170)), rng.randf_range(2.0, 4.0), Color("f7d6e4"))
+	if age >= 3:
+		# Lanterns and glowing fruit hanging in the crown.
+		for x: float in _xs(430, 160):
+			var y := _crown_edge(x, 140.0, 50.0, ph) + rng.randf_range(20, 90)
+			_line(3, Vector2(x, y - 40), Vector2(x, y), 1.5, near_leaf.lightened(0.1))
+			_circle(3, Vector2(x, y + 5), 6.0, Color(glow.lerp(Color(1.0, 0.85, 0.5), 0.6), 0.95))
+			anims.append({"type": "lamp", "layer": 3, "pos": Vector2(x, y + 5), "col": Color(1.0, 0.85, 0.5) if age != 6 else glow, "r": 34.0})
 
 
 func _fern(layer: int, x: float, y: float, s: float, col: Color) -> void:
@@ -560,50 +1066,193 @@ func _fern(layer: int, x: float, y: float, s: float, col: Color) -> void:
 
 
 # ---------------------------------------------------------------------------
-# Dwarves: mountains through the ages
+# Dwarves: mountains and mines through the ages
+
+## A massif: a jagged flank up to a summit, split by a ridge into a lit and a shadowed face, snow above a ragged line
+## (`snow_frac` of the height, 0 = bare). Returns the summit.
+func _massif(layer: int, x: float, base_y: float, w: float, h: float, col: Color, snow: Color, snow_frac: float) -> Vector2:
+	var s := Vector2(x + rng.randf_range(-w * 0.08, w * 0.08), base_y - h)
+	var fl := Vector2(x - w, base_y)
+	var fr := Vector2(x + w, base_y)
+	var left := PackedVector2Array([fl])
+	for i in range(1, 6):
+		var t := i / 6.0
+		var q := fl.lerp(s, t)
+		q += Vector2(rng.randf_range(-w * 0.05, w * 0.05) - (w * 0.1 * t if i % 2 == 0 else 0.0), -(rng.randf_range(0.0, h * 0.06) if i % 2 == 1 else 0.0))
+		left.append(q)
+	left.append(s)
+	var right := PackedVector2Array()
+	for i in range(5, 0, -1):
+		var t := i / 6.0
+		var q := fr.lerp(s, t)
+		q += Vector2(rng.randf_range(-w * 0.05, w * 0.05) + (w * 0.09 * t if i % 2 == 0 else 0.0), -(rng.randf_range(0.0, h * 0.06) if i % 2 == 1 else 0.0))
+		right.append(q)
+	right.append(fr)
+	var rx := x + w * rng.randf_range(-0.05, 0.25)
+	var ridge := PackedVector2Array([s])
+	for i in range(1, 5):
+		ridge.append(s.lerp(Vector2(rx, base_y), i / 5.0) + Vector2(rng.randf_range(-w * 0.06, w * 0.06), 0.0))
+	ridge.append(Vector2(rx, base_y))
+	var lit := PackedVector2Array(left)
+	for i in range(1, ridge.size()):
+		lit.append(ridge[i])
+	var shade := PackedVector2Array([s])
+	shade.append_array(right)
+	for i in range(ridge.size() - 1, 0, -1):
+		shade.append(ridge[i])
+	_add(layer, {"poly": lit, "col": col.lightened(0.07)})
+	_add(layer, {"poly": shade, "col": col.darkened(0.16)})
+	# Strata: a few ragged bands across the flanks.
+	var sil := left.duplicate()
+	sil.append_array(right)
+	for k in 4:
+		var y := base_y - h * (0.18 + k * 0.17)
+		var line := PackedVector2Array()
+		for j in 8:
+			line.append(Vector2(x - w * 0.8 + j * w * 0.23, y + rng.randf_range(-7, 7)))
+		for piece in Geometry2D.intersect_polyline_with_polygon(line, sil):
+			_add(layer, {"polyline": piece, "w": 1.4, "col": Color(0, 0, 0, 0.1)})
+	if snow.a > 0.0 and snow_frac > 0.0:
+		var line_y := base_y - h * (1.0 - snow_frac)
+		var region := PackedVector2Array([Vector2(x - w * 1.4, base_y - h * 1.6), Vector2(x + w * 1.4, base_y - h * 1.6)])
+		for k in 13:
+			region.append(Vector2(x + w * 1.4 - k * (w * 2.8 / 12.0), line_y + rng.randf_range(-16, 26)))
+		for poly in Geometry2D.intersect_polygons(lit, region):
+			_add(layer, {"poly": poly, "col": snow})
+		for poly in Geometry2D.intersect_polygons(shade, region):
+			_add(layer, {"poly": poly, "col": snow.darkened(0.12).lerp(Color("9fb0cc"), 0.3)})
+	return s
+
+
+## A mine mouth in a hillside: a dark adit framed by timber posts and a lintel with a lantern, a spoil heap, and a track
+## running off down the slope with an ore cart on it.
+func _mine(layer: int, x: float, y: float, s: float, timber: Color, lamp: Color, cart_speed := 26.0) -> void:
+	_tri(layer, Vector2(x + 16 * s, y), Vector2(x + 76 * s, y), Vector2(x + 46 * s, y - 24 * s), Color("5a5650"))
+	_add(layer, {"poly": PackedVector2Array([Vector2(x - 20 * s, y), Vector2(x - 17 * s, y - 40 * s), Vector2(x + 17 * s, y - 40 * s), Vector2(x + 20 * s, y)]), "col": Color(0.05, 0.04, 0.04)})
+	_rect(layer, Rect2(x - 26 * s, y - 46 * s, 8 * s, 46 * s), timber)
+	_rect(layer, Rect2(x + 18 * s, y - 46 * s, 8 * s, 46 * s), timber)
+	_rect(layer, Rect2(x - 30 * s, y - 53 * s, 60 * s, 8 * s), timber.lightened(0.06))
+	_glow(layer, Vector2(x, y - 30 * s), 30.0 * s, lamp)
+	anims.append({"type": "lamp", "layer": layer, "pos": Vector2(x, y - 30 * s), "col": lamp, "r": 34.0 * s})
+	# The track: two rails and sleepers, down to the right.
+	var a := Vector2(x + 6 * s, y - 2.0)
+	var b := Vector2(x + 260 * s, y + 20.0 * s)
+	_add(layer, {"polyline": PackedVector2Array([a, b]), "w": 2.5, "col": Color("3a3632")})
+	for k in 18:
+		var u := (k + 0.5) / 18.0
+		var c := a.lerp(b, u)
+		_line(layer, c + Vector2(0, -3), c + Vector2(0, 3), 2.0, timber.darkened(0.3))
+	anims.append({"type": "cart", "layer": layer, "pts": PackedVector2Array([a + Vector2(0, -7), b + Vector2(0, -7)]), "speed": cart_speed, "phase": rng.randf(), "col": timber.darkened(0.15)})
+
+
+## A headframe over a shaft: an A-frame of timbers carrying a winding wheel, and a shed at its foot.
+func _headframe(layer: int, x: float, y: float, s: float, col: Color) -> void:
+	_add(layer, {"polyline": PackedVector2Array([Vector2(x - 26 * s, y), Vector2(x, y - 96 * s), Vector2(x + 26 * s, y)]), "w": 5.0 * s, "col": col})
+	_line(layer, Vector2(x - 15 * s, y - 40 * s), Vector2(x + 15 * s, y - 40 * s), 3.0 * s, col)
+	_line(layer, Vector2(x - 8 * s, y - 68 * s), Vector2(x + 8 * s, y - 68 * s), 3.0 * s, col)
+	_rect(layer, Rect2(x + 26 * s, y - 24 * s, 34 * s, 24 * s), col.lightened(0.05))
+	_tri(layer, Vector2(x + 22 * s, y - 24 * s), Vector2(x + 64 * s, y - 24 * s), Vector2(x + 43 * s, y - 38 * s), col.darkened(0.1))
+	anims.append({"type": "wheel", "layer": layer, "pos": Vector2(x, y - 98 * s), "r": 14.0 * s, "col": col.lightened(0.1)})
+
+
+## A cableway between two pylons with a bucket riding it.
+func _cableway(layer: int, a: Vector2, b: Vector2, col: Color) -> void:
+	for pt: Vector2 in [a, b]:
+		_add(layer, {"polyline": PackedVector2Array([Vector2(pt.x - 10, pt.y + 60), Vector2(pt.x, pt.y), Vector2(pt.x + 10, pt.y + 60)]), "w": 4.0, "col": col})
+	var mid := a.lerp(b, 0.5) + Vector2(0, 26)
+	_add(layer, {"polyline": PackedVector2Array([a, mid, b]), "w": 1.6, "col": col.darkened(0.2)})
+	anims.append({"type": "bucket", "layer": layer, "a": a, "b": b, "sag": 26.0, "speed": 0.05, "phase": rng.randf(), "col": col})
+
+
+## A waterfall spilling from a ledge, in pale streaks that run down.
+func _waterfall(layer: int, x: float, top: float, length: float) -> void:
+	_add(layer, {"poly": PackedVector2Array([Vector2(x - 7, top), Vector2(x + 7, top), Vector2(x + 12, top + length), Vector2(x - 12, top + length)]), "cols": PackedColorArray([Color(0.85, 0.93, 1.0, 0.55), Color(0.85, 0.93, 1.0, 0.55), Color(0.85, 0.93, 1.0, 0.1), Color(0.85, 0.93, 1.0, 0.1)])})
+	anims.append({"type": "fall", "layer": layer, "top": Vector2(x, top), "length": length})
+
+
+## A great gate carved into a mountain foot: a heavy stone frame with a dark hall behind, steps, braziers, two guardian
+## statues.
+func _carved_gate(layer: int, x: float, y: float, s: float, col: Color) -> void:
+	var c := col.lightened(0.08)
+	_add(layer, {"poly": PackedVector2Array([Vector2(x - 120 * s, y), Vector2(x - 104 * s, y - 190 * s), Vector2(x + 104 * s, y - 190 * s), Vector2(x + 120 * s, y)]), "col": c})
+	_add(layer, {"poly": PackedVector2Array([Vector2(x - 54 * s, y), Vector2(x - 46 * s, y - 132 * s), Vector2(x + 46 * s, y - 132 * s), Vector2(x + 54 * s, y)]), "col": Color(0.04, 0.035, 0.035)})
+	_rect(layer, Rect2(x - 64 * s, y - 146 * s, 128 * s, 16 * s), c.darkened(0.12))
+	for k in 5:
+		_rect(layer, Rect2(x - 80 * s + k * 40 * s, y - 182 * s, 14 * s, 12 * s), c.darkened(0.06))
+	for side in [-1.0, 1.0]:
+		# A guardian either side, a brazier at its foot.
+		var gx: float = x + side * 84.0 * s
+		_add(layer, {"poly": PackedVector2Array([Vector2(gx - 14 * s, y), Vector2(gx - 12 * s, y - 100 * s), Vector2(gx + 12 * s, y - 100 * s), Vector2(gx + 14 * s, y)]), "col": c.darkened(0.1)})
+		_add(layer, {"poly": _blob(Vector2(gx, y - 116 * s), Vector2(12 * s, 13 * s), 9), "col": c.lightened(0.05)})
+		_add(layer, {"poly": PackedVector2Array([Vector2(gx - 12 * s, y - 118 * s), Vector2(gx, y - 132 * s), Vector2(gx + 12 * s, y - 118 * s)]), "col": c.darkened(0.2)})
+		_line(layer, Vector2(gx + side * 16 * s, y - 40 * s), Vector2(gx + side * 16 * s, y - 130 * s), 3.0 * s, c.darkened(0.3))
+		_rect(layer, Rect2(gx - side * 34 * s - 6 * s, y - 36 * s, 12 * s, 36 * s), c.darkened(0.3))
+		_circle(layer, Vector2(gx - side * 34 * s, y - 40 * s), 7 * s, Color("ffb050"))
+		anims.append({"type": "lamp", "layer": layer, "pos": Vector2(gx - side * 34 * s, y - 44 * s), "col": Color("ffb050"), "r": 60.0 * s})
+	for k in 3:
+		_rect(layer, Rect2(x - (66 + k * 8) * s, y - (6 - k * 2) * s - 2, (132 + k * 16) * s, 6 * s), c.darkened(0.05 * k))
+
 
 func _mountains() -> void:
 	var p := palette
 	var glow: Color = p.light
-	var snow := age in [1, 3]
-	# Far peaks with snowcaps.
-	for x: float in _xs(360, 140):
-		var h := rng.randf_range(220, 380)
-		var w := rng.randf_range(200, 320)
-		var col := _haze(p.far, 0.3)
-		_add(0, {"poly": PackedVector2Array([Vector2(x - w, 700), Vector2(x - w * 0.2, 700 - h + 20), Vector2(x, 700 - h), Vector2(x + w * 0.3, 700 - h + 30), Vector2(x + w, 700)]), "col": col})
-		if snow or age == 6:
-			var sc := Color("eef2f6") if age != 6 else _haze(Color("4a4a70"), 0.2)
-			_add(0, {"poly": PackedVector2Array([Vector2(x - w * 0.22, 700 - h + 50), Vector2(x - w * 0.2, 700 - h + 20), Vector2(x, 700 - h), Vector2(x + w * 0.3, 700 - h + 30), Vector2(x + w * 0.32, 700 - h + 58), Vector2(x + w * 0.05, 700 - h + 44)]), "col": sc})
-	# Mid cliffs.
-	_ridge(1, 640 if age != 2 else 610, 70, 220, _haze(p.mid, 0.15), 24, 24)
+	var snow := Color("eef2f6") if age in [1, 3] else (Color("6a6a9a") if age == 6 else Color(0, 0, 0, 0))
+	var timber := Color("6b4a2b") if age <= 3 else Color("4a3a30")
+	var lamp := Color("ffb050") if age != 6 else glow
+	# Far ranges: colossal massifs under bands of cloud.
+	for x: float in _xs(520, 170):
+		_massif(0, x, 720, rng.randf_range(260, 380), rng.randf_range(470, 640), _haze(p.far, 0.4), snow, 0.4)
+	_mist(0, 300, 520, _haze(p.sky[1], 0.1), 0.3)
+	for x: float in _xs(400, 130):
+		_massif(0, x, 720, rng.randf_range(190, 290), rng.randf_range(300, 440), _haze(p.far, 0.24), snow, 0.32)
+	# Mid range: the mountains the mines are cut into.
+	var mids: Array = []
+	for x: float in _xs(620, 200):
+		var w := rng.randf_range(250, 360)
+		var h := rng.randf_range(250, 360)
+		_massif(1, x, 700, w, h, _haze(p.mid, 0.15), snow, 0.22)
+		mids.append([x, w, h])
+	if age == 2:
+		# The canyon: guardians carved into its walls, helmed, bearded, leaning on great axes.
+		for x: float in _xs(1300, 300):
+			var c := _haze(p.mid.lightened(0.15), 0.1)
+			_rect(1, Rect2(x - 56, 640, 112, 24), c.darkened(0.1))
+			_add(1, {"poly": PackedVector2Array([Vector2(x - 40, 640), Vector2(x - 52, 520), Vector2(x - 30, 490), Vector2(x + 30, 490), Vector2(x + 52, 520), Vector2(x + 40, 640)]), "col": c})
+			_add(1, {"poly": _blob(Vector2(x, 468), Vector2(24, 24), 12), "col": c.lightened(0.04)})
+			_add(1, {"poly": PackedVector2Array([Vector2(x - 26, 462), Vector2(x - 22, 440), Vector2(x, 430), Vector2(x + 22, 440), Vector2(x + 26, 462)]), "col": c.darkened(0.18)})
+			_add(1, {"poly": PackedVector2Array([Vector2(x - 22, 474), Vector2(x + 22, 474), Vector2(x + 10, 560), Vector2(x, 574), Vector2(x - 10, 560)]), "col": c.darkened(0.08)})
+			_line(1, Vector2(x, 500), Vector2(x, 650), 6, c.darkened(0.25))
+			_add(1, {"poly": PackedVector2Array([Vector2(x - 4, 504), Vector2(x - 34, 490), Vector2(x - 38, 530), Vector2(x - 4, 520)]), "col": c.darkened(0.14)})
+			_add(1, {"poly": PackedVector2Array([Vector2(x + 4, 504), Vector2(x + 34, 490), Vector2(x + 38, 530), Vector2(x + 4, 520)]), "col": c.darkened(0.2)})
+	# Mines: an adit with a track and cart at the foot of most massifs, headframes and cableways between them.
+	for i in mids.size():
+		var m: Array = mids[i]
+		var mx: float = m[0] + (m[1] * 0.28 if i % 2 == 0 else -m[1] * 0.42)
+		var low_y := 700.0 - rng.randf_range(0.0, 24.0)
+		_mine(1, mx, low_y, rng.randf_range(1.35, 1.75), timber, lamp, rng.randf_range(20.0, 36.0))
+		# A second adit higher up the mountain, joined to the first by a zigzag mule path with lanterns.
+		var high := Vector2(m[0] + (-m[1] * 0.12 if i % 2 == 0 else m[1] * 0.2), 700.0 - m[2] * 0.36)
+		var path := PackedVector2Array([high + Vector2(30, 0)])
+		for k in 5:
+			path.append(Vector2(high.x + 30.0 + (110.0 if k % 2 == 0 else -20.0), high.y + (low_y - high.y) * (k + 1) / 5.0))
+		_add(1, {"polyline": path, "w": 3.5, "col": Color("8a7a60", 0.75)})
+		for k in 3:
+			var lp: Vector2 = path[1 + k * 2 if 1 + k * 2 < path.size() else path.size() - 1]
+			_circle(1, lp + Vector2(0, -8), 3.0, lamp)
+			anims.append({"type": "lamp", "layer": 1, "pos": lp + Vector2(0, -8), "col": lamp, "r": 24.0})
+		_mine(1, high.x, high.y, rng.randf_range(1.0, 1.3), timber, lamp, rng.randf_range(14.0, 24.0))
+		if i % 3 == 1:
+			_headframe(1, m[0] + m[1] * 0.55, 700.0, rng.randf_range(1.3, 1.7), timber.lightened(0.05))
+		if i % 2 == 0 and i + 1 < mids.size():
+			var n: Array = mids[i + 1]
+			_cableway(1, Vector2(m[0] + m[1] * 0.2, 700.0 - m[2] * 0.55), Vector2(n[0] - n[1] * 0.2, 700.0 - n[2] * 0.42), timber.lightened(0.1))
+		if age <= 4 and i % 2 == 1:
+			_waterfall(1, m[0] - m[1] * 0.15, 700.0 - m[2] * 0.5, m[2] * 0.5)
 	match age:
-		2:
-			# Guardians carved into the canyon walls: helmed, bearded, leaning on great axes.
-			for x: float in _xs(1300, 300):
-				var c := _haze(p.mid.lightened(0.15), 0.1)
-				_rect(1, Rect2(x - 56, 640, 112, 24), c.darkened(0.1))
-				_add(1, {"poly": PackedVector2Array([Vector2(x - 40, 640), Vector2(x - 52, 520), Vector2(x - 30, 490), Vector2(x + 30, 490), Vector2(x + 52, 520), Vector2(x + 40, 640)]), "col": c})
-				_add(1, {"poly": _blob(Vector2(x, 468), Vector2(24, 24), 12), "col": c.lightened(0.04)})
-				_add(1, {"poly": PackedVector2Array([Vector2(x - 26, 462), Vector2(x - 22, 440), Vector2(x, 430), Vector2(x + 22, 440), Vector2(x + 26, 462)]), "col": c.darkened(0.18)})
-				_add(1, {"poly": PackedVector2Array([Vector2(x - 22, 474), Vector2(x + 22, 474), Vector2(x + 10, 560), Vector2(x, 574), Vector2(x - 10, 560)]), "col": c.darkened(0.08)})
-				_line(1, Vector2(x, 500), Vector2(x, 650), 6, c.darkened(0.25))
-				_add(1, {"poly": PackedVector2Array([Vector2(x - 4, 504), Vector2(x - 34, 490), Vector2(x - 38, 530), Vector2(x - 4, 520)]), "col": c.darkened(0.14)})
-				_add(1, {"poly": PackedVector2Array([Vector2(x + 4, 504), Vector2(x + 34, 490), Vector2(x + 38, 530), Vector2(x + 4, 520)]), "col": c.darkened(0.2)})
 		3:
-			# Great gates carved into the mountain, braziers either side.
-			for x: float in _xs(1400, 300):
-				var c := _haze(p.mid.lightened(0.08), 0.12)
-				_rect(1, Rect2(x - 110, 470, 220, 190), c)
-				_add(1, {"poly": PackedVector2Array([Vector2(x - 120, 470), Vector2(x + 120, 470), Vector2(x + 80, 420), Vector2(x - 80, 420)]), "col": c.darkened(0.08)})
-				_rect(1, Rect2(x - 50, 540, 100, 120), c.darkened(0.45))
-				_line(1, Vector2(x, 540), Vector2(x, 660), 3, c.darkened(0.25))
-				for k in 4:
-					_line(1, Vector2(x - 90 + k * 60, 480), Vector2(x - 90 + k * 60, 660), 2, c.darkened(0.15))
-				for bx in [x - 80, x + 80]:
-					_rect(1, Rect2(bx - 6, 610, 12, 50), c.darkened(0.3))
-					_circle(1, Vector2(bx, 606), 7, Color("ffb050"))
-					anims.append({"type": "lamp", "layer": 1, "pos": Vector2(bx, 600), "col": Color("ffb050"), "r": 60.0})
+			# Great gates carved into the mountain feet, braziers and guardians either side.
+			for x: float in _xs(1500, 300):
+				_carved_gate(1, x, 700.0, 1.0, _haze(p.mid, 0.1))
 		4:
 			# Forge mouths and chimneys glowing in the cliffs.
 			for x: float in _xs(600, 200):
@@ -615,7 +1264,7 @@ func _mountains() -> void:
 		5:
 			_steamworks()
 		6:
-			# Rune lines glowing along the cliff faces; floating runestones.
+			# Rune lines glowing along the cliff faces; floating runestones; veins of light in the rock.
 			for x: float in _xs(420, 140):
 				var y := rng.randf_range(520, 640)
 				var pts := PackedVector2Array([Vector2(x, y), Vector2(x + 12, y - 18), Vector2(x + 24, y), Vector2(x + 36, y - 18)])
@@ -625,23 +1274,48 @@ func _mountains() -> void:
 				_add(1, {"poly": PackedVector2Array([Vector2(x - 12, y + 20), Vector2(x - 14, y - 16), Vector2(x, y - 26), Vector2(x + 14, y - 14), Vector2(x + 12, y + 22)]), "col": _haze(p.mid.lightened(0.1), 0.1)})
 				anims.append({"type": "rune", "layer": 1, "pts": PackedVector2Array([Vector2(x - 5, y - 8), Vector2(x, y + 4), Vector2(x + 5, y - 8)]), "col": glow})
 				_glow(1, Vector2(x, y), 30.0, glow)
+	# Foothills with a long mine railway along them, ore carts running, spoil heaps and timber scaffolds.
 	_ridge(2, 722, 22, 180, p.near.lightened(0.08), 8, 26)
-	# Near: pines (highlands and snow), boulders, cairns.
+	_add(2, {"polyline": PackedVector2Array([Vector2(X0, 734), Vector2(X1, 734)]), "w": 3.0, "col": Color("2e2a28")})
+	var sx := X0
+	while sx < X1:
+		_line(2, Vector2(sx, 731), Vector2(sx, 738), 2.0, timber.darkened(0.25))
+		sx += 22.0
+	for x: float in _xs(820, 260):
+		anims.append({"type": "cart", "layer": 2, "pts": PackedVector2Array([Vector2(x, 728), Vector2(x + 600, 728)]), "speed": rng.randf_range(32.0, 52.0), "phase": rng.randf(), "col": timber.darkened(0.1)})
+	for x: float in _xs(700, 220):
+		var sh := rng.randf_range(30, 60)
+		_tri(2, Vector2(x - sh * 1.6, 736), Vector2(x + sh * 1.6, 736), Vector2(x + rng.randf_range(-10, 10), 736 - sh), Color("4a4640"))
+	for x: float in _xs(1100, 300):
+		# A timber scaffold with a hoist.
+		for k in 3:
+			_line(2, Vector2(x + k * 22, 736), Vector2(x + k * 22, 690), 3.0, timber)
+		_line(2, Vector2(x, 690), Vector2(x + 44, 690), 3.0, timber)
+		_line(2, Vector2(x, 736), Vector2(x + 44, 690), 2.0, timber.darkened(0.1))
+		_line(2, Vector2(x + 44, 690), Vector2(x + 44, 716), 1.5, Color("b0a890"))
+	# Near: pines (highlands and snow), boulders, cairns, and the tools of the trade.
 	if age in [1, 3]:
 		for x: float in _xs(240, 90):
 			_pine(3, x, 752, rng.randf_range(0.9, 1.4), Color("2e4a38") if age == 1 else Color("30443c"), age == 3)
 	for x: float in _xs(420, 140):
-		var s := rng.randf_range(16, 30)
-		_add(3, {"poly": _blob(Vector2(x, 752 - s * 0.5), Vector2(s * 1.4, s), 9), "col": p.near.lightened(0.05)})
+		var s2 := rng.randf_range(16, 30)
+		_add(3, {"poly": _blob(Vector2(x, 752 - s2 * 0.5), Vector2(s2 * 1.4, s2), 9), "col": p.near.lightened(0.05)})
+	for x: float in _xs(900, 260):
+		# A pile of ore and a barrow.
+		for k in 5:
+			_add(3, {"poly": _blob(Vector2(x + k * 9 - 18, 748 - (k % 2) * 6), Vector2(9, 7), 8), "col": Color("3e3a3a").lightened(0.04 * k)})
+		_rect(3, Rect2(x + 30, 736, 20, 10), timber)
+		_circle(3, Vector2(x + 36, 750), 5, Color("2a2826"))
+		_line(3, Vector2(x + 50, 738), Vector2(x + 68, 730), 3.0, timber.darkened(0.2))
 	if age <= 2:
 		for x: float in _xs(900, 200):
 			for k in 4:
-				_add(3, {"poly": _blob(Vector2(x, 746 - k * 12), Vector2(12 - k * 2, 6), 8), "col": Color("8a8478").darkened(0.05 * k)})
+				_add(3, {"poly": _blob(Vector2(x + 300, 746 - k * 12), Vector2(12 - k * 2, 6), 8), "col": Color("8a8478").darkened(0.05 * k)})
 	if age == 4 or age == 6:
 		for x: float in _xs(700, 200):
 			_rect(3, Rect2(x - 5, 712, 10, 40), Color("3a3230"))
-			_circle(3, Vector2(x, 708), 7, Color("ffb050") if age == 4 else glow)
-			anims.append({"type": "lamp", "layer": 3, "pos": Vector2(x, 704), "col": Color("ffb050") if age == 4 else glow, "r": 50.0})
+			_circle(3, Vector2(x, 708), 7, lamp)
+			anims.append({"type": "lamp", "layer": 3, "pos": Vector2(x, 704), "col": lamp, "r": 50.0})
 
 
 func _steamworks() -> void:

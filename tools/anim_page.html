@@ -1,0 +1,86 @@
+<title>Timefront Unit Motion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Alegreya+Sans:wght@400;500;700&display=swap">
+<style>
+:root {
+  --ground: #eef1f5;
+  --ink: #1b2230;
+  --muted: #5b6576;
+  --accent: #3a78d8;
+  --well: #dfe4ec;
+  --line: #c9d0db;
+  --chip-on: #1b2230;
+  --chip-on-ink: #eef1f5;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #151a22; --ink: #e6ebf2; --muted: #98a3b5; --accent: #6ea0ec;
+    --well: #222a36; --line: #323c4b; --chip-on: #e6ebf2; --chip-on-ink: #151a22;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #151a22; --ink: #e6ebf2; --muted: #98a3b5; --accent: #6ea0ec;
+  --well: #222a36; --line: #323c4b; --chip-on: #e6ebf2; --chip-on-ink: #151a22;
+  color-scheme: dark;
+}
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font: 16px/1.5 "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+}
+.wrap { max-width: 1400px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 56px; display: grid; gap: 28px; }
+header { display: grid; gap: 8px; }
+h1, h2 { font-family: "Cinzel", Georgia, serif; font-weight: 700; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(1.6rem, 3vw, 2.2rem); letter-spacing: 0.02em; }
+h2 { font-size: 1.25rem; letter-spacing: 0.04em; display: flex; align-items: baseline; gap: 12px; }
+h2 small { font: 500 0.85rem "Alegreya Sans", system-ui, sans-serif; color: var(--muted); letter-spacing: 0; }
+.lede { margin: 0; color: var(--muted); max-width: 70ch; }
+.build { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.9rem; }
+.filters { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 2; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  padding-block: 10px; background: var(--ground); border-bottom: 1px solid var(--line); }
+.filters span { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-right: 4px; }
+.filters button { font: 500 0.95rem "Alegreya Sans", system-ui, sans-serif; color: var(--ink); background: transparent;
+  border: 1px solid var(--line); border-radius: 999px; padding: 4px 14px; cursor: pointer; }
+.filters button[aria-pressed="true"] { background: var(--chip-on); color: var(--chip-on-ink); border-color: var(--chip-on); }
+.filters button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+section { display: grid; gap: 14px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; }
+figure { margin: 0; display: grid; gap: 6px; }
+.well { background: var(--well); border-radius: 6px; padding: 6px; display: grid; gap: 4px; }
+.well img { display: block; width: 100%; height: auto; border-radius: 3px; image-rendering: auto; }
+.legs { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); text-align: center; }
+figcaption { display: flex; justify-content: space-between; gap: 8px; font-size: 0.95rem; }
+figcaption b { font-weight: 700; }
+figcaption em { font-style: normal; color: var(--muted); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .well img { animation: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Timefront Unit Motion</h1>
+    <p class="lede">Every unit in the game, looping. Left: walking. Middle: one full attack (wind-up, strike, recover) followed by a moment at guard. Right: the same attack as the enemy army is drawn (mirrored, facing left). Units of the same age sit side by side so the three races compare directly.</p>
+    <p class="build"><!--BUILD--></p>
+  </header>
+  <nav class="filters" aria-label="Filter by race">
+    <span>Race</span>
+    <button type="button" id="f-all" data-race="all" aria-pressed="true">All</button>
+    <button type="button" id="f-human" data-race="human" aria-pressed="false">Human</button>
+    <button type="button" id="f-elf" data-race="elf" aria-pressed="false">Elf</button>
+    <button type="button" id="f-dwarf" data-race="dwarf" aria-pressed="false">Dwarf</button>
+  </nav>
+<!--UNITS-->
+</div>
+
+<script>
+const buttons = document.querySelectorAll(".filters button");
+function show(race) {
+  buttons.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.race === race)));
+  document.querySelectorAll("figure[data-race]").forEach(f => { f.hidden = race !== "all" && f.dataset.race !== race; });
+  try { localStorage.setItem("race", race); } catch (e) {}
+}
+buttons.forEach(b => b.addEventListener("click", () => show(b.dataset.race)));
+let saved = "all";
+try { saved = localStorage.getItem("race") || "all"; } catch (e) {}
+show(saved);
+</script>

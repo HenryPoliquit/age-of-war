@@ -4,24 +4,35 @@ extends SceneTree
 ## Needs a display (use Xvfb in the cloud):
 ##   xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolution 1920x1080 -s tools/unit_gallery.gd -- --out=reports/unit_gallery.png
 ## `--race=elf` draws that race; `--race=all` draws the three races side by side in colour instead.
+## `--atk=0.45` freezes every unit at that point of its attack (default −1 = idle).
 
 const MODE_SHADER := preload("res://shaders/gallery_mode.gdshader")
 const ROLES := ["vanguard", "ranged", "heavy", "siege"]
 
 var out := "reports/unit_gallery.png"
 var race: StringName = &"human"
+var atk := -1.0
+var vp := SubViewport.new()
 
 
 func _initialize() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--out="):
 			out = a.get_slice("=", 1)
+		elif a.begins_with("--yaw="):
+			UnitArt.view_yaw = deg_to_rad(float(a.get_slice("=", 1)))
 		elif a.begins_with("--race="):
 			race = StringName(a.get_slice("=", 1))
+		elif a.begins_with("--atk="):
+			atk = a.get_slice("=", 1).to_float()
+	# Fixed-size offscreen canvas: the window gets clamped to smaller screens.
+	vp.size = Vector2i(1920, 1080)
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	root.add_child(vp)
 	var bg := ColorRect.new()
 	bg.color = Color("c9c3b4")
 	bg.size = Vector2(1920, 1080)
-	root.add_child(bg)
+	vp.add_child(bg)
 	for mode in 3:
 		var n := Node2D.new()
 		n.position = Vector2(mode * 640, 0)
@@ -30,7 +41,7 @@ func _initialize() -> void:
 		m.set_shader_parameter("mode", 0 if race == &"all" else mode)
 		n.material = m
 		n.draw.connect(_draw_panel.bind(n, mode))
-		root.add_child(n)
+		vp.add_child(n)
 	_capture.call_deferred()
 
 
@@ -49,8 +60,8 @@ func _draw_panel(n: Node2D, mode: int) -> void:
 			if def == null:
 				continue
 			var base := Vector2(94 + c * 152, 56 + age * 160)
-			UnitArt.begin(n, Transform2D(0.0, Vector2(1.15, 1.15), 0.0, base))
-			UnitArt.draw_unit(n, def, MatchView.TEAM[0], {"walk": 0.6, "move": 0.0, "atk": -1.0, "t": 0.3, "flash": 0.0}, age * 4 + c, r)
+			FkPaint.begin(n, Transform2D(0.0, Vector2(1.15, 1.15), 0.0, base))
+			UnitArt.draw_unit(n, def, MatchView.TEAM[0], {"walk": 0.6, "move": 0.0, "atk": atk, "t": 0.3, "flash": 0.0}, age * 4 + c, r)
 			n.draw_set_transform(Vector2.ZERO)
 			if mode == 0 or race == &"all":
 				n.draw_string(f, base + Vector2(-70, 20), rd.unit_name(def), HORIZONTAL_ALIGNMENT_CENTER, 140, 13, Color(0.15, 0.15, 0.15))
@@ -60,6 +71,6 @@ func _capture() -> void:
 	for i in 3:
 		await process_frame
 	await RenderingServer.frame_post_draw
-	root.get_texture().get_image().save_png(out)
+	vp.get_texture().get_image().save_png(out)
 	print("gallery saved: ", out)
 	quit()

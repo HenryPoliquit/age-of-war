@@ -62,6 +62,7 @@ All stats are per-age final values; the ×1.7 cost / ×1.9 HP-damage scaling was
 | D20 | A skill's zone is fixed when it fires (area: densest enemy window by gold value; strip: enemy front unit back toward their base; sweep: whole lane, one slice per pulse, away from the caster) | Auto-aim with a readable telegraph |
 | D21 | Firing a skill with nothing to hit fails and costs nothing | Never burn XP on an empty lane |
 | D22 | Siege upgrades cost `INF` (unavailable) while the age has no Siege unit | Age 1 has three roles |
+| D23 | Unit drawing lives in a self-contained figure kit (`addons/figure_kit/`, `Fk*` classes); `UnitArt` only maps `UnitDef` + race to a kit spec | Owner wants to reuse the units in other games. Spec `docs/superpowers/specs/2026-09-27-unit-skeleton-design.md`, plan `docs/superpowers/plans/2026-09-27-figure-kit-plan-1-extraction.md` |
 
 ## 5. AI (GDD §11.4)
 

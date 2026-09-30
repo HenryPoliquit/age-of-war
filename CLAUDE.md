@@ -27,8 +27,15 @@ timeout 90 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolu
 # Unit gallery (colour / greyscale / silhouette of every unit) for the PRD §11 silhouette check:
 timeout 90 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolution 1920x1080 -s tools/unit_gallery.gd -- --out=reports/unit_gallery.png
 # (--race=elf for one race's three modes; --race=all for the three races side by side.)
-# Base gallery (every race × age base with its turret towers in front; --towers for a close-up of the towers; --night=1 lights the windows):
+# Role review sheet (rows = ages; walk ×4, guard, wind-up, strike, recover) for one race — the skeleton review loop.
+# --yaw=DEG turns the camera toward the side the figures face (the game uses 25, UnitArt.VIEW_YAW_DEG; 0 = square-on); unit_gallery.gd and unit_anim.gd take it too:
+timeout 90 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --rendering-method gl_compatibility --path . --resolution 1920x1080 -s tools/unit_sheet.gd -- --role=vanguard --race=human --out=reports/sheet_vanguard_human.png
+# Walk sheet (eight phases of one stride for an age's vanguard, ranged and heavy unit; --race=human|elf|dwarf --age=1..6 --scale=N --yaw=DEG):
+timeout 90 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolution 1920x1080 -s tools/walk_sheet.gd -- --race=human --age=3 --out=reports/walk_human_3.png
+# Base gallery (every race × age base with its turret towers in front; --towers for a close-up of the towers; --solo=elf:3 for one base big; --night=1 lights the windows; --yaw=DEG the camera, 25 by default):
 timeout 90 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolution 1920x1080 -s tools/base_gallery.gd -- --out=reports/base_gallery.png
+# Backdrop gallery (sky, scenery, ground, foreground and the base at the gate; --race=human|elf|dwarf --ages=1,2,3,4 → a 2 × 2 sheet; --solo=elf:3 for one full-size; --cam=X):
+timeout 120 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolution 1920x1080 -s tools/backdrop_gallery.gd -- --race=elf --ages=1,2,3,4 --out=reports/backdrop_elf.png
 ```
 
 After adding a new `class_name` script, run `timeout 100 tools/godot --headless --path . --import` once so the class is registered.
@@ -39,3 +46,4 @@ After adding a new `class_name` script, run `timeout 100 tools/godot --headless 
 - After any balance change (anything under `data/`, or AI/sim logic), run the harness and include `reports/sim_report.md` in the PR. Record the change and why in `docs/balance_log.md`.
 - `scripts/sim/` is the only place game rules live. The sim may emit presentation records (`sim.fx`, only when `record_fx` is on) but never reads them back. The view (`scripts/view/`) and AI (`scripts/ai/`) act only through `MatchSim` commands. Keep the sim deterministic: no `randf()`/`Time` in sim code; use `sim.rng` or a seeded RNG.
 - Visual and feel work can't be verified in the cloud. Tasks with visual output end with "owner reviews locally".
+- `addons/figure_kit/` is a reusable, game-agnostic unit renderer: it must never reference a game class (enforced by `tests/test_fk_boundary.gd`). Game-specific mapping lives in `scripts/view/art/unit_art.gd`.

@@ -17,6 +17,9 @@ const BLEND_TIME := 0.12
 const BASE_BAR_BACK := 110.0
 const BASE_BAR_HEIGHT := 470.0
 const BASE_BAR_SIZE := Vector2(230, 12)
+## A damaged turret's life bar: its size and how far over the turret's mount it hangs.
+const TOWER_BAR_SIZE := Vector2(40, 6)
+const TOWER_BAR_ABOVE := 40.0
 var _font: Font
 
 
@@ -70,7 +73,19 @@ func unit_pos(u: SimUnit) -> Vector2:
 	var sim := view.sim
 	var p: float = view.prev_progress.get(u.id, u.progress)
 	var prog := lerpf(p, u.progress, view.alpha)
-	return Vector2(sim.to_world(u.side, prog), GROUND_Y + jitter(u.id))
+	return Vector2(drawn_x(u.def, u.side, sim.to_world(u.side, prog)), GROUND_Y + jitter(u.id))
+
+
+## Where a unit at sim x is drawn: shifted back toward its own base by its body half-depth, so two
+## opposing bodies the sim keeps melee_contact apart (centre to centre) stand that far apart instead
+## of overlapping. Presentation only — the sim never sees it.
+func drawn_x(def: UnitDef, side: int, sim_x: float) -> float:
+	return sim_x - (1.0 if side == 0 else -1.0) * UnitArt.depth_for(def, view.race_of(side)) * draw_scale(def)
+
+
+## Scale a unit is drawn at: later ages are a little bigger.
+static func draw_scale(def: UnitDef) -> float:
+	return UNIT_SCALE * (1.0 + 0.03 * (def.age - 1))
 
 
 func _process(delta: float) -> void:
@@ -136,7 +151,26 @@ func _draw_overlay() -> void:
 			_draw_bars(_overlay, u)
 	for s in sim.sides:
 		_draw_base_bar(_overlay, s)
+		_draw_tower_bars(_overlay, s)
 
+
+
+## A damaged turret's life over its head, the base bar's colour, so it reads against any backdrop and is never hidden by a unit.
+func _draw_tower_bars(ci: CanvasItem, s: SimSide) -> void:
+	var dir := 1.0 if s.index == 0 else -1.0
+	var gate := view.sim.to_world(s.index, 0.0)
+	for i in s.turret_slots:
+		var tur: SimTurret = s.turrets[i]
+		if tur == null or tur.hp >= tur.max_hp:
+			continue
+		var mp := BaseArt.mount_pos(i, s.race, tur.def.age)
+		var centre := Vector2(gate + dir * mp.x, GROUND_Y + 4.0 + mp.y - TOWER_BAR_ABOVE)
+		var r := Rect2(centre - TOWER_BAR_SIZE * 0.5, TOWER_BAR_SIZE)
+		ci.draw_rect(r.grow(2.0), Color(0, 0, 0, 0.7))
+		var fill := Rect2(r.position, Vector2(r.size.x * clampf(tur.hp / tur.max_hp, 0.0, 1.0), r.size.y))
+		if s.index == 1:
+			fill.position.x = r.end.x - fill.size.x
+		ci.draw_rect(fill, view.team_color(s.index))
 
 
 func _draw_base_bar(ci: CanvasItem, s: SimSide) -> void:
@@ -159,7 +193,7 @@ func _draw_base(s: SimSide, t: float) -> void:
 	var team := view.team_color(s.index)
 	var build := clampf((t - view.base_rebuilt.get(s.index, -10.0)) / 1.1, 0.0, 1.0)
 	var xf := Transform2D(0.0, Vector2(dir, 1), 0.0, Vector2(gate, GROUND_Y + 4))
-	UnitArt.begin(self, xf)
+	FkPaint.begin(self, xf)
 	BaseArt.draw_base(self, s.age, team, s.base_hp / s.base_max_hp, t, build, self, s.race)
 	# Turrets stand on their own towers on the ground in front of the gate (drawn behind the units).
 	# Back-row towers first so the front row overlaps them.
@@ -169,7 +203,7 @@ func _draw_base(s: SimSide, t: float) -> void:
 				continue
 			var tur: SimTurret = s.turrets[i]
 			var foot := BaseArt.slot_pos(i)
-			draw_set_transform_matrix(xf * Transform2D(0.0, Vector2.ONE * BaseArt.TOWER_SCALE, 0.0, foot))
+			FkPaint.begin(self, xf * Transform2D(0.0, Vector2.ONE * BaseArt.TOWER_SCALE, 0.0, foot))
 			if tur == null:
 				BaseArt.draw_pad(self, s.race)
 				continue
@@ -180,18 +214,15 @@ func _draw_base(s: SimSide, t: float) -> void:
 			var target_x: float = tur.last_target_x if tur.last_fire_time > -5.0 else gate + dir * 300.0
 			var aim := atan2((GROUND_Y - 20) - world.y, absf(target_x - world.x))
 			var kick := clampf(1.0 - (sim.time - tur.last_fire_time) / 0.25, 0.0, 1.0)
-			draw_set_transform_matrix(xf * Transform2D(0.0, mp))
+			FkPaint.begin(self, xf * Transform2D(0.0, mp))
 			BaseArt.draw_turret(self, tur.def, team, aim, kick, t, outclassed, s.race)
-			if tur.hp < tur.max_hp:
-				draw_rect(Rect2(-14, -30, 28, 3), Color(0, 0, 0, 0.6))
-				draw_rect(Rect2(-14, -30, 28 * tur.hp / tur.max_hp, 3), Color("e05050"))
-			draw_set_transform_matrix(xf)
+			FkPaint.begin(self, xf)
 			if tur.def.kind == "support":
 				draw_set_transform(Vector2.ZERO)
 				var r := tur.def.aura_radius
 				var x0 := gate if dir > 0 else gate - r
 				draw_rect(Rect2(x0, GROUND_Y + 2, r, 10), Color(team.lightened(0.3), 0.12 + 0.05 * sin(t * 2.0)))
-				draw_set_transform_matrix(xf)
+				FkPaint.begin(self, xf)
 	draw_set_transform(Vector2.ZERO)
 
 
@@ -205,14 +236,17 @@ func _pose(u: SimUnit, rt: float, t: float) -> Dictionary:
 	if since >= 0.0 and since < L:
 		atk = since / L
 	var fl := clampf(1.0 - (t - view.flash_at.get(u.id, -10.0)) / 0.09, 0.0, 1.0) * view.fx.flash_scale
-	return {"walk": prog * STRIDE.get(rig, 0.1), "move": move_amt.get(u.id, 1.0 if u.state == &"walk" else 0.0), "atk": atk, "t": t + u.id * 0.37, "flash": fl}
+	# The right-hand army is drawn mirrored (see _draw_unit): its shields show their painted face.
+	var rate: float = UnitArt.stride_rate(u.def, draw_scale(u.def), view.race_of(u.side), STRIDE.get(rig, 0.1))
+	return {"walk": prog * rate, "move": move_amt.get(u.id, 1.0 if u.state == &"walk" else 0.0), "atk": atk, "t": t + u.id * 0.37, "flash": fl,
+		"mirrored": u.side == 1}
 
 
 func _draw_unit(ci: CanvasItem, u: SimUnit, rt: float, t: float) -> void:
 	var pos := unit_pos(u)
 	var dir := 1.0 if u.side == 0 else -1.0
-	var sc := UNIT_SCALE * (1.0 + 0.03 * (u.age - 1))
-	UnitArt.begin(ci, Transform2D(0.0, Vector2(dir * sc, sc), 0.0, pos))
+	var sc := draw_scale(u.def)
+	FkPaint.begin(ci, Transform2D(0.0, Vector2(dir * sc, sc), 0.0, pos))
 	UnitArt.draw_unit(ci, u.def, view.team_color(u.side), _pose(u, rt, t), u.id, view.race_of(u.side))
 	ci.draw_set_transform(Vector2.ZERO)
 
@@ -272,7 +306,7 @@ func _draw_corpse_node(i: int) -> void:
 	var pos := Vector2(c.x, GROUND_Y + jitter(c.id))
 	var wreck := UnitArt.wreck_kind(UnitArt.style_for(def, race)) != ""
 	var fall := 0.0 if wreck else -dir * ease(clampf(u / 0.25, 0.0, 1.0), 0.5) * PI * 0.5
-	UnitArt.begin(n, Transform2D(fall, Vector2(dir, 1) * UNIT_SCALE, 0.0, pos + Vector2(0, -2)))
+	FkPaint.begin(n, Transform2D(fall, Vector2(dir, 1) * UNIT_SCALE, 0.0, pos + Vector2(0, -2)))
 	var col := view.team_color(c.side).darkened(0.35)
 	UnitArt.draw_unit(n, def, col, {"walk": 0.0, "moving": false, "atk": -1.0, "t": 0.0, "flash": 0.0}, c.id, race)
 	n.draw_set_transform(Vector2.ZERO)

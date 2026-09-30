@@ -392,10 +392,10 @@ func _on_shot(f: Dictionary) -> void:
 	var dir := 1.0 if f.side == 0 else -1.0
 	var L := WorldLayer.anim_len(def)
 	var target: SimUnit = f.target
-	var origin := Vector2(f.from_x, GROUND_Y + WorldLayer.jitter(u.id))
+	var origin := Vector2(world.drawn_x(def, f.side, f.from_x), GROUND_Y + WorldLayer.jitter(u.id))
 	var to: Vector2
 	if target != null:
-		to = Vector2(f.to_x, GROUND_Y + WorldLayer.jitter(target.id) - UnitArt.height_for(target.def, race_of(target.side)) * WorldLayer.UNIT_SCALE * 0.5)
+		to = Vector2(world.drawn_x(target.def, target.side, f.to_x), GROUND_Y + WorldLayer.jitter(target.id) - UnitArt.height_for(target.def, race_of(target.side)) * WorldLayer.UNIT_SCALE * AIM)
 	else:
 		to = Vector2(f.to_x + dir * 40.0, GROUND_Y - 70.0)
 	var dtype: String = def.damage_type
@@ -416,7 +416,7 @@ func _on_shot(f: Dictionary) -> void:
 		# Melee: the hit lands on the contact frame of the swing (GDD §13.3).
 		fx.later(L * 0.42, hit)
 		return
-	var m := UnitArt.muzzle_for(st)
+	var m := UnitArt.muzzle_for(st, race)
 	var muzzle := origin + Vector2(dir * m.x, m.y) * WorldLayer.UNIT_SCALE
 	var info: Dictionary = UnitArt.RIGS.get(rig, {})
 	var big: bool = info.get("gun", false) and def.role == "siege"
@@ -427,14 +427,16 @@ func _on_shot(f: Dictionary) -> void:
 		col = magic if def.age >= 5 or kind == "orb" else col
 	if st.get("variant", "") == "flame":
 		col = Color(1.0, 0.55, 0.2)
-	fx.later(L * 0.35, func():
+	fx.later(L * UnitArt.release_for(st), func():
 		if gun:
 			fx.muzzle(muzzle, 0.0 if dir > 0 else PI, big, col if kind in ["bolt", "orb"] else Color(1.0, 0.8, 0.4),
 				"zap" if kind == "bolt" else ("cannon" if big else "gun"))
 		fx.shoot(kind, muzzle, to, dtype, hit, heavy)
-		if kind in ["bolt", "orb"]:
-			fx.projectiles[-1]["col"] = col)
+		fx.projectiles[-1]["col"] = col)
 
+
+## Attacks land between the target's head and chest: this fraction of its drawn height.
+const AIM := 0.72
 
 const TURRET_KIND := {
 	"sentry": ["stone", "arrow", "javelin", "bullet", "tracer", "bolt"],
@@ -450,7 +452,8 @@ func _on_turret_shot(f: Dictionary) -> void:
 	var sp := BaseArt.mount_pos(f.slot, race_of(side), def.age)
 	var from := Vector2(gate + dir * sp.x, GROUND_Y + 4 + sp.y - 8)
 	var target: SimUnit = f.target
-	var to := Vector2(f.to_x, GROUND_Y - (UnitArt.height_for(target.def, race_of(target.side)) * 0.5 if target != null else 6.0))
+	var to_x: float = world.drawn_x(target.def, target.side, f.to_x) if target != null else f.to_x
+	var to := Vector2(to_x, GROUND_Y - (UnitArt.height_for(target.def, race_of(target.side)) * WorldLayer.UNIT_SCALE * AIM if target != null else 6.0))
 	var kind: String = TURRET_KIND.get(def.kind, ["stone"])[clampi(def.age - 1, 0, 5)]
 	var tid := target.id if target != null else -1
 	var splash := def.kind == "artillery"
@@ -465,21 +468,26 @@ func _on_turret_shot(f: Dictionary) -> void:
 		if tid >= 0:
 			flash_at[tid] = anim_time
 		if splash:
-			for v in sim.sides[enemy].units:
-				if absf(sim.to_world(v.side, v.progress) - to.x) <= radius:
-					flash_at[v.id] = anim_time, splash)
-	if kind == "bolt":
-		fx.projectiles[-1]["col"] = col
+			_splash_flash(enemy, f.to_x, radius), splash)
+	fx.projectiles[-1]["col"] = col
+
+
+## Flashes the enemy units an artillery splash caught: the sim's victims, so compare sim x (world px).
+func _splash_flash(enemy: int, x: float, radius: float) -> void:
+	for v in sim.sides[enemy].units:
+		if absf(sim.to_world(v.side, v.progress) - x) <= radius:
+			flash_at[v.id] = anim_time
 
 
 func _on_death(f: Dictionary) -> void:
 	var def: UnitDef = f.def
-	world.add_corpse(def, f.x, f.side, f.unit_id)
-	audio.play("death", Vector2(f.x, GROUND_Y), -4.0)
+	var x := world.drawn_x(def, f.side, f.x)
+	world.add_corpse(def, x, f.side, f.unit_id)
+	audio.play("death", Vector2(x, GROUND_Y), -4.0)
 	match UnitArt.wreck_kind(UnitArt.style_for(def, race_of(f.side))):
 		"blast":
-			fx.impact("blast", Vector2(f.x, GROUND_Y - 24), true)
+			fx.impact("blast", Vector2(x, GROUND_Y - 24), true)
 		"siege":
-			fx.impact("siege", Vector2(f.x, GROUND_Y - 20))
+			fx.impact("siege", Vector2(x, GROUND_Y - 20))
 		_:
-			fx.burst("smoke", Vector2(f.x, GROUND_Y - 4), 4, Color(0.7, 0.62, 0.5, 0.5), Vector2(10, 40), Vector2(0.4, 0.8), Vector2(6, 12), -10.0)
+			fx.burst("smoke", Vector2(x, GROUND_Y - 4), 4, Color(0.7, 0.62, 0.5, 0.5), Vector2(10, 40), Vector2(0.4, 0.8), Vector2(6, 12), -10.0)
