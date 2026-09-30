@@ -21,6 +21,7 @@ Units are 3D bodies seen through a 25° camera; the bases and towers are flat fr
 - Bases still render to a cached texture per race, age, team and camera (the key includes the yaw); the animated bits (lit windows, banners, fire) draw live on the same planes, windows on the recess's inner plane.
 - A tower's turret still mounts at (0, −h): the top platform stays centred on x = 0.
 - Tower heights (`BaseArt.TOWER_H`, revised 2026-09-30): about 1.35 times the infantry of the age for humans and elves, 1.5 for dwarves, so the turret stands above the units it protects.
+- In the match (`WorldLayer._draw_base`) each tower and turret sets its transform with `FkPaint.begin`, never `draw_set_transform_matrix`: the 3D art composes its parts onto FkPaint's own transform, so a directly set canvas transform left the towers drawn at the base's origin (behind the gate) and their turrets hanging in the air (found by building turrets in the running game; `tests/test_view_paint.gd` guards it).
 - The camera is the units' `UnitArt.view_yaw`, so `--yaw=` on `base_gallery.gd` and the other tools moves everything together. At yaw 0 the volumes still read (bodies overlap in depth) and the end faces vanish.
 
 ## Pilot (built): the human medieval castle and stone tower

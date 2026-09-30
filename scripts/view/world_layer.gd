@@ -181,7 +181,7 @@ func _draw_base(s: SimSide, t: float) -> void:
 				continue
 			var tur: SimTurret = s.turrets[i]
 			var foot := BaseArt.slot_pos(i)
-			draw_set_transform_matrix(xf * Transform2D(0.0, Vector2.ONE * BaseArt.TOWER_SCALE, 0.0, foot))
+			FkPaint.begin(self, xf * Transform2D(0.0, Vector2.ONE * BaseArt.TOWER_SCALE, 0.0, foot))
 			if tur == null:
 				BaseArt.draw_pad(self, s.race)
 				continue
@@ -192,18 +192,18 @@ func _draw_base(s: SimSide, t: float) -> void:
 			var target_x: float = tur.last_target_x if tur.last_fire_time > -5.0 else gate + dir * 300.0
 			var aim := atan2((GROUND_Y - 20) - world.y, absf(target_x - world.x))
 			var kick := clampf(1.0 - (sim.time - tur.last_fire_time) / 0.25, 0.0, 1.0)
-			draw_set_transform_matrix(xf * Transform2D(0.0, mp))
+			FkPaint.begin(self, xf * Transform2D(0.0, mp))
 			BaseArt.draw_turret(self, tur.def, team, aim, kick, t, outclassed, s.race)
 			if tur.hp < tur.max_hp:
 				draw_rect(Rect2(-14, -30, 28, 3), Color(0, 0, 0, 0.6))
 				draw_rect(Rect2(-14, -30, 28 * tur.hp / tur.max_hp, 3), Color("e05050"))
-			draw_set_transform_matrix(xf)
+			FkPaint.begin(self, xf)
 			if tur.def.kind == "support":
 				draw_set_transform(Vector2.ZERO)
 				var r := tur.def.aura_radius
 				var x0 := gate if dir > 0 else gate - r
 				draw_rect(Rect2(x0, GROUND_Y + 2, r, 10), Color(team.lightened(0.3), 0.12 + 0.05 * sin(t * 2.0)))
-				draw_set_transform_matrix(xf)
+				FkPaint.begin(self, xf)
 	draw_set_transform(Vector2.ZERO)
 
 
