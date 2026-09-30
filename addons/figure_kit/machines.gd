@@ -296,19 +296,92 @@ static func giant_order(pose: Dictionary) -> Array:
 	return ["left leg", "right leg", "left arm", "body", "right arm"]
 
 
+## The two-legged giants' walk (see FkGait): stride (px a foot reaches ahead of the hips), lift, ankle angles, the bones (thigh,
+## shin), the ankle's height over the sole for a flat foot, the idle feet and the standing hip height.
+const GIANT_GAITS := {
+	"golem": {"stride": 15.0, "lift": 7.0, "heel": 0.04, "toe": 0.32, "clear": 0.08, "arc": 1.0,
+		"l1": 18.44, "l2": 18.11, "flat": 4.0, "idle": [5.6, -1.6], "hip": 40.0},
+	"treant": {"stride": 14.0, "lift": 6.0, "heel": 0.04, "toe": 0.3, "clear": 0.08, "arc": 1.0,
+		"l1": 16.9, "l2": 16.8, "flat": 5.0, "idle": [6.4, -0.4], "hip": 38.0},
+}
+## The golem's iron foot relative to its ankle (sole at y = 4): heel, ball (x = 6, where it bends), toe, top.
+const GOLEM_FOOT := [Vector2(-10, 4), Vector2(6, 4), Vector2(13, 4), Vector2(10, -4), Vector2(6, -4), Vector2(-7, -4)]
+## The treant's root tips relative to its ankle.
+const TREANT_ROOTS := [Vector2(-8, 2), Vector2(1, 3.5), Vector2(10, 2)]
+
+
+## A giant's foot for this frame, relative to its ankle: the outline (golem) or the root tips (treant), pitched `rot` at the
+## ankle, the toe bent `flex` at the ball, squashed by the landing `sq` (0..1).
+static func _giant_foot(kind: String, rot: float, flex: float, sq: float) -> Array:
+	var out := []
+	if kind == "golem":
+		for v: Vector2 in GOLEM_FOOT:
+			var p := v
+			if v.x > 6.0:
+				p = Vector2(6, 4) + (v - Vector2(6, 4)).rotated(-flex)
+			p = Vector2(p.x * (1.0 + 0.35 * sq), p.y * (1.0 - 0.4 * sq) + 1.6 * sq)
+			out.append(p.rotated(rot))
+	else:
+		for v: Vector2 in TREANT_ROOTS:
+			out.append(Vector2(v.x * (1.0 + 0.4 * sq), v.y - 1.5 * sq).rotated(rot))
+	return out
+
+
+static func _giant_low(kind: String, rot: float, flex: float) -> float:
+	var low := 0.0
+	for p: Vector2 in _giant_foot(kind, rot, flex, 0.0):
+		low = maxf(low, p.y + (1.5 if kind == "treant" else 0.0))
+	return low
+
+
+static func _giant_spec(kind: String) -> Dictionary:
+	var cfg: Dictionary = GIANT_GAITS[kind]
+	return {"l": float(cfg.l1) + float(cfg.l2), "scale": 1.0, "flat": cfg.flat,
+		"low": func(rot: float, flex: float) -> float: return _giant_low(kind, rot, flex),
+		"root_dx": func(_w: float, _i: int) -> float: return 0.0}
+
+
+## Where a giant's hips stand and where its two ankles and knees go this frame (`i` = 0 the right leg, 1 the left): the hips
+## ride over nearly straight legs, the feet stay put on the ground, the ankles pitch through the stride.
+## Returns {hip, legs: [{knee, ankle, foot: Array, low, u, sq}]}.
+static func _giant_walk(kind: String, walk: float, mv: float, idle_hip_y: float) -> Dictionary:
+	var cfg: Dictionary = GIANT_GAITS[kind]
+	var hip_y := lerpf(idle_hip_y, -FkGait.hip_height(cfg, walk, kind, _giant_spec.bind(kind)), mv)
+	var hip := Vector2(0, hip_y)
+	var legs := []
+	for i in 2:
+		var ph: float = walk + PI * i
+		var pos := FkGait.stride_pos(ph)
+		var lift: float = float(cfg.lift) * FkGait.swing_lift(pos) * mv
+		var rot: float = FkGait.ankle(pos, cfg) * mv
+		var fx := lerpf(float(cfg.idle[i]), float(cfg.stride) * FkGait.foot_x(ph), mv)
+		var u := giant_contact(ph) if mv > 0.3 else -1.0
+		var sq := 1.0 - u / 0.35 if u >= 0.0 and u < 0.35 else 0.0
+		var flex := FkGait.toe_bend(rot, lift)
+		var foot := _giant_foot(kind, rot, flex, sq)
+		var low := 0.0
+		for p: Vector2 in foot:
+			low = maxf(low, p.y + (1.5 if kind == "treant" else 0.0))
+		var ankle := Vector2(fx, -(low + maxf(0.0, lift - float(cfg.flat))))
+		ankle = FkSkeleton.reach(hip, ankle, cfg.l1, cfg.l2)
+		var knee := FkSkeleton.ik(hip, ankle, cfg.l1, cfg.l2, FkSkeleton.KNEE)
+		legs.append({"knee": knee, "ankle": ankle, "foot": foot, "low": low, "u": u, "sq": sq})
+	return {"hip": hip, "legs": legs}
+
+
 ## Steam Golem: an iron-and-brass walker with a furnace chest and a hammer fist.
 static func golem(ci: CanvasItem, st: Dictionary, pose: Dictionary, _seed: int) -> void:
 	var team: Color = st.team
 	var mv := FkPaint.move_amount(pose)
-	var walk: float = pose.get("walk", 0.0) * 0.8
+	var walk: float = pose.get("walk", 0.0)
 	var t: float = pose.get("t", 0.0)
 	var atk: float = pose.get("atk", -1.0)
 	var iron := FkPaint.tint(Color("5a5a62"), pose)
 	var brass := FkPaint.tint(Color("c09a4a"), pose)
 	var tm := FkPaint.tint(team, pose)
 	var g: Color = st.look.glow
-	var bob := lerpf(sin(t * 1.3) * 0.8, absf(sin(walk)) * 3.0, mv)
-	var hip := Vector2(0, -40 + bob)
+	var gw := _giant_walk("golem", walk, mv, -40.0 + (1.0 - sin(t * 1.3)) * 0.4)
+	var hip: Vector2 = gw.hip
 	var order := giant_order(pose)
 	# The side turned away from us is shaded darker.
 	var far_side := "left" if order[0] == "left leg" else "right"
@@ -316,22 +389,17 @@ static func golem(ci: CanvasItem, st: Dictionary, pose: Dictionary, _seed: int) 
 	var contacts := []
 	for leg in order.slice(0, 2):
 		var i := 0 if leg == "right leg" else 1
-		var ph: float = walk + PI * i
-		var a := lerpf(0.1 if i == 0 else -0.1, sin(ph) * 0.45, mv)
-		var knee := hip + Vector2(4, 18).rotated(-a)
-		var ankle := knee + Vector2(-2, 18).rotated(-a + maxf(0.0, cos(ph)) * 0.5 * mv)
+		var lg: Dictionary = gw.legs[i]
+		var knee: Vector2 = lg.knee
+		var ankle: Vector2 = lg.ankle
 		var far: bool = leg.begins_with(far_side)
 		var c := iron.darkened(0.3 if far else 0.0)
 		FkPaint.seg(ci, hip, knee, 13.0, 11.0, c)
 		ci.draw_circle(knee, 5.0, brass.darkened(0.2 if far else 0.0))
 		FkPaint.seg(ci, knee, ankle, 11.0, 10.0, c)
-		# The landing foot crushes flat (squash) as the stride's weight comes down on it.
-		var u := giant_contact(ph) if mv > 0.3 else -1.0
-		var sq := 1.0 - u / 0.35 if u >= 0.0 and u < 0.35 else 0.0
-		var foot := [Vector2(-10, 4), Vector2(13, 4), Vector2(10, -4), Vector2(-7, -4)]
-		FkPaint.shade_poly(ci, foot.map(func(v: Vector2) -> Vector2: return ankle + Vector2(v.x * (1.0 + 0.35 * sq), v.y * (1.0 - 0.4 * sq) + 1.6 * sq)), c.darkened(0.15))
-		if u >= 0.0:
-			contacts.append([ankle + Vector2(1.5, 5), u])
+		FkPaint.shade_poly(ci, (lg.foot as Array).map(func(v: Vector2) -> Vector2: return ankle + v), c.darkened(0.15))
+		if lg.u >= 0.0:
+			contacts.append([ankle + Vector2(1.5, lg.low + 1.0), lg.u])
 	# A hunched, heavy torso rocking over the supporting leg.
 	FkPaint.push(ci, Transform2D(sin(walk) * 0.06 * mv + 0.08, hip) * Transform2D(0.0, -hip))
 	var drag := sin(walk - 0.9) * 0.35 * mv
@@ -394,15 +462,15 @@ static func golem(ci: CanvasItem, st: Dictionary, pose: Dictionary, _seed: int) 
 static func treant(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int) -> void:
 	var team: Color = st.team
 	var mv := FkPaint.move_amount(pose)
-	var walk: float = pose.get("walk", 0.0) * 0.7
+	var walk: float = pose.get("walk", 0.0)
 	var t: float = pose.get("t", 0.0)
 	var atk: float = pose.get("atk", -1.0)
 	var bark := FkPaint.tint(Color("6a5038"), pose)
 	var leaf := FkPaint.tint(Color("4f7f3c"), pose)
 	var tm := FkPaint.tint(team, pose)
 	var g: Color = st.look.glow
-	var bob := lerpf(sin(t * 1.1 + seed) * 0.8, absf(sin(walk)) * 2.5, mv)
-	var hip := Vector2(0, -34 + bob)
+	var gw := _giant_walk("treant", walk, mv, -38.0 + (1.0 - sin(t * 1.1 + seed)) * 0.4)
+	var hip: Vector2 = gw.hip
 	var order := giant_order(pose)
 	# The side turned away from us is shaded darker.
 	var far_side := "left" if order[0] == "left leg" else "right"
@@ -410,20 +478,17 @@ static func treant(ci: CanvasItem, st: Dictionary, pose: Dictionary, seed: int) 
 	var contacts := []
 	for leg in order.slice(0, 2):
 		var i := 0 if leg == "right leg" else 1
-		var ph: float = walk + PI * i
-		var a := lerpf(0.1 if i == 0 else -0.1, sin(ph) * 0.45, mv)
-		var knee := hip + Vector2(3, 17).rotated(-a)
-		var foot := knee + Vector2(0, 17).rotated(-a + maxf(0.0, cos(ph)) * 0.5 * mv)
+		var lg: Dictionary = gw.legs[i]
+		var knee: Vector2 = lg.knee
+		var foot: Vector2 = lg.ankle
 		var c := bark.darkened(0.3 if leg.begins_with(far_side) else 0.0)
 		FkPaint.seg(ci, hip, knee, 14.0, 11.0, c)
 		FkPaint.seg(ci, knee, foot, 11.0, 9.0, c)
-		# Roots splay flat as the weight crushes down on the landing foot.
-		var u := giant_contact(ph) if mv > 0.3 else -1.0
-		var sq := 1.0 - u / 0.35 if u >= 0.0 and u < 0.35 else 0.0
-		for k in 3:
-			ci.draw_line(foot, foot + Vector2((-8 + k * 9) * (1.0 + 0.4 * sq), 3 + (k % 2) * 1.5 - 1.5 * sq), c.darkened(0.1), 3.0)
-		if u >= 0.0:
-			contacts.append([foot + Vector2(0, 3), u])
+		# Roots spread and pitch with the foot, and splay flat as the weight crushes down on the landing foot.
+		for r: Vector2 in lg.foot:
+			ci.draw_line(foot, foot + r, c.darkened(0.1), 3.0)
+		if lg.u >= 0.0:
+			contacts.append([foot + Vector2(0, lg.low), lg.u])
 	# A hunched, heavy trunk rocking over the supporting leg.
 	FkPaint.push(ci, Transform2D(sin(walk) * 0.06 * mv + 0.07, hip) * Transform2D(0.0, -hip))
 	var sway := sin(t * 1.4 + seed) * 0.08

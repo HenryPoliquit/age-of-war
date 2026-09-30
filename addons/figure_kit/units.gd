@@ -77,9 +77,11 @@ static func height(spec: Dictionary) -> float:
 	return h
 
 
-## Stride phase (rad) per px of ground a foot soldier covers at `scale` (its drawn scale), so its feet stay put on the ground
-## as it walks; the caller multiplies the distance walked by it to get pose.walk. Other rigs return their own default `fallback`.
+## Stride phase (rad) per px of ground a foot soldier or a two-legged giant covers at `scale` (its drawn scale), so its feet stay
+## put on the ground as it walks; the caller multiplies the distance walked by it to get pose.walk. Other rigs return `fallback`.
 static func stride_rate(spec: Dictionary, scale: float, fallback := 0.1) -> float:
+	if FkMachines.GIANT_GAITS.has(spec.rig):
+		return PI / (2.0 * float(FkMachines.GIANT_GAITS[spec.rig].stride) * scale)
 	if spec.rig != "humanoid":
 		return fallback
 	var body: Vector2 = spec.get("look", FkLooks.BODIES[&"human"]).body

@@ -30,10 +30,6 @@ const BALL := Vector2(4.5, 1.5)
 ## never snap across to its mirror solution between frames.
 const ELBOW := 1.0
 const KNEE := -1.0
-## Walking: how straight the stance leg gets (share of its full length between hip and ankle).
-const STANCE_EXT := 0.995
-## How far the foot rises (px) before the toe cap has lifted off the ground: the toe bends at the ball until then.
-const TOE_LIFT := 3.0
 
 
 ## Middle joint (knee, elbow) of a two-bone limb from `root` to `target`, bent to `bend`'s side
@@ -315,65 +311,11 @@ static func boot(foot: Vector2, rot: float, b: float, toe := 0.0, body := Vector
 		return foot + q.rotated(rot))
 
 
-## A foot's position ahead of the hips over one stride (−1..1 × the gait's stride), at its phase `ph` (PI/2 as the heel lands, 3·PI/2
-## as the toe leaves). On the ground the foot slides back at a steady pace, so it stays put on the ground as the body moves
-## over it (a sine would skate: fast under the hips, nearly still at either end). The swing carries it forward on a curve that
-## leaves briskly and arrives at that same pace, reaching a little past its landing spot before settling back onto it.
-static func foot_x(ph: float) -> float:
-	var a := fposmod(ph + PI * 0.5, TAU)
-	if a < PI:
-		# Hermite from −1 (leaving at a gentle −0.6) to +1 (arriving at the stance's pace, −2 per swing).
-		var u := a / PI
-		return ((-6.6 * u + 9.2) * u - 0.6) * u - 1.0
-	return 1.0 - 2.0 * (a - PI) / PI
-
-
 ## Stride phase (rad) per px of ground the figure covers, so a foot on the ground stays put on the ground: a step (the foot
 ## travelling 2 × stride, × build, × the drawn scale) takes PI of phase. `body` is the race's proportions (look.body).
 static func stride_rate(weapon: String, shield: String, build: float, body: Vector2, scale: float) -> float:
 	var g: Dictionary = GAITS[gait_for(weapon, shield)]
 	return PI / (2.0 * g.stride * build * body.y * scale)
-
-
-## The stride's place in its two halves for a foot at phase `ph`: below 1 is the swing (0 as the toe leaves, 1 as the foot lands),
-## 1 to 2 is the stance (1 as it lands, 2 as the toe leaves). One number, so every curve below is a function of it.
-static func _stride_pos(ph: float) -> float:
-	return fposmod(ph + PI * 0.5, TAU) / PI
-
-
-static func _ease(x: float) -> float:
-	var t := clampf(x, 0.0, 1.0)
-	return t * t * (3.0 - 2.0 * t)
-
-
-## How high the foot is lifted in the swing (0..1 × the gait's lift): it rises briskly as the toe leaves (the heel's height is
-## handed over from the ankle to the lift with no dip), peaks about 40% of the way through, and sets down gently, with no
-## vertical speed at touchdown.
-static func _swing_lift(pos: float) -> float:
-	return pow(sin(PI * pow(pos, 0.8)), 1.2) if pos < 1.0 else 0.0
-
-
-## The ankle through a stride (rad; + points the toe down, − lifts it). It lands nearly flat, a mid-foot strike (`heel`: a few
-## degrees of toe-up, or negative to land on the ball), settles flat for the first part of the stance, then the heel lifts
-## steadily as the body rolls over the ball of the foot, reaching `toe` as the toe leaves. The swing keeps that toe-down for
-## a moment and drops it, then lifts the toe (`clear`) to clear the ground before laying it down again for the landing.
-static func _ankle(pos: float, g: Dictionary) -> float:
-	var heel: float = g.heel
-	var toe: float = g.toe
-	var clear: float = g.get("clear", 0.14)
-	if pos < 1.0:
-		# Swing: toe-off, level by 0.45 of the swing, toe lifted by 0.8, then the landing angle.
-		if pos < 0.45:
-			return lerpf(toe, 0.0, _ease(pos / 0.45))
-		if pos < 0.8:
-			return lerpf(0.0, -clear, _ease((pos - 0.45) / 0.35))
-		return lerpf(-clear, -heel, _ease((pos - 0.8) / 0.2))
-	var v := pos - 1.0
-	if v < 0.15:
-		return lerpf(-heel, 0.0, _ease(v / 0.15))
-	if v < 0.45:
-		return 0.0
-	return toe * _ease((v - 0.45) / 0.55)
 
 
 ## A single bump of width PI/2 centred on d = 0 (one stride is TAU).
@@ -382,54 +324,18 @@ static func _bell(d: float) -> float:
 	return cos(2.0 * w) if absf(w) < PI / 4 else 0.0
 
 
-## The highest the hips can stand while walking (px, up): the lowest of what each leg on the ground allows. A leg's ankle stays
-## within `STANCE_EXT` of the leg's full length from the hip, at the ankle's actual height (heel lifted, foot lifted) and its
-## actual distance ahead of the hip root. A leg lifting into its swing allows more height, so it never holds the hips down.
-static func _walk_need(g: Dictionary, walk: float, b: float, body: Vector2) -> float:
+## The legs of a figure of this build and race as FkGait.need() wants them.
+static func _leg_spec(g: Dictionary, b: float, body: Vector2) -> Dictionary:
 	var by := b * body.y
-	var l := (THIGH + SHIN) * by
-	var best := INF
-	for i in 2:
-		var ph := walk + PI * i
-		var pos := _stride_pos(ph)
-		var lift: float = g.lift * _swing_lift(pos)
-		var rot := _ankle(pos, g)
-		var flex := clampf(maxf(rot, 0.0) * (1.0 - lift / TOE_LIFT), 0.0, maxf(rot, 0.0))
-		var low := 0.0
-		for q in boot(Vector2.ZERO, rot, b, flex, body):
-			low = maxf(low, (q as Vector2).y)
-		# The ankle's distance ahead of its hip root (the pelvis turns a little as it walks, swinging the roots fore and aft).
-		var root_dx := (1.0 if i == 0 else -1.0) * HALF_W * b * body.x * sin(g.get("twist", 0.0) * sin(walk))
-		var x: float = g.stride * foot_x(ph) * by - root_dx
-		best = minf(best, low + maxf(0.0, lift - 1.5) * by + sqrt(maxf(0.0, pow(l * STANCE_EXT, 2.0) - x * x)))
-	return best
-
-
-static var _hip_range := {}
-
-
-## Height of the hips above the ground while walking: one smooth swell per step. Lowest as a heel lands (the foot furthest
-## ahead, the leg straight), highest as the body passes over the foot (the leg straight again); between them the knee gives a
-## little (the loading response, and again as the heel lifts), which is what a natural walk looks like, and the hips, knees and
-## ankles move together with no jerk. `arc` (the gait's) shrinks the swell: 0 keeps the hips at the landing height, at the cost
-## of a bent knee mid-stance. Never higher than the legs allow (_walk_need, sampled once per gait and build).
-static func walk_hip_height(g: Dictionary, walk: float, b: float, body: Vector2) -> float:
-	var key := "%s|%s|%s" % [g.stride, b, body]
-	if not _hip_range.has(key):
-		var need := PackedFloat32Array()
-		for i in 48:
-			need.append(_walk_need(g, PI * i / 48.0, b, body))
-		_hip_range[key] = need
-	var need: PackedFloat32Array = _hip_range[key]
-	var low: float = need[0]
-	for v in need:
-		low = minf(low, v)
-	var high: float = need[0]
-	var h := low + (high - low) * (0.5 + 0.5 * cos(2.0 * walk)) * float(g.get("arc", 1.0))
-	# The legs' own limit at this moment (the samples are one step, PI, long).
-	var f := fposmod(walk, PI) / PI * 48.0
-	var i0 := int(f) % 48
-	return minf(h, lerpf(need[i0], need[(i0 + 1) % 48], f - floorf(f)))
+	return {"l": (THIGH + SHIN) * by, "scale": by, "flat": 1.5,
+		"low": func(rot: float, flex: float) -> float:
+			var low := 0.0
+			for q in boot(Vector2.ZERO, rot, b, flex, body):
+				low = maxf(low, (q as Vector2).y)
+			return low,
+		# The pelvis turns a little as it walks, swinging the hip roots fore and aft.
+		"root_dx": func(walk: float, i: int) -> float:
+			return (1.0 if i == 0 else -1.0) * HALF_W * b * body.x * sin(g.get("twist", 0.0) * sin(walk))}
 
 
 ## All joints for one frame. b = build; pose = {walk, move, atk, t}; shield = the shield kind the far
@@ -454,7 +360,7 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 		family = "shield"
 	var g: Dictionary = GAITS[gait_for(weapon, shield)]
 	var k := key(family, pose.get("atk", -1.0), {} if seated else g.get("carry", {}), mv)
-	# Idle sway; a walking figure's hips are placed by walk_hip_height() instead.
+	# Idle sway; a walking figure's hips are placed by FkGait.hip_height() instead.
 	var bob := sin(t * 2.1) * 0.7 * (1.0 - mv)
 	var lunge: float = k.lunge * b * (0.0 if seated else 1.0)
 	var crouch: float = k.crouch * b * (0.0 if seated else 1.0)
@@ -462,7 +368,7 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 	var hip_y := (-HIP_Y * b + bob * 0.5 + crouch) * (1.0 if seated else body.y)
 	if not seated and mv > 0.0:
 		# A stance pose's crouch (the carry pose) counts for less on the march, or the knees never straighten.
-		hip_y = lerpf(hip_y, -walk_hip_height(g, walk, b, body) + crouch * 0.15 * body.y, mv)
+		hip_y = lerpf(hip_y, -FkGait.hip_height(g, walk, "%s|%s|%s" % [gait_for(weapon, shield), b, body], _leg_spec.bind(g, b, body)) + crouch * 0.15 * body.y, mv)
 	var hip := Vector2(lunge * 0.6, hip_y)
 	# A rider's feet stay in the stirrups (relative to the saddle) while the hips rise off it; the hips
 	# sway with the mount's gait and the spine absorbs its bob so the head stays level.
@@ -507,10 +413,10 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 			foot = saddle_hip + Vector2(5.0 - 3.0 * i, 16.0) * b * body
 			rot = -0.3 - 0.05 * k.rise
 		else:
-			var fx := lerpf(2.8 if i == 0 else -3.6, g.stride * foot_x(ph), mv)
-			var pos := _stride_pos(ph)
-			var lift: float = g.lift * _swing_lift(pos) * mv
-			rot = _ankle(pos, g) * mv
+			var fx := lerpf(2.8 if i == 0 else -3.6, g.stride * FkGait.foot_x(ph), mv)
+			var pos := FkGait.stride_pos(ph)
+			var lift: float = g.lift * FkGait.swing_lift(pos) * mv
+			rot = FkGait.ankle(pos, g) * mv
 			fx += k.wide * (0.5 if i == 0 else -0.5)
 			if i == 0:
 				fx += lunge * 1.6 / b * (1.0 - k.step)
@@ -520,7 +426,7 @@ static func solve(b: float, weapon: String, pose: Dictionary, shield := "", seat
 				rot -= 0.2 * k.step_lift
 			# At push-off the heel lifts while the toe cap stays flat on the ground: the foot bends at the
 			# ball, straightening again as it lifts into the swing.
-			flex = clampf(maxf(rot, 0.0) * (1.0 - lift / TOE_LIFT), 0.0, maxf(rot, 0.0))
+			flex = FkGait.toe_bend(rot, lift)
 			foot = Vector2(fx, -lift) * by
 			# The ankle stands as high as the boot's lowest point needs (never under the ground; a heel lifted or a toe pointed
 			# raises it), plus what the foot is lifted beyond a flat foot's own height, so the two hand over with no jump.

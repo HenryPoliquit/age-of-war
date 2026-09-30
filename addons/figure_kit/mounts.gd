@@ -59,10 +59,13 @@ static func quadruped(ci: CanvasItem, kind: String, team: Color, pose: Dictionar
 		ci.draw_circle(g.mid, w1 * 0.5, lc.darkened(0.08))
 		FkPaint.seg(ci, g.mid, g.fetlock, w1 * 0.88, w1 * 0.66, lc)
 		if bp.get("paws", false):
-			FkPaint.ellipse(ci, (g.hoof as Vector2) + Vector2(2, -2), Vector2(6, 3.2), lc.darkened(0.15))
+			FkPaint.ellipse(ci, (g.hoof as Vector2) + Vector2(2, -2), Vector2(6, 3.2), lc.darkened(0.15), 0.5 * g.pitch)
 		else:
 			FkPaint.seg(ci, g.fetlock, g.hoof, w1 * 0.66, w1 * 0.72, lc.darkened(0.1))
-			ci.draw_rect(Rect2((g.hoof as Vector2) + Vector2(-2.5, -2.6), Vector2(5.5, 2.8)), Color(0.12, 0.1, 0.08))
+			# The hoof turns with the pastern: about its toe as the heel lifts off the ground, about its middle in the air.
+			var pivot := Vector2(3.0, 0.2).lerp(Vector2(0.25, -1.2), 1.0 - g.pivot)
+			var corners := [Vector2(-2.5, -2.6), Vector2(3.0, -2.6), Vector2(3.0, 0.2), Vector2(-2.5, 0.2)]
+			FkPaint.poly(ci, corners.map(func(v: Vector2) -> Vector2: return pivot + (v - pivot).rotated(g.pitch)), Color(0.12, 0.1, 0.08), g.hoof)
 	var far_legs: Array = FkQuadruped.LEGS.keys().filter(func(l: String) -> bool: return j.z[l] < 0.0)
 	var near_legs: Array = FkQuadruped.LEGS.keys().filter(func(l: String) -> bool: return j.z[l] > 0.0)
 	for leg in far_legs:

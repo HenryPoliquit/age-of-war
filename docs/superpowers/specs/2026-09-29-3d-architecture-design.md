@@ -20,6 +20,7 @@ Units are 3D bodies seen through a 25° camera; the bases and towers are flat fr
 - The footprint and gate position stay (units spawn at x = 0; turrets stand on `PADS` in front).
 - Bases still render to a cached texture per race, age, team and camera (the key includes the yaw); the animated bits (lit windows, banners, fire) draw live on the same planes, windows on the recess's inner plane.
 - A tower's turret still mounts at (0, −h): the top platform stays centred on x = 0.
+- Tower heights (`BaseArt.TOWER_H`, revised 2026-09-30): about 1.35 times the infantry of the age for humans and elves, 1.5 for dwarves, so the turret stands above the units it protects.
 - The camera is the units' `UnitArt.view_yaw`, so `--yaw=` on `base_gallery.gd` and the other tools moves everything together. At yaw 0 the volumes still read (bodies overlap in depth) and the end faces vanish.
 
 ## Pilot (built): the human medieval castle and stone tower
