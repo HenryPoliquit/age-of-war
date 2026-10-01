@@ -28,17 +28,21 @@ extends Resource
 @export var skill_eager: bool = false
 
 @export_group("Economy & defence")
-## Income upgrade levels to target, and the earliest time to buy each (was the Forge).
-@export var income_target: int = 2
-@export var income_after: float = 45.0
 @export var turret_target: int = 2
 @export var turret_after: float = 60.0
 ## Build turrets sooner if own base HP fraction falls below this.
 @export var turret_panic_hp: float = 0.8
 
 @export_group("Upgrades")
-## Appetite per upgrade row (roles and "turret"): scales the gold fielded in that row when judging
-## whether an upgrade pays for itself (0 = never upgrade that row).
-@export var upgrade_bias: Dictionary = {"vanguard": 1.0, "ranged": 1.0, "heavy": 1.0, "siege": 1.0, "turret": 1.0}
+## Appetite per unit upgrade row: scales the gold fielded in that row when judging whether an upgrade
+## pays for itself (0 = never upgrade that row).
+@export var upgrade_bias: Dictionary = {"vanguard": 1.0, "ranged": 1.0, "heavy": 1.0, "siege": 1.0}
 ## Only buy unit/turret upgrades once the army on the lane is worth this many seconds of income.
 @export var upgrade_after_army_seconds: float = 15.0
+
+@export_group("Research")
+## Share of the XP earned in each era (before the last) this personality will put into research instead
+## of the evolution; 0 = none until the last era, when everything spare goes into research.
+@export_range(0.0, 1.0, 0.01) var research_share: float = 0.1
+## Research ids in the order wanted (data/research/): the first one still open is saved for and bought.
+@export var research_priority: PackedStringArray = PackedStringArray(["income", "skill_damage", "skill_zone", "train_speed", "queue_slots", "turret_attack", "turret_health", "turret_range", "base_health", "ascension"])

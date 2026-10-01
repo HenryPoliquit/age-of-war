@@ -68,16 +68,59 @@ func test_row_label_follows_the_era() -> void:
 	check_eq(HudModel.row_label(sim, 0, "ranged", race), race.unit_name(sim.data.unit_for_role(1, "ranged")))
 	sim.sides[0].age = 3
 	check_eq(HudModel.row_label(sim, 0, "ranged", race), race.unit_name(sim.data.unit_for_role(3, "ranged")))
-	check_eq(HudModel.row_label(sim, 0, "turret", race), "Turrets")
-	check_eq(HudModel.row_label(sim, 0, "income", race), "Income")
 
 
-func test_income_and_range_cells() -> void:
+func test_research_cells() -> void:
 	var sim := new_sim()
-	var inc := HudModel.upgrade_cell(sim, 0, "income", "income")
-	check_eq(inc.text, "○○○  100g")
-	check(inc.tooltip.contains("+20% passive income"), inc.tooltip)
-	check(HudModel.upgrade_cell(sim, 0, "turret", "range").tooltip.contains("Support auras"))
+	var cell := HudModel.research_cell(sim, 0, &"income")
+	check(cell.locked and not cell.enabled, "research opens in Age 2")
+	check(cell.text.contains("Bronze Age"), cell.text)
+	sim.sides[0].age = 2
+	cell = HudModel.research_cell(sim, 0, &"income")
+	check(cell.enabled and not cell.locked)
+	check_eq(cell.text, "Trade Income\n○○○  %d XP" % roundi(sim.data.research_def(&"income").cost_factors[0] * 300.0))
+	check(cell.tooltip.contains("+20% gold income"), cell.tooltip)
+	check(cell.tooltip.contains("evolution costs"), "explains how it is priced: " + cell.tooltip)
+	sim.sides[0].xp = 0.0
+	check(not HudModel.research_cell(sim, 0, &"income").enabled, "not enough XP")
+	sim.sides[0].xp = 99999.0
+	sim.buy_research(0, &"income")
+	cell = HudModel.research_cell(sim, 0, &"income")
+	check(cell.locked, "level 2 opens in Age 3: " + cell.text)
+	sim.sides[0].age = 4
+	for i in 2:
+		sim.buy_research(0, &"income")
+	cell = HudModel.research_cell(sim, 0, &"income")
+	check(cell.maxed and not cell.enabled and cell.text.contains("MAX"), cell.text)
+	check(cell.tooltip.contains("+60% gold income"), cell.tooltip)
+
+
+func test_research_cell_text_for_each_perk() -> void:
+	var sim := new_sim()
+	sim.sides[0].age = 6
+	for def in sim.data.research:
+		var cell := HudModel.research_cell(sim, 0, def.id)
+		check(cell.enabled, "%s buyable at the last era" % def.id)
+		check(cell.tooltip.contains(def.description), def.id)
+	check(HudModel.research_cell(sim, 0, &"turret_range").tooltip.contains("Support auras"))
+	check(HudModel.research_cell(sim, 0, &"queue_slots").tooltip.contains("6 queue slots (+1)"), HudModel.research_cell(sim, 0, &"queue_slots").tooltip)
+	check(HudModel.research_cell(sim, 0, &"ascension").text.contains("Lv 0"))
+	check(HudModel.research_ready(sim, 0))
+	sim.sides[0].xp = 0.0
+	check(not HudModel.research_ready(sim, 0))
+
+
+func test_skill_text_includes_research() -> void:
+	var sim := new_sim()
+	sim.sides[0].age = 3
+	var ab := sim.ability_def(0)
+	var plain := HudModel.skill_effect_text(ab)
+	sim.buy_research(0, &"skill_damage")
+	var boosted := HudModel.skill_effect_text(ab, sim.skill_damage_mult(0))
+	check(plain != boosted, "%s vs %s" % [plain, boosted])
+	check(boosted.contains(str(roundi(ab.damage * 1.05))), boosted)
+	sim.buy_research(0, &"skill_zone")
+	check(HudModel.skill_aim_text(ab, sim.ability_width(0)).contains("%d px" % roundi(ab.width * 1.05)))
 
 
 func test_skill_needs_a_target() -> void:

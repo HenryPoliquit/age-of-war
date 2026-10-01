@@ -9,6 +9,7 @@ var ages: Array[AgeDef] = []
 var personalities: Dictionary = {}  # StringName -> AiPersonalityDef
 var difficulties: Dictionary = {}   # StringName -> AiDifficultyDef
 var races: Dictionary = {}          # StringName -> RaceDef
+var research: Array[ResearchDef] = []  # in panel order
 
 static var _cached: GameData
 
@@ -30,6 +31,9 @@ static func load_from(root: String) -> GameData:
 		gd.difficulties[r.id] = r
 	for r in _load_dir(root + "/races"):
 		gd.races[r.id] = r
+	for r in _load_dir(root + "/research"):
+		gd.research.append(r)
+	gd.research.sort_custom(func(a: ResearchDef, b: ResearchDef): return a.order < b.order)
 	return gd
 
 
@@ -60,6 +64,13 @@ func turret_for_kind(age_index: int, kind: String) -> TurretDef:
 	for t in age(age_index).turrets:
 		if t.kind == kind:
 			return t
+	return null
+
+
+func research_def(id: StringName) -> ResearchDef:
+	for r in research:
+		if r.id == id:
+			return r
 	return null
 
 

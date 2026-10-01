@@ -9,3 +9,5 @@ display_name = "Easy"
 decision_interval = 3.0
 counter_level = 0
 skill_min_value = 30.0
+skill_aim_error = 220.0
+research_skill = 0

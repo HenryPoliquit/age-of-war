@@ -17,4 +17,6 @@ age_plan = "balanced"
 turret_target = 4
 turret_after = 20.0
 turret_panic_hp = 0.95
-upgrade_bias = {"heavy": 1.0, "ranged": 1.0, "siege": 1.0, "turret": 5.0, "vanguard": 1.0}
+upgrade_bias = {"heavy": 1.0, "ranged": 1.0, "siege": 1.0, "vanguard": 1.0}
+research_share = 0.2
+research_priority = PackedStringArray("turret_health", "turret_attack", "turret_range", "income", "train_speed", "queue_slots", "skill_damage", "skill_zone", "base_health", "ascension")

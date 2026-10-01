@@ -12,6 +12,10 @@ var rng := RandomNumberGenerator.new()
 var _timer := 0.0
 var _hp_seen := -1.0
 var _hp_loss_rate := 0.0  # own base HP lost per second, smoothed over decisions
+# XP research budget of the current era: the era it belongs to, the XP earned before it began, and XP spent on research since.
+var _research_age := 0
+var _research_mark := 0.0
+var _research_spent := 0.0
 
 
 func _init(p_personality: AiPersonalityDef, p_difficulty: AiDifficultyDef, p_side: int, p_seed: int = 1) -> void:
@@ -52,6 +56,7 @@ func _decide(sim: MatchSim) -> void:
 	var pressure := _under_pressure(sim)
 	_try_ability(sim, pressure)
 	_spend_xp(sim, pressure)
+	_spend_research(sim)
 	_spend_gold(sim, pressure)
 	_buy_upgrade(sim, pressure)
 
@@ -81,6 +86,37 @@ func _spend_xp(sim: MatchSim, pressure: bool) -> void:
 	sim.evolve(side)
 
 
+## XP research (GDD §6.2). Evolving comes first: before the last era only `research_share` of the XP earned
+## in this era goes to research, so a personality that loves perks still evolves, only later; it takes the
+## first perk of its list that fits what is left of that budget. In the last era the XP has no better use, so
+## it saves for the first open perk of the list, keeping one skill cast in reserve.
+func _spend_research(sim: MatchSim) -> void:
+	var s := sim.sides[side]
+	if s.age != _research_age:
+		_research_age = s.age
+		_research_mark = s.stat_xp_earned
+		_research_spent = 0.0
+	if s.is_evolving():
+		return
+	var last_era := s.age >= GameData.AGE_COUNT
+	var share := personality.research_share * difficulty.research_skill
+	if not last_era and (share <= 0.0 or sim.can_evolve(side)):
+		return
+	var budget := share * (s.stat_xp_earned - _research_mark) - _research_spent
+	for id in personality.research_priority:
+		var cost := sim.research_cost(side, StringName(id))
+		if is_inf(cost):
+			continue
+		if last_era:
+			if s.xp - cost >= sim.ability_cost(side):
+				sim.buy_research(side, StringName(id))
+			return
+		if cost <= budget and s.xp >= cost:
+			if sim.buy_research(side, StringName(id)):
+				_research_spent += cost
+			return
+
+
 # ---------------------------------------------------------------------------
 # Gold
 
@@ -106,15 +142,10 @@ func _best_upgrade(sim: MatchSim, min_bias: float, budget: float) -> Dictionary:
 	var fielded := {}
 	for u in s.units:
 		fielded[u.def.role] = fielded.get(u.def.role, 0.0) + u.cost_paid
-	for t in s.turrets:
-		if t != null:
-			fielded["turret"] = fielded.get("turret", 0.0) + t.def.cost
 	var best_row := ""
 	var best_stat := ""
 	var best_score := 0.0
 	for row in MatchSim.UPGRADES:
-		if row == "income":
-			continue
 		var bias: float = personality.upgrade_bias.get(row, 0.0)
 		var value: float = fielded.get(row, 0.0) * bias
 		if value <= 0.0 or bias < min_bias:
@@ -140,10 +171,8 @@ func _upgrade_bonus(sim: MatchSim, stat: String) -> float:
 			return sim.rules.upgrade_attack_bonus
 		"health":
 			return sim.rules.upgrade_health_bonus
-		"defence":
-			return sim.rules.upgrade_defence_bonus
 		_:
-			return sim.rules.upgrade_range_bonus
+			return sim.rules.upgrade_defence_bonus
 
 
 func _spend_gold(sim: MatchSim, pressure: bool) -> void:
@@ -165,7 +194,7 @@ func _spend_gold(sim: MatchSim, pressure: bool) -> void:
 	# Keep a minimum army on the lane even while saving.
 	var floor_value := income * 12.0
 	var guard := 0
-	while guard < sim.rules.queue_slots:
+	while guard < sim.queue_capacity(side):
 		guard += 1
 		var ranked := _ranked_units(sim)
 		if ranked.is_empty():
@@ -208,8 +237,8 @@ func _structural_want(sim: MatchSim, pressure: bool) -> Dictionary:
 			var best := _best_turret(sim)
 			if best != null:
 				return {"kind": "replace", "slot": t.slot, "def": best, "cost": best.cost - roundf(t.def.cost * sim.rules.sell_refund)}
-	# Wanting a slot that is far out of reach still blocks the Income want (as before), but not a
-	# favoured upgrade: that slot would never be saved for.
+	# Wanting a slot that is far out of reach blocks nothing but the favoured upgrade below: that slot
+	# would never be saved for.
 	var slot_blocked := false
 	if turret_time and s.turret_count() < personality.turret_target:
 		var slot := sim.first_free_slot(side)
@@ -231,16 +260,11 @@ func _structural_want(sim: MatchSim, pressure: bool) -> Dictionary:
 			return {"kind": "upgrade", "row": up.row, "stat": up.stat, "cost": up.cost}
 	if slot_blocked:
 		return {}
-	var inc := s.upgrade_level("income", "income")
-	if inc < personality.income_target and sim.time >= personality.income_after + inc * 90.0 and not pressure:
-		return {"kind": "income", "cost": sim.upgrade_cost(side, "income", "income")}
 	return {}
 
 
 func _do_want(sim: MatchSim, want: Dictionary) -> void:
 	match want.kind:
-		"income":
-			sim.buy_upgrade(side, "income", "income")
 		"upgrade":
 			sim.buy_upgrade(side, want.row, want.stat)
 		"slot":
@@ -374,7 +398,9 @@ func _apply_counters(sim: MatchSim, weights: Dictionary) -> void:
 func _try_ability(sim: MatchSim, pressure: bool) -> void:
 	if not sim.can_fire_ability(side):
 		return
-	var value := sim.ability_zone_value(side)
+	# An aimed skill is judged where it would land with perfect aim (the densest enemy group).
+	var aim := sim.ability_default_aim(side) if sim.ability_is_targeted(side) else NAN
+	var value := sim.ability_zone_value(side, aim)
 	if value <= 0.0:
 		return
 	if not personality.skill_eager and not pressure:
@@ -382,7 +408,12 @@ func _try_ability(sim: MatchSim, pressure: bool) -> void:
 			return
 		if _evolve_soon(sim):
 			return
-	sim.fire_ability(side)
+	if not is_nan(aim) and difficulty.skill_aim_error > 0.0:
+		# Lower difficulties aim loosely; a shot that misses everything is retried on the spot.
+		var loose := aim + rng.randf_range(-difficulty.skill_aim_error, difficulty.skill_aim_error)
+		if sim.fire_ability(side, loose):
+			return
+	sim.fire_ability(side, aim)
 
 
 ## True if an evolution is due within ~10 s at the current XP rate (spending XP on a skill would delay it).

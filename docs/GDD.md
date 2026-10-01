@@ -2,11 +2,32 @@
 
 **Working title:** Timefront
 **Author:** Paul
-**Status:** Draft v3
-**Last updated:** 2026-09-26
+**Status:** Draft v3.2
+**Last updated:** 2026-10-01
 **Companion document:** `docs/PRD.md` — goals, success metrics, scope, engine choice, development workflow. This document is the spec: how the game works, with starting numbers.
 
 > **About the numbers.** Every value here is a *starting baseline* for the balance harness (§15), not a final answer. Values live in data files, not code, and are expected to move. What should not move without revisiting the PRD are the *systems* and the *acceptance targets*.
+
+### What changed in v3.2
+
+From the owner's note that XP was easy to earn and had too few uses (only evolving and the skill), so it piled up. XP now also buys **research** (§6.2), which splits what the two currencies do: **gold upgrades the army** (the unit rows of §6.1), **XP researches everything else**. Spec §6.2; balance evidence in `docs/balance_log.md` (B26).
+
+- **Gold upgrades are units only (§6.1).** The Turrets and Income rows left the gold grid.
+- **Research (§6.2), paid in XP:** *Fortifications* (Turret Damage, Health, Range and **Base Health**, together), *Logistics* (Training Speed, **Barracks Slots** +1 per level up to +3, **Trade Income** — the old Income upgrade, now XP-priced), *Skills* (Skill Damage and Skill Zone, at most **+15%**) and **Ascension**, an endless last-era perk. No cheaper evolution and no shorter skill cooldown: nothing speeds up evolving or skill spam.
+- **Pricing so the tree cannot be bought out before evolving:** a level costs a fraction of the XP your *next evolution* costs, so it is dearer the later you buy it, and every level opens in a given era. Everything open in Age 2 costs 1.5× the Age 2 evolution; in Age 4, 8× the Age 4 one.
+- **XP no longer piles up:** in Tactician mirrors 55% of the XP earned was never spent; now about 6% is (§3.3).
+
+### What changed in v3.1
+
+From the owner's request to make skills more playable: every skill was auto-aimed, hit the same way, and several were hard to read on screen. Spec of the change is §7; the balance evidence is in `docs/balance_log.md` (B20+).
+
+- **Aimed skills (§7, §10):** four of the six skills are aimed — click the Skill button or press Space, then click the lane (or the lane map). The two sweeps stay one-click. Space twice lets the game aim an aimed skill.
+- **Two marks on the ground (§7):** a **circle** for the small targets (Rockfall, Starfall) and a **field of land** for the wide ones (Volley's arrow rain, Cannonade). The same mark is the aim reticle and, after firing, the warning, so you always see where a skill will land. The marks are part of the ground: drawn *under* the units (they stand on it), feathered, in the skill's own colour. The skills that run from your base to theirs (Stampede, Bombardment) put no mark on the ground.
+- **Starfall hits units only (§7):** inside its circle a strike (a lance of light, a star, a lightning bolt, by race) lands on every enemy unit, six times, and nothing falls on empty ground: no blast zone, crater or shake.
+- **Three damage rules (§7):** *flat* (armour and Defence apply, like a unit), *true* (ignores both) and *percent* (a share of each victim's max health, ignores both).
+- **Readable skills (§13.4):** a countdown that fills the mark's outline, the skill's name (red and "ENEMY …" for the opponent's), a target count and markers while aiming, shots that land inside the mark exactly when the damage does, and damage numbers coloured by rule. Each race has its own look for every skill, with identical footprint, timing and damage (§5.7).
+- **Simpler:** the *strip* shape is gone (Volley was the only one; it is an aimed field now) and so is Rockfall's slow. A sweep's herd moves at 1,200 px/s instead of 2,000, so a Stampede can be followed.
+- **Fixes:** an area skill's zone is centred on the group it found, not pinned to its edge; a skill that would hit nothing fails without cost.
 
 ### What changed in v3
 
@@ -61,10 +82,10 @@ A match is won by destroying the enemy base. Target: median 10–14 minutes, mos
 | Source | Value |
 | --- | --- |
 | Passive income | 2 gold/s × current **tide multiplier** (§3.2) |
-| Income upgrade | +20% passive income per level, 3 levels. Cost 100 / 250 / 500 gold × your age cost multiplier (1.7^(age − 1)) (§6.1) |
+| Trade Income research | +20% passive income per level, 3 levels. Paid in **XP**, not gold (§6.2) |
 | Kill bounty | 50% of the killed unit's gold cost |
 
-The Income upgrade is the economy-vs-army decision: gold into Income is gold not on the lane *now*. Because its cost scales with your age, it stays a decision at every stage rather than becoming an automatic late buy.
+Trade Income is the economy-vs-evolution decision: XP into Income is XP not spent on the next evolution. It is priced off that evolution (§6.2), so it stays a decision at every stage rather than becoming an automatic late buy. (It used to be a gold upgrade; at 100 / 250 / 500 gold it was too cheap to refuse.)
 
 ### 3.2 The Tide
 
@@ -88,7 +109,7 @@ Passive income rises for **both sides equally** on a fixed schedule, shown on th
 | Killing a unit | 80% of that unit's gold cost |
 | Damaging the enemy base | 1 XP per 10 damage |
 
-XP is **spent**, not a threshold. It buys either evolution or the special skill (§4, §7).
+XP is **spent**, not a threshold. It buys evolution, the special skill and **research** (§4, §7, §6.2). Measured in Tactician mirrors (Hard, n=40, `docs/balance_log.md` B26), before research a side earned about 21,000 XP a match and 55% of it was never spent; with research about 27,000 XP is earned, 13% goes to evolving, 30% to skills, about 51% to research and 6% is left.
 
 ### 3.4 Momentum (removed in v3)
 
@@ -271,38 +292,119 @@ Ties break by unit ID, so sim runs are reproducible (§15.3).
 | **Artillery** | Age 2 | Blast | Slow, splash, minimum range | Stone Catapult: 180 g, 45 dmg / 3.0 s, splash 60 px, range 150–420 |
 | **Support** | Age 3 | — | Aura near the base: slows enemies or grants allies armour | Tar Cauldron: 220 g, −30% enemy speed within 180 px |
 
-### 6.1 Upgrades
+### 6.1 Upgrades (gold, units)
 
-Bought with **gold**, **3 levels** each, **kept for the whole match** (they carry across evolutions) and applied **immediately** to units and turrets already on the field. Unit upgrades belong to a unit **slot** (Vanguard, Ranged, Heavy, Siege), so the next era's unit in that slot inherits them.
+Bought with **gold**, **3 levels** each, **kept for the whole match** (they carry across evolutions) and applied **immediately** to units already on the field. Upgrades belong to a unit **slot** (Vanguard, Ranged, Heavy, Siege), so the next era's unit in that slot inherits them. Turrets, the base, income and skills are not here: they are XP research (§6.2).
 
-| Row | ⚔ | ♥ | Third |
+| Row | ⚔ | ♥ | 🛡 |
 | --- | --- | --- | --- |
-| Each unit slot (4 rows) | Attack +15% / level | Health +15% / level | 🛡 Defence −10% damage taken / level |
-| Turrets (all) | Attack +15% / level | Health +15% / level | ➶ Range +10% / level (Support auras too) |
-| 💰 Income | +20% passive income / level | — | — |
+| Each unit slot (4 rows) | Attack +15% / level | Health +15% / level | Defence −10% damage taken / level |
 
-**Costs:** level *n* of a unit row costs 0.6× / 1.0× / 1.5× the current price of that slot's unit; the turret row uses the average current-era turret cost; Income costs 100 / 250 / 500 × the age cost multiplier. Health upgrades keep the current HP percentage. The Siege row is unavailable until Siege exists (Age 2).
+**Costs:** level *n* costs 0.6× / 1.0× / 1.5× the current price of that slot's unit. Health upgrades keep the current HP percentage. The Siege row is unavailable until Siege exists (Age 2).
+
+### 6.2 Research (XP)
+
+The **✦ Research** panel (top bar) holds every perk that is not a unit upgrade. Research is bought with **XP, never gold**, and it competes with evolving and the skill for the same XP. Levels are **kept for the whole match** and apply at once to everything already built (HP perks keep the current HP percentage).
+
+| Group | Perk | Per level | Levels | Price factors | Opens in era |
+| --- | --- | --- | --- | --- | --- |
+| Fortifications | Turret Damage | +15% | 3 | 0.10 / 0.16 / 0.24 | 2 / 3 / 4 |
+| | Turret Health | +15% | 3 | 0.08 / 0.14 / 0.20 | 2 / 3 / 4 |
+| | Turret Range | +10% (Support auras too) | 3 | 0.08 / 0.14 / 0.20 | 2 / 3 / 4 |
+| | Base Health | +10% max HP | 3 | 0.10 / 0.16 / 0.24 | 2 / 3 / 4 |
+| Logistics | Training Speed | +15% | 3 | 0.10 / 0.16 / 0.24 | 2 / 3 / 4 |
+| | Barracks Slots | +1 queue slot (5 → 8 at most) | 3 | 0.12 / 0.20 / 0.32 | 2 / 3 / 4 |
+| | Trade Income | +20% passive gold | 3 | 0.90 / 1.50 / 2.40 | 2 / 3 / 4 |
+| Skills | Skill Damage | +5% (at most +15%) | 3 | 0.12 / 0.20 / 0.32 | 3 / 4 / 5 |
+| | Skill Zone | +5% area-skill width (at most +15%; a sweep already covers the lane) | 3 | 0.10 / 0.16 / 0.24 | 3 / 4 / 5 |
+| Ascension | Ascension | +3% damage **and** health for all your units | endless | 0.5 × 1.3^level | 6 |
+
+**Price:** a level costs *factor* × the XP your **next evolution** costs (240 / 300 / 700 / 1,100 / 2,800; the last era uses 2,800). The same perk is therefore dearer the later you buy it, like a gold upgrade. **Gate:** a level cannot be bought before its era, so no perk is maxed early whatever you earn.
+
+**Why it cannot be bought out before evolving.** An era earns only about 1.2–1.5× its evolution's XP (measured per era in `docs/balance_log.md` B26: 361 / 360 / 950 / 1,535 / 3,437 XP in Ages 1–5). Everything open at full price costs more than that and the evolution put together:
+
+| Era | Next evolution | Every open level | × the evolution | XP an era earns |
+| --- | --- | --- | --- | --- |
+| 2 | 300 | 444 | 1.5× | 360 |
+| 3 | 700 | 2,912 | 4.2× | 950 |
+| 4 | 1,100 | 9,196 | 8.4× | 1,535 |
+| 5 | 2,800 | 24,976 | 8.9× | 3,437 |
+| 6 | 2,800 | 26,376 (with Ascension 1) | 9.4× | ~27,000 (a long Age 6) |
+
+So before the last era a player buys a few perks and still has to evolve; in a long Age 6 the whole tree can be bought and **Ascension**, whose price grows 30% a level (1,400, 1,820, 2,366 … XP), is the endless sink for the rest. Ascension stacks with the unit upgrades (×) and buffs damage and health together, so it does not change who wins a fight, only how big the numbers get.
+
+Not in research, on purpose: *cheaper evolution* and *shorter skill cooldown*. Nothing speeds up evolving or lets a side spam skills.
 
 ## 7. Special Skills
 
-Each era has one **special skill**. Click ☄ Skill or press Space: it fires immediately and **aims itself** — no aiming. It costs **XP** (so every use delays the next evolution) and has a **20 s cooldown**. Skills hit units only, never turrets or bases.
+Each era has one **special skill**. It costs **XP** (so every use delays the next evolution) and has a **40 s cooldown** that no perk shortens. The **Skill Damage** and **Skill Zone** research (§6.2) add up to +15% to its damage and to an area skill's width. Skills hit units only, never turrets or bases. Firing a skill whose zone holds no enemy unit fails and costs nothing.
 
-| Shape | Where it lands |
+The six skills differ in two ways: **how you aim them** and **how they hurt**.
+
+### Aim
+
+| Aim | How it works |
 | --- | --- |
-| **Area** | Centred on the densest enemy group (most enemy unit value within its width) |
-| **Strip** | From the enemy's front unit back toward their base, for its width |
-| **Sweep** | Travels from your gate to the enemy gate, hitting every enemy unit it passes |
+| **Auto** | One click on ☄ Skill (or Space) and it fires. The game picks the spot from the skill's shape: **area** — the densest enemy group (most enemy unit value within its width); **sweep** — travels from your gate to the enemy gate, one slice per pulse, hitting every enemy unit it passes |
+| **Aimed** | Click ◎ Skill (or Space) to enter aim mode. A reticle follows the cursor — the skill's mark on the ground, a number for the enemy units inside it and a marker over each. **Left-click the lane** (or the **lane map**, on or off screen) to fire. **Space again** fires at the spot the game would pick (the densest group); **Esc**, a **right-click** (not a camera drag) or the button again cancels. A click that would hit nothing fails and keeps aiming. The game never pauses; aim mode ends by itself if the skill stops being available (XP spent, era changed, no enemy left). An aimed skill is an area of fixed width centred on the click |
 
-| Era | Skill | Shape | XP (starting) |
+The AI aims the same skills through the same command: at the densest group, off by up to 220 / 140 / 70 / 30 / 0 px on Easy / Normal / Hard / Brutal / Nightmare.
+
+### The mark on the ground
+
+| Mark | Skills | What it looks like |
+| --- | --- | --- |
+| **Circle** | Rockfall, Starfall (small: 250–260 px) | A ring on the ground whose outline brightens clockwise as the warning runs out. Rockfall's has dust turning round the rim and what falls lands inside it; Starfall's is a sigil (a second ring and a star turning inside it: eight points for the lance, five for the star, six for the rune) |
+| **Field of land** | Volley, Cannonade (wide: 500–520 px) | A piece of land tinted in the skill's colour, with brackets painted at its corners; its back edge brightens as the countdown runs. Arrows or shells land anywhere across it, and shafts stay standing in it for a moment |
+| **None** | Stampede, Bombardment | Sweeps run from your gate to theirs and need no marker; the herd or the barrage is the picture |
+
+A mark is drawn *under* the units, as a soft shade with a thin light on it, in the skill's own (race) colour, fading in as the warning runs out. The opponent's is pushed toward red and labelled "ENEMY …", and pending marks also show on the lane map. The aim reticle is the same mark in gold (red when it would hit nothing), with a crosshair for a circle.
+
+### Damage
+
+| Rule | What it does | Good against |
+| --- | --- | --- |
+| **Flat** | Damage × the armour matrix (§5.2) × the target's Defence upgrades, like a unit's attack | Everything the matrix favours; weak against what the type bounces off |
+| **True** | Fixed damage that ignores armour and Defence upgrades | Heavies and upgraded stacks that Pierce or Slash bounce off |
+| **Percent** | A share of each victim's **max** health per pulse; ignores armour and Defence | Big units: it takes as much from a Heavy as its size deserves, and it scales by itself with every age and Health upgrade |
+
+Balance caution (balance log B20): anything that blunts Heavy pushes without killing lengthens matches, so percent numbers must stay small.
+
+A skill can also **shove** the units it hits back toward their base.
+
+| Era | Skill | Aim | Shape | Damage (per unit hit) | XP (starting) |
+| --- | --- | --- | --- | --- | --- |
+| Stone | **Stampede** — a herd charges down the lane at 1,200 px/s | Auto | Sweep | Flat Slash 35, shoves back 60 px | 60 |
+| Bronze | **Rockfall** — boulders crash inside a circle | **Aimed** | Circle, 260 px | Flat Blast 90 × 3 pulses | 75 |
+| Iron | **Volley** — three waves of arrows rain on a field of land | **Aimed** | Field, 520 px | **True** 123 × 3 pulses (Pierce look) | 175 |
+| Medieval | **Bombardment** — a walking barrage from gate to gate | Auto | Sweep | **Percent** 12% of max HP, shoves back 12 px | 275 |
+| Gunpowder | **Cannonade** — signal flares mark a field, then heavy shells carpet it | **Aimed** | Field, 500 px | Flat Blast 912 × 5 pulses | 700 |
+| Arcane | **Starfall** — after a 1.5 s warning, a strike lands on every enemy unit inside the circle, six times, 0.5 s apart | **Aimed** | Circle, 250 px | **Percent** 18% of max HP × 6 pulses | 1,000 |
+
+A sweep's slices cross each unit once, so its damage is per unit, not per pulse. Every other shape hits a unit on every pulse it stands in.
+
+### What you see
+
+- **Warning.** While an aimed skill winds up, its mark stays on the ground (§ The mark on the ground) with the outline filling as the warning runs out and the skill's name and seconds left above it: in your colour for your skills, red with "ENEMY" for the opponent's. The lane map marks pending zones too, so a skill off-screen is never a surprise. Sweeps show no warning.
+- **Starfall** (Arcane Lance, Thunder Rune) draws nothing on empty ground: each strike comes from the sim's hit on a unit and lands exactly where that unit stands, so a unit that walks in is struck and one that walks out is not. No crater, ring, scorch or shake. A dense pack gets at most 12 full strikes per pulse and a glint for the rest.
+- **Landing.** Shots are launched early enough to land at the instant their pulse resolves, and inside the mark; incoming boulders and shells cast a growing shadow on the ground, arrows and thorns stay standing for a moment, and a light curtain falls over a volley's field. Cannonade plants three coloured signal flares in its field during the warning.
+- **Numbers.** Every unit a skill hits shows what it took, coloured by rule: orange for flat, cyan with a diamond for true, green with a percent sign for percent; bigger when it kills. A setting turns them off.
+- **Result.** When your skill finishes, a line reports it: "Rockfall: 4 hit, 1 killed", or "Rockfall: missed".
+
+### Races
+
+Each race names and dresses the same skill; footprint, timing and damage never change (§5.7).
+
+| Skill | Human | Elf | Dwarf |
 | --- | --- | --- | --- |
-| Stone | **Stampede** — a herd charges down the lane, knocking enemies back | Sweep | 60 |
-| Bronze | **Rockfall** — boulders crash onto the biggest enemy group | Area | 75 |
-| Iron | **Volley** — three volleys along the enemy line (Pierce) | Strip | 175 |
-| Medieval | **Bombardment** — a walking barrage from gate to gate (Blast) | Sweep | 275 |
-| Gunpowder | **Cannonade** — heavy Blast along the enemy line, telegraphed | Strip | 700 |
-| Arcane | **Starfall** — a massive strike on the densest group after a 1.5 s telegraph | Area | 1,000 |
+| Stone | **Stampede** — a herd of boars in road dust | **Wild Hunt** — stags trailing petals and light | **Ram Charge** — rams striking sparks |
+| Bronze | **Rockfall** — quarried boulders, burning at the edges, from above | **Stone Rain** — mint crystal shards streaking in slantwise | **Boulder Toss** — rune-carved boulders lobbed from behind the lines |
+| Iron | **Pilum Volley** — heavy javelins on the field | **Arrow Rain** — a swarm of glowing arrows | **Axe Storm** — spinning throwing axes |
+| Medieval | **Trebuchet Barrage** — flaming stones lobbed from your walls | **Hail of Thorns** — briar spikes raining down | **Rockslide** — an avalanche of tumbling boulders |
+| Gunpowder | **Cannonade** — iron round shot with smoke and a muzzle flash | **Moonfire** — silver orbs in pillars of moonlight | **Grand Cannonade** — rune-forged shells trailing furnace fire |
+| Arcane | **Arcane Lance** — a spear of light through each unit | **Starfall** — a star dives onto each unit | **Thunder Rune** — a lightning bolt strikes each unit |
 
-A marker shows where it will land during the telegraph; afterwards a short line reports the result ("Volley: 6 killed"). Each race names and dresses the same skill (human / elf / dwarf): Stampede / Wild Hunt / Ram Charge, Rockfall / Stone Rain / Boulder Toss, Pilum Volley / Arrow Rain / Axe Storm, Trebuchet Barrage / Hail of Thorns / Rockslide, Cannonade / Moonfire / Grand Cannonade, Arcane Lance / Starfall / Thunder Rune. The AI uses the same skills under the same rules.
+The AI uses the same skills under the same rules.
 
 ## 8. Front Line & Escalation
 
@@ -338,8 +440,11 @@ Cut after the first playtest: invisible modifiers that confused players and were
 | Queue unit | Click unit card | 1 / 2 / 3 / 4 |
 | Build / sell turret | Click slot (a list opens above it) | Q / W / E / R |
 | Evolve | Click ▲ Evolve | T |
-| Fire skill | Click ☄ Skill | Space |
-| Upgrades | ⬆ Upgrades opens the grid; click a cell | — |
+| Fire an auto skill | Click ☄ Skill | Space |
+| Aim a skill | Click ◎ Skill, then click the lane or the lane map | Space, then click; Space again = let the game aim |
+| Cancel aiming | Right-click (not a drag), click ✕ Cancel aim | Esc |
+| Upgrades (gold, units) | ⬆ Upgrades opens the grid; click a cell | — |
+| Research (XP) | ✦ Research opens the panel (the button shows • when something is affordable); click a perk. Opening one drop-down closes the other | — |
 | Pan camera | Edge-pan or right-drag | A / D |
 | Speed / pause | 1×/2× toggle, ⏸ | Esc opens settings (pauses) |
 
@@ -363,10 +468,12 @@ The AI plays by the same rules as the player: same costs, same tide, same queue,
 
 | Personality | Plan |
 | --- | --- |
-| **Rusher** | Early aggression, fast-age, few turrets, upgrades its Vanguards |
-| **Turtle** | Early turrets and turret upgrades, counter-attacks when you over-extend |
-| **Economist** | Early Income upgrades, big late-game waves |
-| **Tactician** | Adapts to your composition; upgrades what it fields most; the default balanced opponent |
+| **Rusher** | Early aggression, fast-age, few turrets, upgrades its Vanguards; researches Training Speed and Barracks Slots |
+| **Turtle** | Early turrets, researches Turret Health / Damage / Range first, counter-attacks when you over-extend |
+| **Economist** | Researches Trade Income first, big late-game waves |
+| **Tactician** | Adapts to your composition; upgrades what it fields most; researches income and skills before fortifications; the default balanced opponent |
+
+**Research (§6.2).** Before the last era an AI puts at most its `research_share` of the XP it earned in that era into research (Tactician 10%, Economist 25%, Turtle 20%, Rusher 8%; Easy none before the last era, Normal half), takes the first perk of its personality's list that fits, and always evolves first. In the last era it saves for the first open perk, keeping one skill cast in reserve.
 
 ### 11.3 Sim-Only Archetypes
 
@@ -374,7 +481,7 @@ Used by the balance harness, never shipped as opponents:
 
 - **Fast-age Tactician:** always evolves the moment XP allows; fires the skill only when it can't delay an evolution.
 - **Skill-heavy Tactician:** fires the skill whenever it can hit anything.
-- **Spam bots:** queue only one role (one bot per role). Used for the dominant-unit check (PRD §6).
+- **Spam bots:** queue only one role (one bot per role). Used for the dominant-unit check (PRD §6). They research like the Tactician, so a spam-vs-Tactician result is about the army alone.
 
 ### 11.4 Implementation Approach
 
@@ -465,8 +572,8 @@ Effects are built per damage type, so the counter system is visible:
 | Lights | Muzzle flashes, explosions and abilities spawn short-lived 2D lights that shade nearby units |
 | Glow | Emissive effects (muzzle flashes, Arcane-age magic weapons, ability beams) glow; confirm how 2D glow behaves in the chosen renderer during M2 |
 | Knockback | Blast damage pushes units back a few pixels with a small hop |
-| Telegraphs | Ground decal before every ability; Starfall shows a charging column first |
-| Damage numbers | Optional, off by default |
+| Telegraphs | A circle or a field of land on the ground, *under* the units, for every aimed skill: a soft shade with a thin light in the skill's colour that brightens as the warning runs out, with the skill's name (red and "ENEMY" for the opponent's); none for the base-to-base sweeps; Starfall also charges (a sigil, converging rings, a rising column, motes) and Cannonade plants signal flares |
+| Damage numbers | Optional, off by default for units and turrets; skill numbers (coloured by damage rule, §7) are on by default and have their own toggle |
 
 ### 13.5 The Evolution Moment
 
@@ -495,9 +602,9 @@ Smooth follow-pan with easing; brief, subtle zoom punch on ability impacts and e
 
 ### 13.9 HUD
 
-- **Top bar (slim):** left — XP, ▲ Evolve, ☄ Skill; centre — your era, elapsed time, enemy era; right — ⬆ Upgrades (drop-down grid), gold (+income/s), 1×/2× toggle, pause, settings.
+- **Top bar (slim):** left — XP, ▲ Evolve, ☄ Skill; centre — your era, elapsed time, enemy era; right — ⬆ Upgrades (drop-down grid, gold), ✦ Research (drop-down panel, XP), gold (+income/s), 1×/2× toggle, pause, settings.
 - **Bottom left:** four unit cards (portrait, name, price, hotkey).
-- **Bottom centre:** lane map (gates and a dot per unit); under it, the unit in training with its progress bar and the 5-slot queue.
+- **Bottom centre:** lane map (gates and a dot per unit); under it, the unit in training with its progress bar and the queue (5 slots, up to 8 with Barracks Slots).
 - **Bottom right:** four turret slots (built, empty, locked with unlock price); clicking one opens the build list or a Sell option directly above it.
 - **In the world:** a base HP bar above each base.
 - Tooltips show the damage × armour matrix row for the hovered unit, and exact effects and prices for upgrades.

@@ -1,6 +1,6 @@
 class_name MatchHud
 extends CanvasLayer
-## Match HUD (GDD §13.9): top bar, upgrade grid, unit cards, lane map with training queue, turret slots,
+## Match HUD (GDD §13.9): top bar, upgrade grid, research panel, unit cards, lane map with training queue, turret slots,
 ## event banners and the post-match screen. Panels render HudModel values; actions go through MatchSim.
 
 const ACCENT := UiStyle.ACCENT
@@ -18,11 +18,14 @@ var _root: Control
 var _theme: Theme
 var _top: TopBar
 var _grid: UpgradeGrid
+var _research: ResearchPanel
 var _turrets: TurretBar
 var _units: UnitBar
 var _lane: LanePanel
 var _banner: Label
 var _banner_sub: Label
+var _aim_hint: Label
+var _aim_panel: PanelContainer
 var _banner_t := -10.0
 var _post: PanelContainer
 var _flash := 0.0
@@ -45,15 +48,28 @@ func _ready() -> void:
 	_turrets = TurretBar.new(self)
 	_root.add_child(_turrets)
 	_build_banner()
+	_build_aim_hint()
 	_grid = UpgradeGrid.new(self)
 	_root.add_child(_grid)
-	_top.upgrades_button.toggled.connect(func(on: bool): _grid.visible = on)
+	_research = ResearchPanel.new(self)
+	_root.add_child(_research)
+	# The two drop-downs share the spot under the top bar: opening one closes the other.
+	_top.upgrades_button.toggled.connect(func(on: bool):
+		_grid.visible = on
+		if on:
+			_top.research_button.button_pressed = false)
+	_top.research_button.toggled.connect(func(on: bool):
+		_research.visible = on
+		if on:
+			_top.upgrades_button.button_pressed = false)
 	# Dev aid for screenshots: open the HUD's pop-ups without clicking.
 	if "--hud-demo-settings" in OS.get_cmdline_user_args():
 		get_tree().create_timer(2.0).timeout.connect(open_settings)
 	if "--hud-demo" in OS.get_cmdline_user_args():
 		get_tree().create_timer(2.0).timeout.connect(func():
 			_top.upgrades_button.button_pressed = true
+			if "--hud-demo-research" in OS.get_cmdline_user_args():
+				_top.research_button.button_pressed = true
 			_turrets.open_menu(0))
 
 
@@ -116,6 +132,20 @@ func _build_banner() -> void:
 	_banner_sub = _label(v, "", 20)
 	_banner_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.modulate.a = 0.0
+
+
+## The strip under the top bar that says what an aimed skill would hit while the player is aiming.
+func _build_aim_hint() -> void:
+	_aim_panel = PanelContainer.new()
+	_aim_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_aim_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_aim_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_aim_panel.offset_top = 66
+	_aim_panel.add_theme_stylebox_override("panel", _box(PANEL_BG, ACCENT, 8, 2))
+	_aim_hint = _label(_aim_panel, "", 18, UiStyle.TEXT)
+	_aim_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_aim_panel.visible = false
+	_root.add_child(_aim_panel)
 
 
 func banner(text: String, col: Color, side: int, small := false) -> void:
@@ -190,10 +220,16 @@ func _process(delta: float) -> void:
 	var me := sim.sides[0]
 	_top.refresh()
 	_grid.refresh()
+	_research.refresh()
 	_turrets.refresh()
 	_units.refresh()
 	_lane.refresh()
 	_flash = maxf(0.0, _flash - delta)
+	var aiming := view.aim.active
+	_aim_panel.visible = aiming
+	if aiming:
+		_aim_hint.text = HudModel.aim_hint(sim, 0, view.race_def(0), view.aim.preview())
+		_aim_panel.reset_size()
 	var bt := view.anim_time - _banner_t
 	var bv: Control = _banner.get_parent()
 	bv.modulate.a = clampf(minf(bt / 0.15, (2.6 - bt) / 0.6), 0.0, 1.0)

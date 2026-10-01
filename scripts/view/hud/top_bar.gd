@@ -1,6 +1,6 @@
 class_name TopBar
 extends PanelContainer
-## Slim top bar (GDD §13.9): XP · Evolve · Skill | your era · clock · enemy era | Upgrades · gold ·
+## Slim top bar (GDD §13.9): XP · Evolve · Skill | your era · clock · enemy era | Upgrades · Research · gold ·
 ## speed · pause · settings. Renders HudModel values; acts only through MatchSim commands.
 
 ## Left and right groups share one minimum width so the centre group sits in the middle of the screen.
@@ -8,6 +8,7 @@ const SIDE_WIDTH := 620.0
 
 var hud: MatchHud
 var upgrades_button: Button
+var research_button: Button
 var _xp: Label
 var _evolve: Button
 var _evolve_meter: MatchHud.Meter
@@ -51,7 +52,7 @@ func _init(p_hud: MatchHud) -> void:
 	_evolve_meter.col = MatchHud.XP
 	_evolve_meter.custom_minimum_size = Vector2(0, 4)
 	ev.add_child(_evolve_meter)
-	_skill = hud._btn(left, "", func(): hud.feedback(hud.sim.fire_ability(0)))
+	_skill = hud._btn(left, "", func(): hud.view.skill_pressed())
 	_skill.custom_minimum_size = Vector2(250, 34)
 
 	var mid := HBoxContainer.new()
@@ -77,6 +78,13 @@ func _init(p_hud: MatchHud) -> void:
 	upgrades_button.tooltip_text = "Show or hide the upgrade grid"
 	upgrades_button.custom_minimum_size = Vector2(140, 34)
 	right.add_child(upgrades_button)
+	research_button = Button.new()
+	research_button.focus_mode = Control.FOCUS_NONE
+	research_button.text = "✦ Research"
+	research_button.toggle_mode = true
+	research_button.tooltip_text = "Show or hide XP research: turrets, base, training, income, skills"
+	research_button.custom_minimum_size = Vector2(140, 34)
+	right.add_child(research_button)
 	var gi := MatchHud.Icon.new()
 	gi.kind = "gold"
 	right.add_child(gi)
@@ -120,12 +128,13 @@ func refresh() -> void:
 	var sim := hud.sim
 	var race := hud.view.race_def(0)
 	_xp.text = "%d XP" % sim.sides[0].xp
+	research_button.text = "✦ Research •" if HudModel.research_ready(sim, 0) else "✦ Research"
 	var ev := HudModel.evolve_state(sim, 0)
 	_evolve.text = ev.text
 	_evolve.tooltip_text = ev.tooltip
 	_evolve.disabled = not ev.enabled
 	_evolve_meter.value = ev.progress
-	var sk := HudModel.skill_state(sim, 0, race)
+	var sk := HudModel.skill_state(sim, 0, race, hud.view.aim.active)
 	_skill.text = sk.text
 	_skill.tooltip_text = sk.tooltip
 	_skill.disabled = not sk.enabled

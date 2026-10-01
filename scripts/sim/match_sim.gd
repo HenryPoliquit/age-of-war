@@ -11,14 +11,13 @@ const LEFT := 0
 const RIGHT := 1
 const DRAW := 2
 const ROLES: Array[String] = ["vanguard", "ranged", "heavy", "siege"]
-## Upgrade rows and the stats each offers (GDD §6.1). Unit rows are the four roles.
+## Gold upgrade rows and the stats each offers (GDD §6.1): one row per unit role. Everything else
+## (turrets, base, training, income, skills) is XP research, see `buy_research` (GDD §6.2).
 const UPGRADES := {
 	"vanguard": ["attack", "health", "defence"],
 	"ranged": ["attack", "health", "defence"],
 	"heavy": ["attack", "health", "defence"],
 	"siege": ["attack", "health", "defence"],
-	"turret": ["attack", "health", "range"],
-	"income": ["income"],
 }
 
 var data: GameData
@@ -64,7 +63,7 @@ func set_start_age(age: int) -> void:
 	age = clampi(age, 1, GameData.AGE_COUNT)
 	for s in sides:
 		s.age = age
-		s.base_max_hp = data.age(age).base_max_hp
+		s.base_max_hp = base_hp_for(s.index, age)
 		s.base_hp = s.base_max_hp
 		s.gold = rules.start_gold * rules.age_cost_mult(age)
 		for a in range(1, age):
@@ -131,38 +130,33 @@ func upgrade_cost(side: int, row: String, stat: String) -> float:
 		return INF
 	var s := sides[side]
 	var level := s.upgrade_level(row, stat)
-	if row == "income":
-		if level >= rules.income_upgrade_costs.size():
-			return INF
-		return roundf(rules.income_upgrade_costs[level] * rules.age_cost_mult(s.age))
 	if level >= rules.upgrade_cost_factors.size():
 		return INF
-	var basis := 0.0
-	if row == "turret":
-		var roster := turret_roster(side)
-		for t in roster:
-			basis += t.cost
-		basis /= maxf(1.0, roster.size())
-	else:
-		var def := data.unit_for_role(s.age, row)
-		if def == null:
-			return INF
-		basis = unit_price(side, def)
-	return roundf(rules.upgrade_cost_factors[level] * basis)
+	var def := data.unit_for_role(s.age, row)
+	if def == null:
+		return INF
+	return roundf(rules.upgrade_cost_factors[level] * unit_price(side, def))
 
 
 func can_buy_upgrade(side: int, row: String, stat: String) -> bool:
 	return not is_over() and sides[side].gold >= upgrade_cost(side, row, stat)
 
 
-## Multipliers from upgrades; `row` is a role or "turret". Read at damage/HP time so they apply to
-## everything already fielded, whatever its age (PLAN D18).
+## Multipliers from upgrades and research; `row` is a role or "turret". Read at damage/HP time so they apply
+## to everything already fielded, whatever its age (PLAN D18). Units get their gold upgrades times Ascension;
+## turrets only their research.
 func attack_mult(side: int, row: String) -> float:
-	return 1.0 + rules.upgrade_attack_bonus * sides[side].upgrade_level(row, "attack")
+	var s := sides[side]
+	if row == "turret":
+		return 1.0 + s.research_total(&"turret_attack")
+	return (1.0 + rules.upgrade_attack_bonus * s.upgrade_level(row, "attack")) * (1.0 + s.research_total(&"ascension"))
 
 
 func health_mult(side: int, row: String) -> float:
-	return 1.0 + rules.upgrade_health_bonus * sides[side].upgrade_level(row, "health")
+	var s := sides[side]
+	if row == "turret":
+		return 1.0 + s.research_total(&"turret_health")
+	return (1.0 + rules.upgrade_health_bonus * s.upgrade_level(row, "health")) * (1.0 + s.research_total(&"ascension"))
 
 
 func defence_mult(side: int, role: String) -> float:
@@ -170,7 +164,31 @@ func defence_mult(side: int, role: String) -> float:
 
 
 func turret_range_mult(side: int) -> float:
-	return 1.0 + rules.upgrade_range_bonus * sides[side].upgrade_level("turret", "range")
+	return 1.0 + sides[side].research_total(&"turret_range")
+
+
+## Max HP of this side's base in `age`, with its Base Health research.
+func base_hp_for(side: int, age: int) -> float:
+	return data.age(age).base_max_hp * (1.0 + sides[side].research_total(&"base_health"))
+
+
+## Training speed multiplier (Training Speed research).
+func train_speed_mult(side: int) -> float:
+	return 1.0 + sides[side].research_total(&"train_speed")
+
+
+## Units this side's training queue holds (Barracks Slots research adds to the rules' base).
+func queue_capacity(side: int) -> int:
+	return rules.queue_slots + roundi(sides[side].research_total(&"queue_slots"))
+
+
+## Skill damage multiplier (Skill Damage research); area width multiplier is `skill_zone_mult`.
+func skill_damage_mult(side: int) -> float:
+	return 1.0 + sides[side].research_total(&"skill_damage")
+
+
+func skill_zone_mult(side: int) -> float:
+	return 1.0 + sides[side].research_total(&"skill_zone")
 
 
 func max_turret_slots() -> int:
@@ -180,13 +198,13 @@ func max_turret_slots() -> int:
 func income_rate(side: int) -> float:
 	var s := sides[side]
 	return rules.base_income * rules.tide_multiplier_at(time) \
-		* (1.0 + rules.income_upgrade_bonus * s.upgrade_level("income", "income")) * (1.0 + s.income_bonus)
+		* (1.0 + s.research_total(&"income")) * (1.0 + s.income_bonus)
 
 
 func can_queue(side: int, def: UnitDef) -> bool:
 	var s := sides[side]
 	return not is_over() and def != null and def.age == s.age \
-		and s.queue.size() < rules.queue_slots and s.gold >= unit_price(side, def)
+		and s.queue.size() < queue_capacity(side) and s.gold >= unit_price(side, def)
 
 
 func can_evolve(side: int) -> bool:
@@ -194,8 +212,17 @@ func can_evolve(side: int) -> bool:
 	return not is_over() and not s.is_evolving() and s.age < GameData.AGE_COUNT and s.xp >= evolve_cost(side)
 
 
+func ability_def(side: int) -> AbilityDef:
+	return data.age(sides[side].age).ability
+
+
 func ability_cost(side: int) -> float:
-	return float(data.age(sides[side].age).ability.xp_cost)
+	return float(ability_def(side).xp_cost)
+
+
+## True when this side's current skill is aimed by the caster (`fire_ability` takes an aim point).
+func ability_is_targeted(side: int) -> bool:
+	return ability_def(side).is_targeted()
 
 
 func can_fire_ability(side: int) -> bool:
@@ -257,17 +284,87 @@ func buy_upgrade(side: int, row: String, stat: String) -> bool:
 	if stat == "health":
 		# Max HP rises for everything already fielded; current HP keeps its percentage (PLAN D19).
 		var ratio := health_mult(side, row) / old_hp
-		if row == "turret":
+		for u in s.units:
+			if u.def.role == row:
+				u.max_hp *= ratio
+				u.hp *= ratio
+	_emit({"type": "upgrade", "side": side, "row": row, "stat": stat, "level": s.upgrade_level(row, stat)})
+	return true
+
+
+# ---------------------------------------------------------------------------
+# Research (GDD §6.2): XP perks for everything that is not a unit upgrade
+
+## XP a research level costs per unit of its price factor: what the current era's evolution costs (the last
+## era uses its own evolution's price). A perk bought later therefore costs more, like a gold upgrade.
+func research_basis(side: int) -> float:
+	return float(data.age(mini(sides[side].age + 1, GameData.AGE_COUNT)).evolve_cost)
+
+
+func research_level(side: int, id: StringName) -> int:
+	return sides[side].research_level(id)
+
+
+## True while the era is too early for the next level of this perk.
+func research_locked(side: int, id: StringName) -> bool:
+	var def := data.research_def(id)
+	var s := sides[side]
+	return def == null or (not def.is_maxed(s.research_level(id)) and s.age < def.age_for_next(s.research_level(id)))
+
+
+## XP for the next level; INF when maxed, unknown, or not yet open in this era.
+func research_cost(side: int, id: StringName) -> float:
+	var def := data.research_def(id)
+	if def == null or def.is_maxed(sides[side].research_level(id)) or research_locked(side, id):
+		return INF
+	return roundf(def.factor_for_next(sides[side].research_level(id)) * research_basis(side))
+
+
+## Same price, but ignoring the era gate: what the level would cost in the current era.
+func research_price(side: int, id: StringName) -> float:
+	var def := data.research_def(id)
+	if def == null or def.is_maxed(sides[side].research_level(id)):
+		return INF
+	return roundf(def.factor_for_next(sides[side].research_level(id)) * research_basis(side))
+
+
+func can_buy_research(side: int, id: StringName) -> bool:
+	return not is_over() and sides[side].xp >= research_cost(side, id)
+
+
+func buy_research(side: int, id: StringName) -> bool:
+	if not can_buy_research(side, id):
+		return false
+	var s := sides[side]
+	var def := data.research_def(id)
+	var c := research_cost(side, id)
+	var old_unit_hp := {}
+	for role in ROLES:
+		old_unit_hp[role] = health_mult(side, role)
+	var old_turret_hp := health_mult(side, "turret")
+	var old_base := s.base_max_hp
+	s.xp -= c
+	s.stat_xp_research += c
+	var level := s.research_level(id) + 1
+	s.research[id] = level
+	s.research_totals[id] = def.bonus * level
+	# Max HP rises for everything it covers; current HP keeps its percentage (PLAN D19).
+	match id:
+		&"ascension":
+			for u in s.units:
+				var r: float = health_mult(side, u.def.role) / old_unit_hp[u.def.role]
+				u.max_hp *= r
+				u.hp *= r
+		&"turret_health":
+			var r := health_mult(side, "turret") / old_turret_hp
 			for t in s.turrets:
 				if t != null:
-					t.max_hp *= ratio
-					t.hp *= ratio
-		else:
-			for u in s.units:
-				if u.def.role == row:
-					u.max_hp *= ratio
-					u.hp *= ratio
-	_emit({"type": "upgrade", "side": side, "row": row, "stat": stat, "level": s.upgrade_level(row, stat)})
+					t.max_hp *= r
+					t.hp *= r
+		&"base_health":
+			s.base_max_hp = base_hp_for(side, s.age)
+			s.base_hp *= s.base_max_hp / old_base
+	_emit({"type": "research", "side": side, "id": String(id), "level": level})
 	return true
 
 
@@ -321,73 +418,113 @@ func first_free_slot(side: int) -> int:
 	return -1
 
 
-## Fires this side's current-era skill where its shape lands now (PLAN D20). Fails, costing nothing,
-## when there is nothing to hit (D21).
-func fire_ability(side: int) -> bool:
+## Fires this side's current-era skill (PLAN D20). Auto skills land where their shape says; an aimed
+## skill (`ability_is_targeted`) lands centred on `aim_x`, a world x, or on the densest enemy group when
+## no aim is given. Fails, costing nothing, when no enemy unit would be inside the zone (D21).
+func fire_ability(side: int, aim_x: float = NAN) -> bool:
 	if not can_fire_ability(side):
 		return false
-	var zone := ability_zone(side)
-	if zone.is_empty():
+	var zone := ability_zone(side, aim_x)
+	if zone.is_empty() or _units_in_zone(enemy_of(side), zone).is_empty():
 		return false
 	var s := sides[side]
-	var def := data.age(s.age).ability
+	var def := ability_def(side)
 	s.xp -= def.xp_cost
 	s.ability_cooldown = rules.ability_cooldown
 	var center: float = (zone[0] + zone[1]) * 0.5
-	effects.append({"side": side, "def": def, "lo": zone[0], "hi": zone[1], "next_t": time + def.telegraph, "pulse": 0, "kills": 0})
-	_emit({"type": "ability", "side": side, "ability": String(def.id), "x": center, "lo": zone[0], "hi": zone[1]})
+	effects.append({"side": side, "def": def, "lo": zone[0], "hi": zone[1], "next_t": time + def.telegraph, "pulse": 0,
+		"kills": 0, "hit_ids": {}, "damage": 0.0})
+	_emit({"type": "ability", "side": side, "ability": String(def.id), "x": center, "lo": zone[0], "hi": zone[1], "aimed": def.is_targeted()})
 	return true
 
 
 ## [lo, hi] in world x where this side's skill would land now, or [] if no enemy unit is on the lane.
-func ability_zone(side: int) -> Array:
-	var def := data.age(sides[side].age).ability
+## `aim_x` only matters to aimed skills; without it they use `ability_default_aim`.
+func ability_zone(side: int, aim_x: float = NAN) -> Array:
+	var def := ability_def(side)
 	var enemy := enemy_of(side)
 	var front := _front_unit(enemy)
 	if front == null:
 		return []
-	match def.shape:
-		"sweep":
-			return [0.0, rules.lane_length]
-		"strip":
-			# From the enemy's front unit back toward the enemy base.
-			var x := to_world(enemy, front.progress)
-			return [x, x + def.width] if enemy == RIGHT else [x - def.width, x]
-		_:
-			var c := _densest_window(enemy, def.width)
-			return [c - def.width * 0.5, c + def.width * 0.5]
+	var width := ability_width(side)
+	if def.is_targeted():
+		var c := ability_default_aim(side) if is_nan(aim_x) else clampf(aim_x, 0.0, rules.lane_length)
+		return [c - width * 0.5, c + width * 0.5]
+	if def.shape == "sweep":
+		return [0.0, rules.lane_length]
+	var c := _densest_window(enemy, width)
+	return [c - width * 0.5, c + width * 0.5]
+
+
+## Zone length in px of this side's current skill, with its Skill Zone research (a sweep has no width).
+func ability_width(side: int) -> float:
+	return ability_def(side).width * skill_zone_mult(side)
+
+
+## World x an aimed skill lands on when the caster gives no aim (the densest enemy group); NAN if the
+## enemy has no unit on the lane. The AI aims with this, and a player's "let the game aim" press.
+func ability_default_aim(side: int) -> float:
+	if _front_unit(enemy_of(side)) == null:
+		return NAN
+	return _densest_window(enemy_of(side), ability_width(side))
+
+
+## Living units of `of_side` inside a [lo, hi] world-x zone.
+func _units_in_zone(of_side: int, zone: Array) -> Array[SimUnit]:
+	var out: Array[SimUnit] = []
+	for u in sides[of_side].units:
+		if not u.alive():
+			continue
+		var x := to_world(of_side, u.progress)
+		if x >= zone[0] and x <= zone[1]:
+			out.append(u)
+	return out
+
+
+## What firing at `aim_x` would hit right now: {zone, count, value} (value = gold paid for those units).
+## For the aim reticle and the AI; the sim itself only reads the zone when the skill fires.
+func ability_preview(side: int, aim_x: float = NAN) -> Dictionary:
+	var zone := ability_zone(side, aim_x)
+	if zone.is_empty():
+		return {"zone": zone, "count": 0, "value": 0.0}
+	var hit := _units_in_zone(enemy_of(side), zone)
+	var v := 0.0
+	for u in hit:
+		v += u.cost_paid
+	return {"zone": zone, "count": hit.size(), "value": v}
 
 
 ## Gold value of the enemy units inside this side's skill zone right now.
-func ability_zone_value(side: int) -> float:
-	var zone := ability_zone(side)
-	if zone.is_empty():
-		return 0.0
-	var enemy := enemy_of(side)
-	var v := 0.0
-	for u in sides[enemy].units:
-		var x := to_world(enemy, u.progress)
-		if u.alive() and x >= zone[0] and x <= zone[1]:
-			v += u.cost_paid
-	return v
+func ability_zone_value(side: int, aim_x: float = NAN) -> float:
+	return ability_preview(side, aim_x).value
 
 
 ## Centre of the `width` window holding the most gold of `of_side`'s units. Candidate windows start or
-## end at a unit; the first best window in unit order wins ties (deterministic).
+## end at a unit; the first best window in unit order wins ties (deterministic). The result is re-centred
+## on the units inside the winning window, so the group sits in the middle of the zone, not on its edge.
 func _densest_window(of_side: int, width: float) -> float:
 	var best := NAN
 	var best_v := -1.0
+	var best_lo := 0.0
+	var best_hi := 0.0
 	for u in sides[of_side].units:
 		var start := to_world(of_side, u.progress)
 		for c in [start + width * 0.5, start - width * 0.5]:
 			var v := 0.0
+			var lo := INF
+			var hi := -INF
 			for w in sides[of_side].units:
-				if w.alive() and absf(to_world(of_side, w.progress) - c) <= width * 0.5:
+				var x := to_world(of_side, w.progress)
+				if w.alive() and absf(x - c) <= width * 0.5:
 					v += w.cost_paid
+					lo = minf(lo, x)
+					hi = maxf(hi, x)
 			if v > best_v:
 				best_v = v
 				best = c
-	return best
+				best_lo = lo
+				best_hi = hi
+	return best if is_nan(best) or is_inf(best_lo) else (best_lo + best_hi) * 0.5
 
 
 # ---------------------------------------------------------------------------
@@ -435,7 +572,7 @@ func _evolution(s: SimSide, dt: float) -> void:
 		s.evolve_left = 0.0
 		var pct := s.base_hp / s.base_max_hp
 		s.age += 1
-		s.base_max_hp = data.age(s.age).base_max_hp
+		s.base_max_hp = base_hp_for(s.index, s.age)
 		s.base_hp = s.base_max_hp * pct
 		s.age_times[s.age - 1] = time
 		_emit({"type": "evolve", "side": s.index, "age": s.age})
@@ -444,7 +581,7 @@ func _evolution(s: SimSide, dt: float) -> void:
 func _training(s: SimSide, dt: float) -> void:
 	if s.queue.is_empty() or s.is_evolving():
 		return
-	s.train_progress += dt
+	s.train_progress += dt * train_speed_mult(s.index)
 	var def: UnitDef = s.queue[0]
 	if s.train_progress + 1e-6 < def.train_time or s.units.size() >= rules.field_cap:
 		return
@@ -557,10 +694,11 @@ func _hit_unit(attacker: SimUnit, target: SimUnit, raw: float, dtype: String) ->
 
 
 ## Applies matrix + buffs; returns damage actually dealt. Kill rewards go to `by_side`.
-func _damage_unit(target: SimUnit, raw: float, dtype: String, by_side: int) -> float:
+## `true_damage` skips the armour matrix and the Defence upgrades (true and percent skills).
+func _damage_unit(target: SimUnit, raw: float, dtype: String, by_side: int, true_damage := false) -> float:
 	if not target.alive():
 		return 0.0
-	var dmg := raw * rules.matrix(dtype, target.def.armour) * defence_mult(target.side, target.def.role)
+	var dmg := raw if true_damage else raw * rules.matrix(dtype, target.def.armour) * defence_mult(target.side, target.def.role)
 	dmg = minf(dmg, target.hp)
 	target.hp -= dmg
 	target.stat_damage_taken += dmg
@@ -695,7 +833,8 @@ func _resolve_effects() -> void:
 		if e.pulse < def.pulses:
 			keep.append(e)
 		else:
-			_emit({"type": "ability_end", "side": e.side, "ability": String(def.id), "kills": e.kills})
+			_emit({"type": "ability_end", "side": e.side, "ability": String(def.id), "kills": e.kills, "hits": e.hit_ids.size(),
+				"damage": snappedf(e.damage, 0.1)})
 	effects = keep
 
 
@@ -711,18 +850,25 @@ func _ability_pulse(e: Dictionary) -> void:
 		hi = lo + slice
 	var target_side := enemy_of(e.side)
 	if record_fx:
-		fx.append({"type": "ability_pulse", "lo": lo, "hi": hi, "side": e.side, "ability": String(def.id)})
-	for u in sides[target_side].units:
-		if not u.alive():
-			continue
+		fx.append({"type": "ability_pulse", "lo": lo, "hi": hi, "side": e.side, "ability": String(def.id), "pulse": e.pulse, "pulses": def.pulses})
+	var power := skill_damage_mult(e.side)
+	for u in _units_in_zone(target_side, [lo, hi]):
+		var raw := def.damage * power
+		if def.damage_mode == "percent":
+			raw = def.damage_pct * power * u.max_hp
 		var x := to_world(u.side, u.progress)
-		if x < lo or x > hi:
-			continue
-		_damage_unit(u, def.damage, def.damage_type, e.side)
-		if not u.alive():
+		var dealt := _damage_unit(u, raw, def.damage_type, e.side, def.ignores_armour())
+		e.hit_ids[u.id] = true
+		e.damage += dealt
+		var killed := not u.alive()
+		if killed:
 			e.kills += 1
-		elif def.knockback > 0.0:
-			u.progress = maxf(0.0, u.progress - def.knockback)
+		else:
+			if def.knockback > 0.0:
+				u.progress = maxf(0.0, u.progress - def.knockback)
+		if record_fx:
+			fx.append({"type": "skill_hit", "x": x, "side": target_side, "dealt": dealt, "killed": killed, "mode": def.damage_mode,
+				"pct": def.damage_pct * power, "ability": String(def.id), "unit_id": u.id, "def": u.def})
 	match_log.count_ability_damage(e.side)
 
 

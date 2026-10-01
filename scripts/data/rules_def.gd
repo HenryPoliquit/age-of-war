@@ -25,20 +25,16 @@ extends Resource
 @export var xp_per_base_damage: float = 0.1
 
 @export_group("Upgrades")
-## Gold for upgrade level n (1-based) = factor[n − 1] × the current price of what is upgraded
-## (the role's current-age unit, or the average current-age turret).
+## Gold for upgrade level n (1-based) = factor[n − 1] × the current price of the role's current-age unit.
+## Unit upgrades only; turrets, the base, income and skills are XP research (data/research/).
 @export var upgrade_cost_factors: PackedFloat32Array = PackedFloat32Array([0.6, 1.0, 1.5])
 @export var upgrade_attack_bonus: float = 0.15
 @export var upgrade_health_bonus: float = 0.15
 ## Fraction of incoming damage removed per Defence level.
 @export var upgrade_defence_bonus: float = 0.1
-## Turret range and Support aura radius per Range level.
-@export var upgrade_range_bonus: float = 0.1
-## Income row (was the Forge): cost per level (× age cost multiplier) and income bonus per level.
-@export var income_upgrade_costs: PackedInt32Array = PackedInt32Array([100, 250, 500])
-@export var income_upgrade_bonus: float = 0.2
 
 @export_group("Spawning")
+## Training-queue slots before any Barracks Slots research.
 @export var queue_slots: int = 5
 @export var field_cap: int = 30
 

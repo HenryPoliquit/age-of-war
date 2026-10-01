@@ -1,10 +1,10 @@
 class_name UpgradeGrid
 extends PanelContainer
-## Drop-down upgrade grid under the top bar (GDD §6.1, §13.9): a row per unit slot (named after the
-## current era's unit), Turrets and Income; columns ⚔ ♥ 🛡 (➶ Range for turrets). Mouse only; the game
-## keeps running while it is open.
+## Drop-down gold upgrade grid under the top bar (GDD §6.1, §13.9): a row per unit slot, named after the
+## current era's unit; columns ⚔ ♥ 🛡. Units only: turrets, the base, income and skills are XP research
+## (ResearchPanel). Mouse only; the game keeps running while it is open.
 
-const ROWS := ["vanguard", "ranged", "heavy", "siege", "turret", "income"]
+const ROWS := ["vanguard", "ranged", "heavy", "siege"]
 
 var hud: MatchHud
 var _labels := {}   # row -> Label
@@ -29,7 +29,7 @@ func _init(p_hud: MatchHud) -> void:
 	grid.add_theme_constant_override("v_separation", 4)
 	add_child(grid)
 	hud._label(grid, "")
-	for head in ["⚔ Attack", "♥ Health", "🛡 Defence · ➶ Range"]:
+	for head in ["⚔ Attack", "♥ Health", "🛡 Defence"]:
 		var l := hud._label(grid, head, 15, UiStyle.ACCENT)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	for row in ROWS:
