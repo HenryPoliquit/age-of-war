@@ -73,15 +73,17 @@ func test_fx_records_only_when_enabled() -> void:
 	check(sim.fx.any(func(f): return f.type == "shot"), "shots recorded")
 
 
-func test_ai_buys_unit_or_turret_upgrades() -> void:
+func test_ai_buys_unit_upgrades_with_gold_and_turret_research_with_xp() -> void:
 	# Emergent behaviour, so judged over several matches rather than one seed.
 	var gd := GameData.get_default()
 	for seed in range(11, 16):
 		var r := MatchRunner.run(gd, {"personality": &"tactician"}, {"personality": &"turtle"}, seed)
-		var bought: Array = r.log.events.filter(func(ev): return ev.type == "upgrade" and ev.row != "income")
-		check(not bought.is_empty(), "seed %d: some unit or turret upgrade was bought" % seed)
-		# GDD §11.2: Turtle's identity is turrets and turret upgrades.
-		check(bought.any(func(ev): return ev.row == "turret" and ev.side == 1), "seed %d: Turtle upgrades its turrets" % seed)
+		var bought: Array = r.log.events.filter(func(ev): return ev.type == "upgrade")
+		check(not bought.is_empty(), "seed %d: some unit upgrade was bought" % seed)
+		check(bought.all(func(ev): return ev.row in MatchSim.ROLES), "seed %d: gold upgrades are for units only" % seed)
+		# GDD §11.2: Turtle's identity is turrets, and now its fortification research.
+		var fortified: Array = r.log.events.filter(func(ev): return ev.type == "research" and ev.side == 1 and ev.id.begins_with("turret_"))
+		check(not fortified.is_empty(), "seed %d: Turtle researches its turrets" % seed)
 
 
 func test_ai_upgrades_only_what_pays_off() -> void:

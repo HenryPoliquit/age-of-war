@@ -10,3 +10,4 @@ decision_interval = 0.5
 counter_level = 2
 income_bonus = 0.1
 skill_min_value = 100.0
+skill_aim_error = 30.0

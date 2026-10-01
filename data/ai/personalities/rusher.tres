@@ -14,9 +14,9 @@ role_mix = {
 }
 reserve_seconds = 1.0
 age_plan = "fast"
-income_target = 1
-income_after = 60.0
 turret_target = 2
 turret_after = 90.0
-upgrade_bias = {"heavy": 0.5, "ranged": 0.5, "siege": 0.5, "turret": 0.0, "vanguard": 2.0}
+upgrade_bias = {"heavy": 0.5, "ranged": 0.5, "siege": 0.5, "vanguard": 2.0}
 upgrade_after_army_seconds = 30.0
+research_share = 0.08
+research_priority = PackedStringArray("train_speed", "queue_slots", "income", "turret_attack", "turret_health", "base_health", "skill_damage", "turret_range", "skill_zone", "ascension")

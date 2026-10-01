@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ResearchDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/research_def.gd" id="1_rs"]
+
+[resource]
+script = ExtResource("1_rs")
+id = &"turret_health"
+display_name = "Turret Health"
+description = "Your turrets take more punishment, in every era."
+group = "fortify"
+order = 2
+bonus = 0.15
+levels = 3
+cost_factors = PackedFloat32Array(0.08, 0.14, 0.2)
+cost_growth = 1
+min_ages = PackedInt32Array(2, 3, 4)

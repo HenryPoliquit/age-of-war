@@ -28,8 +28,13 @@ func _init() -> void:
 		_check(a.ability != null and a.ability.age == a.index, tag + " ability")
 		if a.ability != null:
 			var ab := a.ability
-			_check(ab.shape in ["area", "strip", "sweep"] and ab.xp_cost > 0 and ab.pulses >= 1 and ab.damage > 0, tag + " skill shape/cost/pulses/damage")
+			_check(ab.shape in ["area", "sweep"] and ab.xp_cost > 0 and ab.pulses >= 1, tag + " skill shape/cost/pulses")
 			_check(ab.shape == "sweep" or ab.width > 0, tag + " skill width")
+			_check(ab.aim in ["auto", "target"], tag + " skill aim")
+			_check(ab.aim == "auto" or ab.shape == "area", tag + " only an area skill can be aimed")
+			_check(ab.damage_mode in ["flat", "true", "percent"], tag + " skill damage mode")
+			_check(ab.damage_mode == "percent" or ab.damage > 0, tag + " flat/true skill has damage")
+			_check(ab.damage_mode != "percent" or (ab.damage_pct > 0.0 and ab.damage_pct <= 1.0), tag + " percent skill has damage_pct in (0, 1]")
 		var roles := {}
 		for u in a.units:
 			var ut := "unit %s" % u.id
@@ -64,15 +69,41 @@ func _init() -> void:
 			for t in a.turrets:
 				_check(rd.turret_names.has(String(t.id)), "race %s names turret %s" % [rid, t.id])
 			_check(rd.ability_names.has(String(a.ability.id)), "race %s names ability %s" % [rid, a.ability.id])
+	var research_ids := {}
+	_check(gd.research.size() >= 1, "research perks load")
+	for d in gd.research:
+		var rt := "research %s" % d.id
+		_check(not research_ids.has(d.id), rt + " id unique")
+		research_ids[d.id] = true
+		_check(d.display_name != "" and d.description != "", rt + " name and description")
+		_check(d.group in ["fortify", "logistics", "skills", "ascension"], rt + " group")
+		_check(d.bonus > 0.0, rt + " bonus")
+		_check(d.levels >= 0 and not d.cost_factors.is_empty() and not d.min_ages.is_empty(), rt + " levels/prices/ages")
+		_check(d.is_endless() or (d.cost_factors.size() == d.levels and d.min_ages.size() == d.levels), rt + " one price and one era per level")
+		_check(not d.is_endless() or d.cost_growth > 1.0, rt + " endless perk gets dearer")
+		for i in range(1, d.cost_factors.size()):
+			_check(d.cost_factors[i] > d.cost_factors[i - 1], rt + " prices rise")
+		for i in range(1, d.min_ages.size()):
+			_check(d.min_ages[i] >= d.min_ages[i - 1], rt + " eras do not go backwards")
+		for age in d.min_ages:
+			_check(age >= 2 and age <= GameData.AGE_COUNT, rt + " era in 2..6")
+		if d.id == &"queue_slots":
+			_check(is_equal_approx(d.bonus, 1.0) and d.levels == 3, rt + " is +1 slot a level, three levels")
+		if d.id in [&"skill_damage", &"skill_zone"]:
+			_check(d.bonus * d.levels <= 0.1501, rt + " is capped at +15%")
+	for need in ["turret_attack", "turret_health", "turret_range", "base_health", "train_speed", "queue_slots", "income", "skill_damage", "skill_zone", "ascension"]:
+		_check(research_ids.has(StringName(need)), "research %s exists" % need)
 	for id in gd.personalities:
 		var p: AiPersonalityDef = gd.personalities[id]
 		_check(p.age_plan in ["balanced", "fast"], "personality %s age_plan" % id)
+		for rid in p.research_priority:
+			_check(research_ids.has(StringName(rid)), "personality %s research %s exists" % [id, rid])
 	for id in gd.difficulties:
 		var d: AiDifficultyDef = gd.difficulties[id]
 		_check(d.decision_interval > 0, "difficulty %s interval" % id)
 		_check(d.income_bonus == 0.0 or id in [&"brutal", &"nightmare"], "difficulty %s: only Brutal/Nightmare get bonuses (GDD §11.1)" % id)
 	if problems.is_empty():
-		print("data OK: %d ages, %d ids, %d races, %d personalities, %d difficulties" % [gd.ages.size(), ids.size(), gd.races.size(), gd.personalities.size(), gd.difficulties.size()])
+		print("data OK: %d ages, %d ids, %d races, %d personalities, %d difficulties, %d research perks" % [gd.ages.size(), ids.size(), gd.races.size(), gd.personalities.size(), gd.difficulties.size(), gd.research.size()])
 	else:
 		for p in problems:
 			print("INVALID: ", p)

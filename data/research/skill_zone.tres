@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ResearchDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/research_def.gd" id="1_rs"]
+
+[resource]
+script = ExtResource("1_rs")
+id = &"skill_zone"
+display_name = "Skill Zone"
+description = "Your area skills cover more ground (sweeps already cover the whole lane)."
+group = "skills"
+order = 9
+bonus = 0.05
+levels = 3
+cost_factors = PackedFloat32Array(0.1, 0.16, 0.24)
+cost_growth = 1
+min_ages = PackedInt32Array(3, 4, 5)

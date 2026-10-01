@@ -8,3 +8,4 @@ id = &"skill_heavy"
 display_name = "Skill-heavy Tactician"
 sim_only = true
 skill_eager = true
+research_priority = PackedStringArray("skill_damage", "skill_zone", "income", "train_speed", "queue_slots", "turret_health", "base_health", "turret_attack", "turret_range", "ascension")

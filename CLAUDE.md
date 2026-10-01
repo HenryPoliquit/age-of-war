@@ -32,6 +32,8 @@ timeout 90 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolu
 timeout 90 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --rendering-method gl_compatibility --path . --resolution 1920x1080 -s tools/unit_sheet.gd -- --role=vanguard --race=human --out=reports/sheet_vanguard_human.png
 # Walk sheet (eight phases of one stride for an age's vanguard, ranged and heavy unit; --race=human|elf|dwarf --age=1..6 --scale=N --yaw=DEG):
 timeout 90 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolution 1920x1080 -s tools/walk_sheet.gd -- --race=human --age=3 --out=reports/walk_human_3.png
+# Skill gallery (fires one skill in a staged match and tiles frames; --races=human,elf,dwarf gives one row per race; --aim shows aim mode and the reticle; --enemy makes the enemy fire it; --times=a,b,c picks the frames; --aim-x=X aims an aimed skill):
+timeout 200 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolution 1920x1080 -s tools/skill_gallery.gd -- --skill=rockfall --races=human,elf,dwarf --times=0.75,1.0,1.3 --out=reports/skill_rockfall.png
 # Base gallery (every race × age base with its turret towers in front; --towers for a close-up of the towers; --solo=elf:3 for one base big; --night=1 lights the windows; --yaw=DEG the camera, 25 by default):
 timeout 90 xvfb-run -a -s "-screen 0 1920x1080x24" tools/godot --path . --resolution 1920x1080 -s tools/base_gallery.gd -- --out=reports/base_gallery.png
 # Backdrop gallery (sky, scenery, ground, foreground and the base at the gate; --race=human|elf|dwarf --ages=1,2,3,4 → a 2 × 2 sheet; --solo=elf:3 for one full-size; --cam=X):

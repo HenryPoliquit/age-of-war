@@ -30,8 +30,17 @@ func test_siege_row_unavailable_in_age_1() -> void:
 func test_unknown_row_or_stat_rejected() -> void:
 	var sim := new_sim()
 	check(not sim.buy_upgrade(0, "ranged", "range"), "units have no range upgrade")
-	check(not sim.buy_upgrade(0, "turret", "defence"), "turrets have no defence upgrade")
 	check(not sim.buy_upgrade(0, "wizard", "attack"))
+
+
+func test_gold_upgrades_are_for_units_only() -> void:
+	var sim := new_sim()
+	var gold := sim.sides[0].gold
+	check_eq(MatchSim.UPGRADES.keys(), ["vanguard", "ranged", "heavy", "siege"], "one gold row per role")
+	for spec in [["turret", "attack"], ["turret", "health"], ["turret", "range"], ["income", "income"]]:
+		check(sim.upgrade_cost(0, spec[0], spec[1]) == INF, "%s %s is XP research now" % spec)
+		check(not sim.buy_upgrade(0, spec[0], spec[1]))
+	check_near(sim.sides[0].gold, gold, 0.001, "nothing charged")
 
 
 func test_not_enough_gold() -> void:
@@ -92,52 +101,3 @@ func test_upgrades_apply_to_older_age_units() -> void:
 	run_for(sim, 5.1)
 	check(sim.buy_upgrade(0, "vanguard", "health"))
 	check_near(old.max_hp, old.def.hp * 1.15, 0.01, "Age 1 Vanguard still on the lane gets the Age 2 purchase")
-
-
-func test_turret_upgrades() -> void:
-	var sim := new_sim()
-	var def := sim.data.turret_for_kind(1, "sentry")
-	check_near(sim.upgrade_cost(0, "turret", "attack"), roundf(0.6 * def.cost), 0.01, "average Age 1 turret cost")
-	sim.build_turret(0, 0, def)
-	var t: SimTurret = sim.sides[0].turrets[0]
-	t.hp = t.max_hp * 0.5
-	check(sim.buy_upgrade(0, "turret", "health"))
-	check_near(t.max_hp, def.hp * 1.15, 0.01, "built turret gains HP")
-	check_near(t.hp / t.max_hp, 0.5, 1e-4, "keeps percentage")
-	sim.sell_turret(0, 0)
-	sim.build_turret(0, 0, def)
-	check_near(sim.sides[0].turrets[0].max_hp, def.hp * 1.15, 0.01, "turret built later has it too")
-	check(sim.buy_upgrade(0, "turret", "range"))
-	var e := place(sim, 1, "vanguard", sim.rules.lane_length - def.range * 1.05)
-	run_pinned(sim, 0.1, [e])
-	check(e.hp < e.max_hp, "range upgrade reaches further")
-
-
-func test_range_upgrade_widens_support_aura() -> void:
-	var sim := new_sim()
-	var support: TurretDef = null
-	var age := 1
-	for a in sim.data.ages:
-		for t in a.turrets:
-			if t.kind == "support" and support == null:
-				support = t
-				age = a.index
-	check(support != null, "some age has a Support turret")
-	sim.sides[0].age = age
-	sim.build_turret(0, 0, support)
-	var e := place(sim, 1, "vanguard", sim.rules.lane_length - support.aura_radius * 1.05, age)
-	sim.step()
-	check_near(e.slow, 0.0, 1e-4, "outside the base aura")
-	check(sim.buy_upgrade(0, "turret", "range"))
-	e.progress = sim.rules.lane_length - support.aura_radius * 1.05
-	sim.step()
-	check(e.slow > 0.0, "inside the upgraded aura")
-
-
-func test_income_upgrade_replaces_forge() -> void:
-	var sim := new_sim()
-	check_near(sim.upgrade_cost(0, "income", "income"), 100.0, 0.01)
-	check(sim.buy_upgrade(0, "income", "income"))
-	check_near(sim.income_rate(0), 2.4, 1e-4)
-	sim.sides[0].age = 3
-	check_near(sim.upgrade_cost(0, "income", "income"), roundf(250.0 * sim.rules.age_cost_mult(3)), 0.01)
