@@ -12,3 +12,5 @@ extends Resource
 ## Aimed skills land this many px (at most) off the densest enemy group; 0 = perfectly aimed.
 @export var skill_aim_error: float = 0.0
 @export var income_bonus: float = 0.0
+## Scales a personality's research share: 0 = never buys research before the last era.
+@export_range(0.0, 1.0, 0.05) var research_skill: float = 1.0

@@ -8,6 +8,10 @@ var xp: float = 0.0
 var age: int = 1
 ## Upgrade levels: row -> {stat -> level}; missing = 0 (MatchSim.UPGRADES lists rows and stats).
 var upgrades: Dictionary = {}
+## XP research levels: research id -> level; missing = 0 (data/research/*.tres).
+var research: Dictionary = {}
+## Research effect totals (level × bonus per perk id), kept in step with `research` by MatchSim.
+var research_totals: Dictionary = {}
 var turret_slots: int = 1
 var turrets: Array = [null, null, null, null]
 var base_hp: float = 1000.0
@@ -30,6 +34,7 @@ var age_times: PackedFloat32Array = PackedFloat32Array([0.0, -1, -1, -1, -1, -1]
 var stat_gold_earned: float = 0.0
 var stat_gold_spent: float = 0.0
 var stat_xp_earned: float = 0.0
+var stat_xp_research: float = 0.0
 
 
 func is_evolving() -> bool:
@@ -45,6 +50,15 @@ func set_upgrade_level(row: String, stat: String, level: int) -> void:
 	if not upgrades.has(row):
 		upgrades[row] = {}
 	upgrades[row][stat] = level
+
+
+func research_level(id: StringName) -> int:
+	return research.get(id, 0)
+
+
+## Sum of this side's research bonuses for an effect (a fraction; whole slots for queue_slots).
+func research_total(id: StringName) -> float:
+	return research_totals.get(id, 0.0)
 
 
 func turret_count() -> int:

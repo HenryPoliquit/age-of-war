@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ResearchDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/research_def.gd" id="1_rs"]
+
+[resource]
+script = ExtResource("1_rs")
+id = &"skill_damage"
+display_name = "Skill Damage"
+description = "Your era skills hit harder."
+group = "skills"
+order = 8
+bonus = 0.05
+levels = 3
+cost_factors = PackedFloat32Array(0.12, 0.2, 0.32)
+cost_growth = 1
+min_ages = PackedInt32Array(3, 4, 5)

@@ -2,11 +2,20 @@
 
 **Working title:** Timefront
 **Author:** Paul
-**Status:** Draft v3.1
-**Last updated:** 2026-09-30
+**Status:** Draft v3.2
+**Last updated:** 2026-10-01
 **Companion document:** `docs/PRD.md` — goals, success metrics, scope, engine choice, development workflow. This document is the spec: how the game works, with starting numbers.
 
 > **About the numbers.** Every value here is a *starting baseline* for the balance harness (§15), not a final answer. Values live in data files, not code, and are expected to move. What should not move without revisiting the PRD are the *systems* and the *acceptance targets*.
+
+### What changed in v3.2
+
+From the owner's note that XP was easy to earn and had too few uses (only evolving and the skill), so it piled up. XP now also buys **research** (§6.2), which splits what the two currencies do: **gold upgrades the army** (the unit rows of §6.1), **XP researches everything else**. Spec §6.2; balance evidence in `docs/balance_log.md` (B26).
+
+- **Gold upgrades are units only (§6.1).** The Turrets and Income rows left the gold grid.
+- **Research (§6.2), paid in XP:** *Fortifications* (Turret Damage, Health, Range and **Base Health**, together), *Logistics* (Training Speed, **Barracks Slots** +1 per level up to +3, **Trade Income** — the old Income upgrade, now XP-priced), *Skills* (Skill Damage and Skill Zone, at most **+15%**) and **Ascension**, an endless last-era perk. No cheaper evolution and no shorter skill cooldown: nothing speeds up evolving or skill spam.
+- **Pricing so the tree cannot be bought out before evolving:** a level costs a fraction of the XP your *next evolution* costs, so it is dearer the later you buy it, and every level opens in a given era. Everything open in Age 2 costs 1.5× the Age 2 evolution; in Age 4, 8× the Age 4 one.
+- **XP no longer piles up:** in Tactician mirrors 55% of the XP earned was never spent; now about 6% is (§3.3).
 
 ### What changed in v3.1
 
@@ -73,10 +82,10 @@ A match is won by destroying the enemy base. Target: median 10–14 minutes, mos
 | Source | Value |
 | --- | --- |
 | Passive income | 2 gold/s × current **tide multiplier** (§3.2) |
-| Income upgrade | +20% passive income per level, 3 levels. Cost 100 / 250 / 500 gold × your age cost multiplier (1.7^(age − 1)) (§6.1) |
+| Trade Income research | +20% passive income per level, 3 levels. Paid in **XP**, not gold (§6.2) |
 | Kill bounty | 50% of the killed unit's gold cost |
 
-The Income upgrade is the economy-vs-army decision: gold into Income is gold not on the lane *now*. Because its cost scales with your age, it stays a decision at every stage rather than becoming an automatic late buy.
+Trade Income is the economy-vs-evolution decision: XP into Income is XP not spent on the next evolution. It is priced off that evolution (§6.2), so it stays a decision at every stage rather than becoming an automatic late buy. (It used to be a gold upgrade; at 100 / 250 / 500 gold it was too cheap to refuse.)
 
 ### 3.2 The Tide
 
@@ -100,7 +109,7 @@ Passive income rises for **both sides equally** on a fixed schedule, shown on th
 | Killing a unit | 80% of that unit's gold cost |
 | Damaging the enemy base | 1 XP per 10 damage |
 
-XP is **spent**, not a threshold. It buys either evolution or the special skill (§4, §7).
+XP is **spent**, not a threshold. It buys evolution, the special skill and **research** (§4, §7, §6.2). Measured in Tactician mirrors (Hard, n=40, `docs/balance_log.md` B26), before research a side earned about 21,000 XP a match and 55% of it was never spent; with research about 27,000 XP is earned, 13% goes to evolving, 30% to skills, about 51% to research and 6% is left.
 
 ### 3.4 Momentum (removed in v3)
 
@@ -283,21 +292,52 @@ Ties break by unit ID, so sim runs are reproducible (§15.3).
 | **Artillery** | Age 2 | Blast | Slow, splash, minimum range | Stone Catapult: 180 g, 45 dmg / 3.0 s, splash 60 px, range 150–420 |
 | **Support** | Age 3 | — | Aura near the base: slows enemies or grants allies armour | Tar Cauldron: 220 g, −30% enemy speed within 180 px |
 
-### 6.1 Upgrades
+### 6.1 Upgrades (gold, units)
 
-Bought with **gold**, **3 levels** each, **kept for the whole match** (they carry across evolutions) and applied **immediately** to units and turrets already on the field. Unit upgrades belong to a unit **slot** (Vanguard, Ranged, Heavy, Siege), so the next era's unit in that slot inherits them.
+Bought with **gold**, **3 levels** each, **kept for the whole match** (they carry across evolutions) and applied **immediately** to units already on the field. Upgrades belong to a unit **slot** (Vanguard, Ranged, Heavy, Siege), so the next era's unit in that slot inherits them. Turrets, the base, income and skills are not here: they are XP research (§6.2).
 
-| Row | ⚔ | ♥ | Third |
+| Row | ⚔ | ♥ | 🛡 |
 | --- | --- | --- | --- |
-| Each unit slot (4 rows) | Attack +15% / level | Health +15% / level | 🛡 Defence −10% damage taken / level |
-| Turrets (all) | Attack +15% / level | Health +15% / level | ➶ Range +10% / level (Support auras too) |
-| 💰 Income | +20% passive income / level | — | — |
+| Each unit slot (4 rows) | Attack +15% / level | Health +15% / level | Defence −10% damage taken / level |
 
-**Costs:** level *n* of a unit row costs 0.6× / 1.0× / 1.5× the current price of that slot's unit; the turret row uses the average current-era turret cost; Income costs 100 / 250 / 500 × the age cost multiplier. Health upgrades keep the current HP percentage. The Siege row is unavailable until Siege exists (Age 2).
+**Costs:** level *n* costs 0.6× / 1.0× / 1.5× the current price of that slot's unit. Health upgrades keep the current HP percentage. The Siege row is unavailable until Siege exists (Age 2).
+
+### 6.2 Research (XP)
+
+The **✦ Research** panel (top bar) holds every perk that is not a unit upgrade. Research is bought with **XP, never gold**, and it competes with evolving and the skill for the same XP. Levels are **kept for the whole match** and apply at once to everything already built (HP perks keep the current HP percentage).
+
+| Group | Perk | Per level | Levels | Price factors | Opens in era |
+| --- | --- | --- | --- | --- | --- |
+| Fortifications | Turret Damage | +15% | 3 | 0.10 / 0.16 / 0.24 | 2 / 3 / 4 |
+| | Turret Health | +15% | 3 | 0.08 / 0.14 / 0.20 | 2 / 3 / 4 |
+| | Turret Range | +10% (Support auras too) | 3 | 0.08 / 0.14 / 0.20 | 2 / 3 / 4 |
+| | Base Health | +10% max HP | 3 | 0.10 / 0.16 / 0.24 | 2 / 3 / 4 |
+| Logistics | Training Speed | +15% | 3 | 0.10 / 0.16 / 0.24 | 2 / 3 / 4 |
+| | Barracks Slots | +1 queue slot (5 → 8 at most) | 3 | 0.12 / 0.20 / 0.32 | 2 / 3 / 4 |
+| | Trade Income | +20% passive gold | 3 | 0.90 / 1.50 / 2.40 | 2 / 3 / 4 |
+| Skills | Skill Damage | +5% (at most +15%) | 3 | 0.12 / 0.20 / 0.32 | 3 / 4 / 5 |
+| | Skill Zone | +5% area-skill width (at most +15%; a sweep already covers the lane) | 3 | 0.10 / 0.16 / 0.24 | 3 / 4 / 5 |
+| Ascension | Ascension | +3% damage **and** health for all your units | endless | 0.5 × 1.3^level | 6 |
+
+**Price:** a level costs *factor* × the XP your **next evolution** costs (240 / 300 / 700 / 1,100 / 2,800; the last era uses 2,800). The same perk is therefore dearer the later you buy it, like a gold upgrade. **Gate:** a level cannot be bought before its era, so no perk is maxed early whatever you earn.
+
+**Why it cannot be bought out before evolving.** An era earns only about 1.2–1.5× its evolution's XP (measured per era in `docs/balance_log.md` B26: 361 / 360 / 950 / 1,535 / 3,437 XP in Ages 1–5). Everything open at full price costs more than that and the evolution put together:
+
+| Era | Next evolution | Every open level | × the evolution | XP an era earns |
+| --- | --- | --- | --- | --- |
+| 2 | 300 | 444 | 1.5× | 360 |
+| 3 | 700 | 2,912 | 4.2× | 950 |
+| 4 | 1,100 | 9,196 | 8.4× | 1,535 |
+| 5 | 2,800 | 24,976 | 8.9× | 3,437 |
+| 6 | 2,800 | 26,376 (with Ascension 1) | 9.4× | ~27,000 (a long Age 6) |
+
+So before the last era a player buys a few perks and still has to evolve; in a long Age 6 the whole tree can be bought and **Ascension**, whose price grows 30% a level (1,400, 1,820, 2,366 … XP), is the endless sink for the rest. Ascension stacks with the unit upgrades (×) and buffs damage and health together, so it does not change who wins a fight, only how big the numbers get.
+
+Not in research, on purpose: *cheaper evolution* and *shorter skill cooldown*. Nothing speeds up evolving or lets a side spam skills.
 
 ## 7. Special Skills
 
-Each era has one **special skill**. It costs **XP** (so every use delays the next evolution) and has a **40 s cooldown**. Skills hit units only, never turrets or bases. Firing a skill whose zone holds no enemy unit fails and costs nothing.
+Each era has one **special skill**. It costs **XP** (so every use delays the next evolution) and has a **40 s cooldown** that no perk shortens. The **Skill Damage** and **Skill Zone** research (§6.2) add up to +15% to its damage and to an area skill's width. Skills hit units only, never turrets or bases. Firing a skill whose zone holds no enemy unit fails and costs nothing.
 
 The six skills differ in two ways: **how you aim them** and **how they hurt**.
 
@@ -403,7 +443,8 @@ Cut after the first playtest: invisible modifiers that confused players and were
 | Fire an auto skill | Click ☄ Skill | Space |
 | Aim a skill | Click ◎ Skill, then click the lane or the lane map | Space, then click; Space again = let the game aim |
 | Cancel aiming | Right-click (not a drag), click ✕ Cancel aim | Esc |
-| Upgrades | ⬆ Upgrades opens the grid; click a cell | — |
+| Upgrades (gold, units) | ⬆ Upgrades opens the grid; click a cell | — |
+| Research (XP) | ✦ Research opens the panel (the button shows • when something is affordable); click a perk. Opening one drop-down closes the other | — |
 | Pan camera | Edge-pan or right-drag | A / D |
 | Speed / pause | 1×/2× toggle, ⏸ | Esc opens settings (pauses) |
 
@@ -427,10 +468,12 @@ The AI plays by the same rules as the player: same costs, same tide, same queue,
 
 | Personality | Plan |
 | --- | --- |
-| **Rusher** | Early aggression, fast-age, few turrets, upgrades its Vanguards |
-| **Turtle** | Early turrets and turret upgrades, counter-attacks when you over-extend |
-| **Economist** | Early Income upgrades, big late-game waves |
-| **Tactician** | Adapts to your composition; upgrades what it fields most; the default balanced opponent |
+| **Rusher** | Early aggression, fast-age, few turrets, upgrades its Vanguards; researches Training Speed and Barracks Slots |
+| **Turtle** | Early turrets, researches Turret Health / Damage / Range first, counter-attacks when you over-extend |
+| **Economist** | Researches Trade Income first, big late-game waves |
+| **Tactician** | Adapts to your composition; upgrades what it fields most; researches income and skills before fortifications; the default balanced opponent |
+
+**Research (§6.2).** Before the last era an AI puts at most its `research_share` of the XP it earned in that era into research (Tactician 10%, Economist 25%, Turtle 20%, Rusher 8%; Easy none before the last era, Normal half), takes the first perk of its personality's list that fits, and always evolves first. In the last era it saves for the first open perk, keeping one skill cast in reserve.
 
 ### 11.3 Sim-Only Archetypes
 
@@ -438,7 +481,7 @@ Used by the balance harness, never shipped as opponents:
 
 - **Fast-age Tactician:** always evolves the moment XP allows; fires the skill only when it can't delay an evolution.
 - **Skill-heavy Tactician:** fires the skill whenever it can hit anything.
-- **Spam bots:** queue only one role (one bot per role). Used for the dominant-unit check (PRD §6).
+- **Spam bots:** queue only one role (one bot per role). Used for the dominant-unit check (PRD §6). They research like the Tactician, so a spam-vs-Tactician result is about the army alone.
 
 ### 11.4 Implementation Approach
 
@@ -559,9 +602,9 @@ Smooth follow-pan with easing; brief, subtle zoom punch on ability impacts and e
 
 ### 13.9 HUD
 
-- **Top bar (slim):** left — XP, ▲ Evolve, ☄ Skill; centre — your era, elapsed time, enemy era; right — ⬆ Upgrades (drop-down grid), gold (+income/s), 1×/2× toggle, pause, settings.
+- **Top bar (slim):** left — XP, ▲ Evolve, ☄ Skill; centre — your era, elapsed time, enemy era; right — ⬆ Upgrades (drop-down grid, gold), ✦ Research (drop-down panel, XP), gold (+income/s), 1×/2× toggle, pause, settings.
 - **Bottom left:** four unit cards (portrait, name, price, hotkey).
-- **Bottom centre:** lane map (gates and a dot per unit); under it, the unit in training with its progress bar and the 5-slot queue.
+- **Bottom centre:** lane map (gates and a dot per unit); under it, the unit in training with its progress bar and the queue (5 slots, up to 8 with Barracks Slots).
 - **Bottom right:** four turret slots (built, empty, locked with unlock price); clicking one opens the build list or a Sell option directly above it.
 - **In the world:** a base HP bar above each base.
 - Tooltips show the damage × armour matrix row for the hovered unit, and exact effects and prices for upgrades.

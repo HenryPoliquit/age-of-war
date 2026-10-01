@@ -116,7 +116,8 @@ class TrainRow extends Control:
 			draw_rect(Rect2(bar.position, Vector2(bar.size.x * p, bar.size.y)), MatchHud.ACCENT)
 		draw_rect(bar, Color(1, 1, 1, 0.2), false, 1.0)
 		draw_string(f, Vector2(336, y), "Queue", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, dim)
-		for i in sim.rules.queue_slots:
+		var slots := sim.queue_capacity(0)
+		for i in slots:
 			var r := Rect2(390 + i * 36, size.y * 0.5 - 15.0, 30, 30)
 			draw_rect(r, Color(0, 0, 0, 0.4))
 			if i < me.queue.size():
@@ -126,4 +127,4 @@ class TrainRow extends Control:
 				UnitArt.draw_unit(self, q, hud.view.team_color(0), {"t": 0.0}, i, race)
 				draw_set_transform(Vector2.ZERO)
 			draw_rect(r, MatchHud.ACCENT if i == 0 and not me.queue.is_empty() else Color(1, 1, 1, 0.15), false, 1.0)
-		draw_string(f, Vector2(390 + sim.rules.queue_slots * 36 + 12, y), "On field %d/%d" % [me.units.size(), sim.rules.field_cap], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, dim)
+		draw_string(f, Vector2(390 + slots * 36 + 12, y), "On field %d/%d" % [me.units.size(), sim.rules.field_cap], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, dim)

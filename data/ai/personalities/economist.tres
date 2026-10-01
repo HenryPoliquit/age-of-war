@@ -13,5 +13,5 @@ role_mix = {
 "vanguard": 0.4
 }
 reserve_seconds = 6.0
-income_target = 3
-income_after = 10.0
+research_share = 0.25
+research_priority = PackedStringArray("income", "queue_slots", "train_speed", "turret_health", "base_health", "turret_attack", "skill_damage", "turret_range", "skill_zone", "ascension")

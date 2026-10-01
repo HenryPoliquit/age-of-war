@@ -1,6 +1,6 @@
 class_name MatchHud
 extends CanvasLayer
-## Match HUD (GDD §13.9): top bar, upgrade grid, unit cards, lane map with training queue, turret slots,
+## Match HUD (GDD §13.9): top bar, upgrade grid, research panel, unit cards, lane map with training queue, turret slots,
 ## event banners and the post-match screen. Panels render HudModel values; actions go through MatchSim.
 
 const ACCENT := UiStyle.ACCENT
@@ -18,6 +18,7 @@ var _root: Control
 var _theme: Theme
 var _top: TopBar
 var _grid: UpgradeGrid
+var _research: ResearchPanel
 var _turrets: TurretBar
 var _units: UnitBar
 var _lane: LanePanel
@@ -50,13 +51,25 @@ func _ready() -> void:
 	_build_aim_hint()
 	_grid = UpgradeGrid.new(self)
 	_root.add_child(_grid)
-	_top.upgrades_button.toggled.connect(func(on: bool): _grid.visible = on)
+	_research = ResearchPanel.new(self)
+	_root.add_child(_research)
+	# The two drop-downs share the spot under the top bar: opening one closes the other.
+	_top.upgrades_button.toggled.connect(func(on: bool):
+		_grid.visible = on
+		if on:
+			_top.research_button.button_pressed = false)
+	_top.research_button.toggled.connect(func(on: bool):
+		_research.visible = on
+		if on:
+			_top.upgrades_button.button_pressed = false)
 	# Dev aid for screenshots: open the HUD's pop-ups without clicking.
 	if "--hud-demo-settings" in OS.get_cmdline_user_args():
 		get_tree().create_timer(2.0).timeout.connect(open_settings)
 	if "--hud-demo" in OS.get_cmdline_user_args():
 		get_tree().create_timer(2.0).timeout.connect(func():
 			_top.upgrades_button.button_pressed = true
+			if "--hud-demo-research" in OS.get_cmdline_user_args():
+				_top.research_button.button_pressed = true
 			_turrets.open_menu(0))
 
 
@@ -207,6 +220,7 @@ func _process(delta: float) -> void:
 	var me := sim.sides[0]
 	_top.refresh()
 	_grid.refresh()
+	_research.refresh()
 	_turrets.refresh()
 	_units.refresh()
 	_lane.refresh()
